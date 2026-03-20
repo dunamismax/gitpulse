@@ -97,6 +97,7 @@ These commands were actually run successfully in this repository on `2026-03-20`
 | --- | --- | --- |
 | Headless workspace check | `cargo check --workspace --exclude gitpulse-desktop` | Passed |
 | Test suite | `cargo test --workspace --exclude gitpulse-desktop` | Passed |
+| Nextest suite | `cargo nextest run --workspace --exclude gitpulse-desktop` | Passed |
 | Lint | `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` | Passed |
 | Manual analytics rebuild | `cargo run -p gitpulse-cli -- rebuild-rollups` | Passed |
 | CLI diagnostics smoke test | `cargo run -p gitpulse-cli -- doctor` | Passed |
@@ -159,13 +160,64 @@ These commands were actually run successfully in this repository on `2026-03-20`
 
 ### Positive State
 
-- The runtime cleanly separates domain logic, infra boundaries, orchestration, and presentation.
-- Live work, committed work, and pushed work stay distinct in both models and UI.
-- The repo includes real tests rather than scaffold-only placeholders.
-- CI and local tooling docs are aligned.
-- The web UI ships local assets and does not depend on a CDN in production.
-- Repo-specific pattern overrides now have a first-class UI surface instead of hidden persistence-only support.
-- Manual analytics rebuilds are now available without needing a code-level runtime hook.
+- The crate split is clean and legible: `gitpulse-core` stays mostly pure, `gitpulse-infra` owns external boundaries, `gitpulse-runtime` orchestrates, and `gitpulse-web` stays thin.
+- Docs are unusually well aligned for an early product: `README.md`, `docs/architecture.md`, `docs/metrics.md`, `AGENTS.md`, and this file describe the same mental model.
+- Quality gates are real, not decorative: CI runs format, clippy, nextest, and cargo-deny for the main workspace path.
+- Test coverage is small but meaningful. The current suite exercises repo discovery, exclusions, history import, push detection, pattern override flows, and route smoke tests.
+- Local-first product boundaries are consistent throughout the codebase. Source code stays local, GitHub verification is optional, and the desktop shell reuses the same runtime/web stack instead of forking behavior.
+
+### 2026-03-20 Comprehensive Review Addendum
+
+#### What was re-checked in this pass
+
+- `cargo test --workspace --exclude gitpulse-desktop` ✅
+- `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` ✅
+- `cargo nextest run --workspace --exclude gitpulse-desktop` ✅
+
+#### Specific findings
+
+1. **High: repeated imports duplicate historical file-activity rows and inflate analytics.**
+   - `GitPulseRuntime::refresh_repository()` always calls `import_repo_history(repo_id, 2)`.
+   - `Database::insert_commits()` correctly uses `INSERT OR IGNORE`, but `import_repo_history()` still unconditionally writes `file_activity_events` for every imported commit, even when the commit already exists.
+   - Repro during this review on a temp repo: `commit_events` stayed `1` while `file_activity_events` increased `2 -> 3` after a second `gitpulse import --repo repo --days 30`.
+   - Impact: daily rollups, files-touched counts, focus sessions, and score can drift upward over time even when no new historical commits were added.
+
+2. **High: dashboard staged totals are currently wrong.**
+   - `rebuild_analytics()` reads snapshot rows but never adds `staged_additions` or `staged_deletions` into `DailyAccumulator`, so rollups persist staged values as zero.
+   - Repro during this review: latest `repo_status_snapshots` row showed staged `(1, 0)` after staging a file, while the latest `daily_rollups` all-scope row remained `(0, 0)`.
+   - Impact: the dashboard `TodaySummary.staged_lines` can disagree with real repository state, which undercuts trust in the metrics model.
+
+3. **Medium: analytics rebuild work is full-history and synchronous on the hot path.**
+   - Every refresh/import/settings update calls `rebuild_analytics()`, which full-scans snapshots, file events, commits, and pushes, then rewrites sessions and upserts rollups/achievements.
+   - This is acceptable for small datasets, but it will get slower as users track more repos and longer histories.
+   - Product risk: the current design may feel great in v1 demos and then become laggy on long-lived real usage.
+
+4. **Medium: repo detail SVG charts currently trust unescaped labels.**
+   - `render_rank_bars()` interpolates file paths and language names directly into SVG text, and the templates render that SVG with `|safe`.
+   - File paths are repo-controlled input. On a local-only app this is less severe than a public web app, but it is still an avoidable XSS footgun.
+
+5. **Medium: desktop confidence is materially lower than CLI/web confidence.**
+   - CI excludes `gitpulse-desktop`, and this review did not find an automated desktop smoke path.
+   - The desktop shell is intentionally thin, which is good, but release confidence is still mostly derived from CLI/web verification.
+
+#### Test coverage gaps worth fixing next
+
+- No security-focused test around chart-label escaping.
+- No automated desktop verification path in CI.
+
+#### Implementation follow-up (`2026-03-20`, later pass)
+
+- Implemented: `import_repo_history()` now only writes imported `file_activity_events` for commits that were newly inserted into `commit_events`, so repeated imports no longer inflate history-derived activity.
+- Implemented: `rebuild_analytics()` now carries the latest per-repo staged snapshot totals into repo-scoped and all-scope daily rollups, which fixes dashboard staged-line totals.
+- Added regression coverage in `crates/gitpulse-runtime/tests/runtime_integration.rs` for both import idempotency and staged-rollup propagation.
+- Verified in this pass:
+  - `cargo test -p gitpulse-runtime --test runtime_integration`
+  - `cargo test --workspace --exclude gitpulse-desktop`
+  - `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
+- Remaining notable work:
+  - escape or structurally render repo-detail SVG labels
+  - decide whether full-history synchronous `rebuild_analytics()` is still acceptable before larger datasets
+  - re-verify the desktop shell end to end
 
 ### Known Limits
 
@@ -177,9 +229,12 @@ These commands were actually run successfully in this repository on `2026-03-20`
 
 ## 5. Next Pass Priorities
 
-1. Re-verify the Tauri desktop shell end to end on this machine and document the exact command/result.
-2. Improve today/rollup aggregation to reduce repeated live-diff overcounting in high-churn repos.
-3. Add a retroactive cleanup/reimport path for cases where repo-specific pattern overrides should be applied to previously stored activity history.
+1. Fix import idempotency so historical commit re-imports do not append duplicate `file_activity_events`, then add a regression test.
+2. Fix staged-line rollup aggregation so dashboard totals match the latest repository snapshot, then add coverage for `rebuild_analytics()`.
+3. Decide whether analytics rebuilds stay full-history for v1 or move to incremental rollups before larger real-world datasets make the refresh path feel slow.
+4. Escape or structurally render repo-detail chart labels instead of injecting raw SVG text from repo-controlled values.
+5. Re-verify the Tauri desktop shell end to end on this machine and document the exact command/result.
+6. Add a retroactive cleanup/reimport path for cases where repo-specific pattern overrides should be applied to previously stored activity history.
 
 ## 6. Next-Agent Checklist
 

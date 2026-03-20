@@ -1,6 +1,6 @@
 use std::{path::Path, process::Command};
 
-use gitpulse_core::RepoPatternSettings;
+use gitpulse_core::{AuthorIdentity, RepoPatternSettings};
 use gitpulse_infra::{AppConfig, AppPaths};
 use gitpulse_runtime::{BootstrapOptions, GitPulseRuntime};
 use tempfile::tempdir;
@@ -32,6 +32,24 @@ fn test_paths(base: &Path) -> AppPaths {
     }
 }
 
+async fn count_file_activity_kind(runtime: &GitPulseRuntime, kind: &str) -> i64 {
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM file_activity_events WHERE kind = ?1")
+        .bind(kind)
+        .fetch_one(runtime.db().pool())
+        .await
+        .unwrap()
+}
+
+fn config_with_test_author() -> AppConfig {
+    let mut config = AppConfig::default();
+    config.settings.authors.push(AuthorIdentity {
+        email: "tester@example.com".into(),
+        name: Some("GitPulse Tester".into()),
+        aliases: Vec::new(),
+    });
+    config
+}
+
 #[tokio::test]
 async fn add_target_discovers_repositories_under_parent_folder() {
     let temp = tempdir().unwrap();
@@ -45,7 +63,7 @@ async fn add_target_discovers_repositories_under_parent_folder() {
 
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        AppConfig::default(),
+        config_with_test_author(),
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -69,7 +87,7 @@ async fn detects_push_when_ahead_count_drops() {
 
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        AppConfig::default(),
+        config_with_test_author(),
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -119,4 +137,71 @@ async fn updates_repository_pattern_overrides() {
 
     let detail = runtime.repo_detail(&repo_id.to_string()).await.unwrap();
     assert_eq!(detail.pattern_overrides, overrides);
+}
+
+#[tokio::test]
+async fn import_history_is_idempotent_for_file_activity_rows() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let tracked = runtime.add_target(&repo).await.unwrap();
+    let repo_id = tracked[0].id;
+
+    assert_eq!(count_file_activity_kind(&runtime, "import").await, 1);
+    assert_eq!(runtime.db().list_commits(Some(repo_id), 10).await.unwrap().len(), 1);
+
+    runtime.import_repository(&repo_id.to_string(), 30).await.unwrap();
+
+    assert_eq!(count_file_activity_kind(&runtime, "import").await, 1);
+    assert_eq!(runtime.db().list_commits(Some(repo_id), 10).await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn rebuild_analytics_carries_staged_snapshot_totals_into_rollups() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let tracked = runtime.add_target(&repo).await.unwrap();
+    let repo_id = tracked[0].id;
+
+    std::fs::write(repo.join("README.md"), "hello\nworld\n").unwrap();
+    git(&["add", "README.md"], &repo);
+
+    runtime.refresh_repository(repo_id, true).await.unwrap();
+
+    let snapshot = runtime.db().latest_snapshot(repo_id).await.unwrap().unwrap();
+    assert_eq!(snapshot.staged_stats.additions, 1);
+    assert_eq!(snapshot.staged_stats.deletions, 0);
+
+    let repo_rollup = runtime.db().list_daily_rollups(Some(repo_id), 1).await.unwrap();
+    let repo_today = repo_rollup.first().unwrap();
+    assert_eq!(repo_today.staged_additions, 1);
+    assert_eq!(repo_today.staged_deletions, 0);
+
+    let overall_rollup = runtime.db().list_daily_rollups(None, 1).await.unwrap();
+    let overall_today = overall_rollup.first().unwrap();
+    assert_eq!(overall_today.staged_additions, 1);
+    assert_eq!(overall_today.staged_deletions, 0);
 }

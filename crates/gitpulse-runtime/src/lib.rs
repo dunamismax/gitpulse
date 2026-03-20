@@ -334,13 +334,17 @@ impl GitPulseRuntime {
                 &filter,
             )
             .await?;
-        let count = self
+        let inserted_commit_shas = self
             .inner
             .db
             .insert_commits(&imported.iter().map(|entry| entry.commit.clone()).collect::<Vec<_>>())
-            .await?;
+            .await?
+            .into_iter()
+            .collect::<HashSet<_>>();
         for item in imported {
-            if item.touched_paths.is_empty() {
+            if item.touched_paths.is_empty()
+                || !inserted_commit_shas.contains(&item.commit.commit_sha)
+            {
                 continue;
             }
             let entries = item
@@ -355,7 +359,7 @@ impl GitPulseRuntime {
                 .insert_file_activity(repo_id, item.commit.authored_at_utc, &entries)
                 .await?;
         }
-        Ok(count)
+        Ok(inserted_commit_shas.len() as u64)
     }
 
     pub async fn rescan_all(&self) -> Result<()> {
@@ -652,7 +656,7 @@ impl GitPulseRuntime {
         let score_formula = ScoreFormula::default();
 
         let snapshot_rows = sqlx::query(
-            "SELECT repo_id, observed_at_utc, language_breakdown_json
+            "SELECT repo_id, observed_at_utc, language_breakdown_json, staged_additions, staged_deletions
              FROM repo_status_snapshots ORDER BY observed_at_utc ASC",
         )
         .fetch_all(self.inner.db.pool())
@@ -678,6 +682,7 @@ impl GitPulseRuntime {
 
         let mut activity = Vec::<ActivityPoint>::new();
         let mut by_scope = BTreeMap::<(Option<Uuid>, NaiveDate), DailyAccumulator>::new();
+        let mut latest_staged_by_repo_day = BTreeMap::<(Uuid, NaiveDate), (i64, i64)>::new();
 
         for row in &snapshot_rows {
             let repo_id: Uuid = row.get("repo_id");
@@ -701,6 +706,18 @@ impl GitPulseRuntime {
                 .or_default()
                 .languages_touched
                 .max(language_breakdown.len() as i64);
+            latest_staged_by_repo_day
+                .insert((repo_id, day), (row.get("staged_additions"), row.get("staged_deletions")));
+        }
+
+        for ((repo_id, day), (staged_additions, staged_deletions)) in latest_staged_by_repo_day {
+            let repo_accumulator = by_scope.entry((Some(repo_id), day)).or_default();
+            repo_accumulator.staged_additions = staged_additions;
+            repo_accumulator.staged_deletions = staged_deletions;
+
+            let all_accumulator = by_scope.entry((None, day)).or_default();
+            all_accumulator.staged_additions += staged_additions;
+            all_accumulator.staged_deletions += staged_deletions;
         }
 
         for row in &file_rows {

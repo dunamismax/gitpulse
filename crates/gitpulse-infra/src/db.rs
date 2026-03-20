@@ -402,8 +402,8 @@ impl Database {
             .collect())
     }
 
-    pub async fn insert_commits(&self, commits: &[CommitEvent]) -> Result<u64> {
-        let mut inserted = 0_u64;
+    pub async fn insert_commits(&self, commits: &[CommitEvent]) -> Result<Vec<String>> {
+        let mut inserted = Vec::new();
         let mut transaction = self.pool.begin().await?;
         for commit in commits {
             let result = sqlx::query(
@@ -427,7 +427,9 @@ impl Database {
             .bind(commit.imported_at_utc)
             .execute(&mut *transaction)
             .await?;
-            inserted += result.rows_affected();
+            if result.rows_affected() > 0 {
+                inserted.push(commit.commit_sha.clone());
+            }
         }
         transaction.commit().await?;
         Ok(inserted)
