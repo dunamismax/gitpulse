@@ -10,6 +10,7 @@ GitPulse is a local-first Rust desktop and web app for monitoring git activity a
 - Keep live work, committed work, and pushed work separate
 - Detect local pushes from ahead/behind transitions without git hooks
 - Store analytics locally in SQLite with rebuildable daily rollups
+- Edit repo-specific include/exclude overrides from the repository detail page
 - Render a responsive HTMX dashboard with server-side SVG charts
 - Run as:
   - a local web app with `gitpulse serve`
@@ -71,6 +72,7 @@ Useful commands:
 cargo run -p gitpulse-cli -- add /path/to/repo-or-folder
 cargo run -p gitpulse-cli -- rescan --all
 cargo run -p gitpulse-cli -- import --all --days 30
+cargo run -p gitpulse-cli -- rebuild-rollups
 cargo run -p gitpulse-cli -- doctor
 ```
 
@@ -120,6 +122,8 @@ Platform-specific locations:
 - Live line counts are approximate and reflect current working-tree or imported diff metadata, not code value.
 - Untracked files count as additions only when they look like text and stay under a simple size threshold.
 - Binary churn, generated paths, vendored content, lockfiles, and common build outputs are excluded by default.
+- Global patterns can be overridden per repository from the detail page, but excludes still win over includes.
 - Commit and push history totals are filtered by configured author identities. Live local activity always counts.
+- Changing repo-specific patterns immediately rescans active repos, but it does not retroactively rewrite previously stored file-activity history.
 
 More detail lives in [docs/metrics.md](/Users/sawyer/github/gitpulse/docs/metrics.md).

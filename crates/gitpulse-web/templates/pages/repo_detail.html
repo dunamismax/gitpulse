@@ -34,6 +34,26 @@
 <section class="grid two">
   <article class="panel">
     <header class="panel-head">
+      <div>
+        <h3>Pattern Overrides</h3>
+        <p class="muted">These patterns are added to the global settings for this repo only. Excludes still win over includes.</p>
+      </div>
+    </header>
+    <form method="post" action="/repositories/{{ detail.card.repo.id }}/patterns">
+      <label>Repo Include Patterns</label>
+      <textarea name="include_patterns" rows="5" placeholder="src/**&#10;docs/**">{% for pattern in detail.pattern_overrides.include %}{{ pattern }}
+{% endfor %}</textarea>
+      <label>Repo Exclude Patterns</label>
+      <textarea name="exclude_patterns" rows="7" placeholder="generated/**&#10;fixtures/**">{% for pattern in detail.pattern_overrides.exclude %}{{ pattern }}
+{% endfor %}</textarea>
+      <p class="field-note">Saving applies the new filters to future refreshes for this repository and immediately rescans active repos.</p>
+      <div class="button-row">
+        <button type="submit">Save Repo Patterns</button>
+      </div>
+    </form>
+  </article>
+  <article class="panel">
+    <header class="panel-head">
       <h3>Language Breakdown</h3>
     </header>
     {{ language_chart_svg|safe }}

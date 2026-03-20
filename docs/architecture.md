@@ -45,6 +45,7 @@ GitPulse is structured as a Rust-first local analytics system with a thin HTML/H
 
 - Application orchestration
 - Coordinates adds/imports/refreshes
+- Validates and persists repo-specific pattern overrides
 - Detects pushes from state transitions
 - Rebuilds analytics from ledger data
 - Exposes high-level queries for the UI and CLI
@@ -54,6 +55,7 @@ GitPulse is structured as a Rust-first local analytics system with a thin HTML/H
 - Axum routes and handlers
 - Askama templates
 - HTMX partial endpoints
+- Repository detail forms for repo-specific pattern overrides
 - SVG chart rendering and static assets
 
 ### CLI and Desktop Apps

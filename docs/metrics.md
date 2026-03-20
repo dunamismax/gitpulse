@@ -111,7 +111,12 @@ GitPulse excludes common noisy paths by default, including:
 - minified assets
 - common binary/large asset extensions
 
-You can also configure include/exclude globs.
+You can also configure include/exclude globs globally and add repo-specific overrides.
+
+Repo-specific override caveat:
+
+- Excludes still win over includes after the global and repo-specific lists are combined
+- Saving repo-specific patterns affects future refreshes and imports, but does not rewrite older stored file-activity events
 
 ## Timezone And Day Boundary
 

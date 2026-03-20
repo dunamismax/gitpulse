@@ -29,7 +29,8 @@ GitPulse is a local-first Rust desktop and web app for tracking repository activ
 - Canonical accounting comes from git snapshots and persisted events, not raw filesystem watcher events.
 - Daily score is intentionally separate from raw stats.
 - The app is useful with no GitHub token configured.
-- Global include/exclude patterns are user-editable today; per-repo pattern storage exists but does not yet have a dedicated editor surface.
+- Global include/exclude patterns are user-editable in settings, and per-repo overrides are editable from the repository detail page.
+- Repo-specific pattern changes immediately rescan active repos, but they do not retroactively rewrite previously stored file-activity history.
 
 ## Verified Commands
 
@@ -37,13 +38,13 @@ GitPulse is a local-first Rust desktop and web app for tracking repository activ
 cargo check --workspace --exclude gitpulse-desktop
 cargo test --workspace --exclude gitpulse-desktop
 cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings
+cargo run -p gitpulse-cli -- rebuild-rollups
 cargo run -p gitpulse-cli -- doctor
 ```
 
 ## Current Gaps
 
 - Tauri desktop shell is included and wired up, but a full end-to-end desktop launch was not re-verified in this pass.
-- Per-repo include/exclude editing is not exposed in the UI yet.
 - There is no destructive history purge UI flow.
 - Push detection is local-state-based first and optional GitHub confirmation second.
 

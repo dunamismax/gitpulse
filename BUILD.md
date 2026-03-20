@@ -67,15 +67,16 @@ GitPulse is a local-first Rust workspace that tracks activity across one or many
   - Local push detection from ahead-count drops
   - Optional GitHub-based remote push confirmation
   - Daily rollups, sessions, streaks, score, goals, and achievements
+  - Explicit `rebuild-rollups` CLI command for manual analytics rebuilds
   - Server-side SVG charts
   - Clap CLI
   - Tauri v2 shell scaffolded around the same runtime and web app
+  - Per-repo include/exclude pattern editor on the repository detail page
   - CI, `cargo-deny`, and `cargo-nextest` config files
   - Integration tests for repo discovery, exclusions, commit import, push detection, and route smoke coverage
 - Not implemented:
   - Team or cloud mode
   - Mobile client
-  - Per-repo pattern editor UI
   - Explicit history purge UI
 
 ## 2. Verified Build and Run Workflow
@@ -97,6 +98,7 @@ These commands were actually run successfully in this repository on `2026-03-20`
 | Headless workspace check | `cargo check --workspace --exclude gitpulse-desktop` | Passed |
 | Test suite | `cargo test --workspace --exclude gitpulse-desktop` | Passed |
 | Lint | `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` | Passed |
+| Manual analytics rebuild | `cargo run -p gitpulse-cli -- rebuild-rollups` | Passed |
 | CLI diagnostics smoke test | `cargo run -p gitpulse-cli -- doctor` | Passed |
 
 ### Desktop Verification Note
@@ -139,9 +141,12 @@ These commands were actually run successfully in this repository on `2026-03-20`
 - Config file path is resolved via platform `ProjectDirs(dev/GitPulse/GitPulse)`.
 - Data is stored locally in `gitpulse.sqlite3` under the platform data directory.
 - The runtime persists settings in the database as `app_settings`.
+- Per-repo include/exclude overrides are stored on the `repositories` rows as JSON and are combined with global settings patterns at snapshot time.
+- Excludes still win over includes after global and repo-specific pattern lists are merged.
 - The app auto-detects a default git author identity when no author emails are configured yet.
 - Daily rollups are derived from UTC timestamps using the configured timezone and day-boundary offset.
 - Live file activity is only recorded when a refresh meaningfully differs from the prior snapshot.
+- Saving repo-specific pattern overrides immediately rescans active repos, but it does not retroactively rewrite previously stored file-activity events.
 
 ### Git Remote Notes
 
@@ -159,20 +164,22 @@ These commands were actually run successfully in this repository on `2026-03-20`
 - The repo includes real tests rather than scaffold-only placeholders.
 - CI and local tooling docs are aligned.
 - The web UI ships local assets and does not depend on a CDN in production.
+- Repo-specific pattern overrides now have a first-class UI surface instead of hidden persistence-only support.
+- Manual analytics rebuilds are now available without needing a code-level runtime hook.
 
 ### Known Limits
 
 - Live line counts are approximate, especially around repeated edits and imported historical metadata.
 - Push detection is based on observed upstream state transitions rather than hooks or remote truth.
+- Repo-specific pattern changes only affect future refresh/import behavior plus the immediate active-repo rescan; prior stored activity rows remain as historical truth unless a deeper cleanup flow is added later.
 - The dashboard polls instead of using a more advanced streaming transport.
 - Tauri desktop verification still needs a fresh local end-to-end smoke pass.
 
 ## 5. Next Pass Priorities
 
-1. Add a per-repo pattern editor in the UI.
-2. Add an explicit `rebuild-rollups` CLI command.
-3. Re-verify the Tauri desktop shell end to end on this machine and document the exact command/result.
-4. Improve today/rollup aggregation to reduce repeated live-diff overcounting in high-churn repos.
+1. Re-verify the Tauri desktop shell end to end on this machine and document the exact command/result.
+2. Improve today/rollup aggregation to reduce repeated live-diff overcounting in high-churn repos.
+3. Add a retroactive cleanup/reimport path for cases where repo-specific pattern overrides should be applied to previously stored activity history.
 
 ## 6. Next-Agent Checklist
 
@@ -190,6 +197,7 @@ These commands were actually run successfully in this repository on `2026-03-20`
    - `cargo check --workspace --exclude gitpulse-desktop`
    - `cargo test --workspace --exclude gitpulse-desktop`
    - `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
+   - `cargo run -p gitpulse-cli -- rebuild-rollups`
    - `cargo run -p gitpulse-cli -- doctor`
 4. If git parsing or rollup math changes, update tests in:
    - `crates/gitpulse-infra/tests/`

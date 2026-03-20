@@ -2,6 +2,8 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::config::RepoPatternSettings;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RepositoryState {
     Active,
@@ -221,6 +223,7 @@ pub struct SessionSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RepoDetailView {
     pub card: RepoCard,
+    pub pattern_overrides: RepoPatternSettings,
     pub recent_commits: Vec<CommitEvent>,
     pub recent_pushes: Vec<PushEvent>,
     pub recent_sessions: Vec<FocusSession>,

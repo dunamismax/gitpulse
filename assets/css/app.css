@@ -155,6 +155,15 @@ a {
   margin-bottom: 18px;
 }
 
+.panel-head h3,
+label {
+  margin: 0;
+}
+
+.panel-head p {
+  margin: 6px 0 0;
+}
+
 .chip,
 .badge {
   display: inline-flex;
@@ -286,6 +295,11 @@ textarea {
   color: var(--text);
 }
 
+textarea {
+  min-height: 120px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 button {
   border: none;
   border-radius: 14px;
@@ -332,6 +346,12 @@ button.danger {
 .meta-list {
   display: grid;
   gap: 6px;
+}
+
+.field-note {
+  margin: -4px 0 18px;
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .chart-svg,

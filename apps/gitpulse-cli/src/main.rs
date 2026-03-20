@@ -34,6 +34,7 @@ enum Command {
         #[arg(long)]
         repo: Option<String>,
     },
+    RebuildRollups,
     Doctor,
 }
 
@@ -94,6 +95,15 @@ async fn main() -> Result<()> {
             } else if let Some(repo) = repo {
                 runtime.import_repository(&repo, days).await?;
             }
+        }
+        Command::RebuildRollups => {
+            let runtime = GitPulseRuntime::bootstrap(BootstrapOptions {
+                start_background_tasks: false,
+                ..BootstrapOptions::default()
+            })
+            .await?;
+            runtime.rebuild_analytics().await?;
+            println!("Rebuilt daily rollups, sessions, and achievements.");
         }
         Command::Doctor => {
             let runtime = GitPulseRuntime::bootstrap(BootstrapOptions {

@@ -9,8 +9,8 @@ use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, NaiveDate, Utc};
 use gitpulse_core::{
     ActivityKind, ActivityPoint, AppSettings, DailyRollup, GoalProgress, PushEvent, PushEventKind,
-    RepoCard, RepoDetailView, RepoHealth, RepoStatusSnapshot, Repository, RepositoryMetrics,
-    RepositoryState, SessionSummary, TodaySummary, TrendPoint,
+    RepoCard, RepoDetailView, RepoHealth, RepoPatternSettings, RepoStatusSnapshot, Repository,
+    RepositoryMetrics, RepositoryState, SessionSummary, TodaySummary, TrendPoint,
     metrics::{compute_streaks, evaluate_achievements},
     scoring::ScoreFormula,
     sessionize,
@@ -545,8 +545,10 @@ impl GitPulseRuntime {
             .into_iter()
             .map(|entry| (entry.path, entry.touches))
             .collect();
+        let (include, exclude) = self.inner.db.repository_patterns(repo.id).await?;
         Ok(RepoDetailView {
             card,
+            pattern_overrides: RepoPatternSettings { include, exclude },
             recent_commits: self.inner.db.list_commits(Some(repo.id), 20).await?,
             recent_pushes: self.inner.db.list_push_events(Some(repo.id), 10).await?,
             recent_sessions: self
@@ -600,6 +602,31 @@ impl GitPulseRuntime {
         self.inner.db.save_settings(&settings).await?;
         self.inner.config.write().await.settings = settings;
         self.rebuild_analytics().await
+    }
+
+    pub async fn update_repository_patterns(
+        &self,
+        selector: &str,
+        patterns: RepoPatternSettings,
+    ) -> Result<()> {
+        let repo = self
+            .get_repository(selector)
+            .await?
+            .ok_or_else(|| anyhow!("repository not found: {selector}"))?;
+        let settings = self.inner.config.read().await.settings.clone();
+        let mut include = settings.patterns.include;
+        include.extend(patterns.include.clone());
+        let mut exclude = settings.patterns.exclude;
+        exclude.extend(patterns.exclude.clone());
+        PathFilter::from_patterns(&include, &exclude)?;
+        self.inner
+            .db
+            .set_repository_patterns(repo.id, &patterns.include, &patterns.exclude)
+            .await?;
+        if repo.state == RepositoryState::Active {
+            self.refresh_repository(repo.id, true).await?;
+        }
+        Ok(())
     }
 
     pub async fn doctor(&self) -> Result<DoctorReport> {

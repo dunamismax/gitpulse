@@ -8,7 +8,9 @@ use axum::{
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
 };
-use gitpulse_core::{RepoCard, RepoDetailView, RepoHealth, SessionSummary, TodaySummary};
+use gitpulse_core::{
+    RepoCard, RepoDetailView, RepoHealth, RepoPatternSettings, SessionSummary, TodaySummary,
+};
 use gitpulse_runtime::{
     AchievementsView, ActivityFeedItem, DashboardView, GitPulseRuntime, SettingsView,
 };
@@ -26,6 +28,7 @@ pub fn router(runtime: GitPulseRuntime) -> Router {
         .route("/repositories", get(repositories_page))
         .route("/repositories/add", post(add_repository))
         .route("/repositories/{id}/refresh", post(refresh_repository))
+        .route("/repositories/{id}/patterns", post(update_repository_patterns))
         .route("/repositories/{id}/toggle", post(toggle_repository))
         .route("/repositories/{id}/remove", post(remove_repository))
         .route("/repositories/{id}", get(repository_detail_page))
@@ -116,6 +119,30 @@ async fn repository_detail_page(
         status,
         active_nav: "repositories",
     })
+}
+
+#[derive(serde::Deserialize)]
+struct RepoPatternForm {
+    include_patterns: String,
+    exclude_patterns: String,
+}
+
+async fn update_repository_patterns(
+    State(state): State<WebState>,
+    Path(repo_id): Path<String>,
+    Form(form): Form<RepoPatternForm>,
+) -> Result<Redirect, WebError> {
+    state
+        .runtime
+        .update_repository_patterns(
+            &repo_id,
+            RepoPatternSettings {
+                include: parse_patterns(&form.include_patterns),
+                exclude: parse_patterns(&form.exclude_patterns),
+            },
+        )
+        .await?;
+    Ok(Redirect::to(format!("/repositories/{repo_id}").as_str()))
 }
 
 async fn sessions_page(State(state): State<WebState>) -> Result<Html<String>, WebError> {

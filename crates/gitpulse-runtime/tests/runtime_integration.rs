@@ -1,5 +1,6 @@
 use std::{path::Path, process::Command};
 
+use gitpulse_core::RepoPatternSettings;
 use gitpulse_infra::{AppConfig, AppPaths};
 use gitpulse_runtime::{BootstrapOptions, GitPulseRuntime};
 use tempfile::tempdir;
@@ -89,4 +90,33 @@ async fn detects_push_when_ahead_count_drops() {
             .iter()
             .any(|push| matches!(push.kind, gitpulse_core::PushEventKind::PushDetectedLocal))
     );
+}
+
+#[tokio::test]
+async fn updates_repository_pattern_overrides() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        AppConfig::default(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let tracked = runtime.add_target(&repo).await.unwrap();
+    let repo_id = tracked[0].id;
+    let overrides = RepoPatternSettings {
+        include: vec!["src/**".into()],
+        exclude: vec!["fixtures/**".into(), "generated/**".into()],
+    };
+
+    runtime.update_repository_patterns(&repo_id.to_string(), overrides.clone()).await.unwrap();
+
+    let detail = runtime.repo_detail(&repo_id.to_string()).await.unwrap();
+    assert_eq!(detail.pattern_overrides, overrides);
 }
