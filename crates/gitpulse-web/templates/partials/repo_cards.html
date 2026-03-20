@@ -1,0 +1,44 @@
+<div class="repo-grid">
+  {% for card in cards %}
+  <article class="repo-card">
+    <header>
+      <div>
+        <h4><a href="/repositories/{{ card.repo.id }}">{{ card.repo.name }}</a></h4>
+        <p>{{ card.repo.root_path }}</p>
+      </div>
+      <span class="badge">
+        {% match card.health %}
+        {% when RepoHealth::Healthy %}Healthy
+        {% when RepoHealth::MissingUpstream %}No Upstream
+        {% when RepoHealth::DetachedHead %}Detached
+        {% when RepoHealth::Error %}Needs Attention
+        {% endmatch %}
+      </span>
+    </header>
+    <div class="repo-stats">
+      <span>{{ card.metrics.commits_today }} commits</span>
+      <span>{{ card.metrics.pushes_today }} pushes</span>
+      <span>{{ card.metrics.files_touched_today }} files</span>
+      <span>{{ card.metrics.score_today }} score</span>
+    </div>
+    <div class="sparkline">
+      {% for point in card.sparkline %}
+      <span style="height: {{ point }}px"></span>
+      {% endfor %}
+    </div>
+    <div class="button-row">
+      <form method="post" action="/repositories/{{ card.repo.id }}/refresh">
+        <button type="submit">Rescan</button>
+      </form>
+      <form method="post" action="/repositories/{{ card.repo.id }}/toggle">
+        <button type="submit" class="secondary">
+          {% if card.repo.is_monitored %}Disable{% else %}Enable{% endif %}
+        </button>
+      </form>
+      <form method="post" action="/repositories/{{ card.repo.id }}/remove">
+        <button type="submit" class="danger">Remove</button>
+      </form>
+    </div>
+  </article>
+  {% endfor %}
+</div>

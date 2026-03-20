@@ -1,0 +1,9 @@
+<div class="feed-list">
+  {% for item in items %}
+  <div class="feed-item">
+    <strong>{{ item.repo_name }}</strong>
+    <span>{{ item.kind }}</span>
+    <small>{{ item.observed_at_label }}</small>
+  </div>
+  {% endfor %}
+</div>

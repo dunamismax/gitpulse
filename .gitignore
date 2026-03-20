@@ -1,0 +1,8 @@
+/target
+/.sqlx
+/.DS_Store
+/dist
+/tmp
+/.idea
+/apps/gitpulse-desktop/src-tauri/gen
+gitpulse-data

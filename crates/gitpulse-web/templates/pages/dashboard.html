@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Today</p>
+    <h2>What are you changing right now?</h2>
+    <p class="muted">GitPulse keeps live work, committed work, and pushed work separate so the signal stays honest.</p>
+  </div>
+</section>
+
+<div id="dashboard-summary" hx-get="/partials/dashboard-summary" hx-trigger="load, every 2s">
+  {% include "partials/dashboard_summary.html" %}
+</div>
+
+<section class="grid two">
+  <article class="panel">
+    <header class="panel-head">
+      <h3>30 Day Trend</h3>
+      <span class="chip">Changed lines + score</span>
+    </header>
+    {{ trend_chart_svg|safe }}
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <h3>12 Week Heatmap</h3>
+      <span class="chip">Consistency</span>
+    </header>
+    {{ heatmap_svg|safe }}
+  </article>
+</section>
+
+<section class="grid two">
+  <article class="panel" id="activity-feed" hx-get="/partials/activity-feed" hx-trigger="load, every 2s">
+    <header class="panel-head">
+      <h3>Activity Feed</h3>
+      <span class="chip">Live</span>
+    </header>
+    {% include "partials/activity_feed.html" %}
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Goals</h3>
+      <span class="chip">Transparent scoring</span>
+    </header>
+    <div class="goal-stack">
+      {% for goal in view.today.goal_progress %}
+      <div class="goal-row">
+        <div class="goal-meta">
+          <span>{{ goal.label }}</span>
+          <strong>{{ goal.current }}/{{ goal.target }}</strong>
+        </div>
+        <div class="progress">
+          <span style="width: {{ goal.percent() }}%"></span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel" id="repo-cards" hx-get="/partials/repo-cards" hx-trigger="load, every 10s">
+  <header class="panel-head">
+    <h3>Repository Pulse</h3>
+    <span class="chip">{{ view.repo_cards.len() }} tracked</span>
+  </header>
+  {% include "partials/repo_cards.html" %}
+</section>
+{% endblock %}

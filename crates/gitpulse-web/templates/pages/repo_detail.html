@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head spread">
+  <div>
+    <p class="eyebrow">Repository Detail</p>
+    <h2>{{ detail.card.repo.name }}</h2>
+    <p class="muted">{{ detail.card.repo.root_path }}</p>
+  </div>
+  <div class="button-row">
+    <form method="post" action="/repositories/{{ detail.card.repo.id }}/refresh">
+      <button type="submit">Rescan</button>
+    </form>
+  </div>
+</section>
+
+<section class="grid three">
+  <article class="stat-card">
+    <span>Branch</span>
+    <strong>{{ status.branch_label }}</strong>
+    <small>{{ status.upstream_label }}</small>
+  </article>
+  <article class="stat-card">
+    <span>Live / Staged</span>
+    <strong>{{ status.live_lines }} / {{ status.staged_lines }}</strong>
+    <small>Changed lines</small>
+  </article>
+  <article class="stat-card">
+    <span>Last Push</span>
+    <strong>{{ status.last_push }}</strong>
+    <small>Local detection</small>
+  </article>
+</section>
+
+<section class="grid two">
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Language Breakdown</h3>
+    </header>
+    {{ language_chart_svg|safe }}
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Files Touched</h3>
+    </header>
+    {{ files_chart_svg|safe }}
+  </article>
+</section>
+
+<section class="grid two">
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Recent Commits</h3>
+    </header>
+    <table class="table">
+      <thead>
+        <tr><th>Commit</th><th>Summary</th><th>Lines</th><th>When</th></tr>
+      </thead>
+      <tbody>
+        {% for commit in detail.recent_commits %}
+        <tr>
+          <td><code>{{ commit.commit_sha[..7] }}</code></td>
+          <td>{{ commit.summary }}</td>
+          <td>{{ commit.additions + commit.deletions }}</td>
+          <td>{{ commit.authored_at_utc.format("%Y-%m-%d %H:%M") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Recent Sessions</h3>
+    </header>
+    <div class="session-list">
+      {% for session in detail.recent_sessions %}
+      <div class="session-item">
+        <strong>{{ session.active_minutes }} min</strong>
+        <span>{{ session.started_at_utc.format("%Y-%m-%d %H:%M") }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,48 @@
+server_host = "127.0.0.1"
+server_port = 7467
+
+[settings.goals]
+changed_lines_per_day = 250
+commits_per_day = 3
+focus_minutes_per_day = 90
+
+[settings.monitoring]
+import_days = 30
+session_gap_minutes = 15
+repo_discovery_depth = 5
+watcher_debounce_ms = 700
+idle_poll_seconds = 20
+live_poll_seconds = 2
+
+[settings.ui]
+timezone = "UTC"
+day_boundary_minutes = 0
+
+[settings.github]
+enabled = false
+verify_remote_pushes = false
+
+[settings.patterns]
+include = []
+exclude = [
+  ".git/**",
+  "target/**",
+  "node_modules/**",
+  "dist/**",
+  "build/**",
+  ".next/**",
+  "coverage/**",
+  "vendor/**",
+  "**/*.lock",
+  "**/*.min.js",
+  "**/*.map",
+  "**/*.png",
+  "**/*.jpg",
+  "**/*.jpeg",
+  "**/*.gif",
+  "**/*.pdf",
+]
+
+[[settings.authors]]
+email = "you@example.com"
+name = "Your Name"
