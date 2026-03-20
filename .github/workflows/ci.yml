@@ -13,9 +13,14 @@ jobs:
         with:
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-deny
       - name: Format
         run: cargo fmt --all -- --check
       - name: Lint
         run: cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings
-      - name: Test
-        run: cargo test --workspace --exclude gitpulse-desktop
+      - name: Nextest
+        run: cargo nextest run --workspace --exclude gitpulse-desktop
+      - name: Deny
+        run: cargo deny check

@@ -1,13 +1,55 @@
 [graph]
+all-features = true
 targets = [{ triple = "aarch64-apple-darwin" }, { triple = "x86_64-unknown-linux-gnu" }]
 
 [advisories]
 version = 2
+yanked = "deny"
+ignore = [
+    { id = "RUSTSEC-2020-0163", reason = "Inherited through `tokei`; no maintained replacement is available without replacing the repo-size implementation." },
+    { id = "RUSTSEC-2024-0370", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies move off `proc-macro-error`." },
+    { id = "RUSTSEC-2024-0411", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0412", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0413", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0414", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0415", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0416", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0417", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0418", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0419", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2024-0420", reason = "Inherited through the current Tauri GTK stack on Linux; remove when upstream desktop dependencies leave gtk3 bindings." },
+    { id = "RUSTSEC-2025-0057", reason = "Inherited through `tauri-utils`; remove when upstream replaces `fxhash`." },
+    { id = "RUSTSEC-2025-0075", reason = "Inherited through `tauri-utils`; remove when upstream removes the old `unic` stack." },
+    { id = "RUSTSEC-2025-0080", reason = "Inherited through `tauri-utils`; remove when upstream removes the old `unic` stack." },
+    { id = "RUSTSEC-2025-0081", reason = "Inherited through `tauri-utils`; remove when upstream removes the old `unic` stack." },
+    { id = "RUSTSEC-2025-0098", reason = "Inherited through `tauri-utils`; remove when upstream removes the old `unic` stack." },
+    { id = "RUSTSEC-2025-0100", reason = "Inherited through `tauri-utils`; remove when upstream removes the old `unic` stack." },
+]
 
 [licenses]
-allow = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MPL-2.0", "Unicode-3.0", "Zlib"]
+version = 2
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Zlib",
+]
 confidence-threshold = 0.8
+unused-allowed-license = "allow"
 
 [bans]
 wildcards = "allow"
 multiple-versions = "allow"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

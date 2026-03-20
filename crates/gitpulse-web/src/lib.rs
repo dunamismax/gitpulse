@@ -12,7 +12,7 @@ use gitpulse_core::{RepoCard, RepoDetailView, RepoHealth, SessionSummary, TodayS
 use gitpulse_runtime::{
     AchievementsView, ActivityFeedItem, DashboardView, GitPulseRuntime, SettingsView,
 };
-use tower_http::services::ServeDir;
+use tower_http::{compression::CompressionLayer, services::ServeDir, trace::TraceLayer};
 
 #[derive(Clone)]
 pub struct WebState {
@@ -36,6 +36,8 @@ pub fn router(runtime: GitPulseRuntime) -> Router {
         .route("/partials/activity-feed", get(activity_feed_partial))
         .route("/partials/repo-cards", get(repo_cards_partial))
         .nest_service("/assets", ServeDir::new(assets_root))
+        .layer(CompressionLayer::new())
+        .layer(TraceLayer::new_for_http())
         .with_state(WebState { runtime })
 }
 
