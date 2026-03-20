@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use notify::RecursiveMode;
-use notify_debouncer_full::{DebounceEventResult, Debouncer, FileIdMap, new_debouncer};
+use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
 use tokio::sync::mpsc;
 use tracing::warn;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ pub struct RefreshSignal {
 }
 
 pub struct WatcherService {
-    debouncer: Debouncer<notify::RecommendedWatcher, FileIdMap>,
+    debouncer: Debouncer<notify::RecommendedWatcher, RecommendedCache>,
     repo_paths: Arc<std::sync::Mutex<HashMap<PathBuf, Uuid>>>,
 }
 
