@@ -1,286 +1,518 @@
-# BUILD.md
+# GitPulse Build Plan
 
-> This is the primary operational handoff document for this repository.
-> It is a living document. Every future agent or developer who touches this project is responsible for keeping it accurate, current, and up to date.
-> If code, tooling, workflows, risks, or verified commands change, update this file in the same pass.
+Last updated: 2026-03-21
+Status: active product hardening and release-shaping
+Scope: local-first Rust desktop and web app for repository activity analytics
+Primary UI: localhost Axum + Askama + HTMX dashboard, with a thin Tauri desktop shell over the same runtime
+Primary delivery order: analytics correctness and trust first, then desktop confidence and scale, then cleanup/admin flows and release polish
 
-## Verification Snapshot
+## Purpose
+
+This file is the canonical execution, tracking, and handoff document for GitPulse.
+Any agent making meaningful changes to code, docs, tooling, data flow, or product behavior should read it first and update it before handoff.
+If deeper design docs are added later under `docs/`, they should be linked here instead of replacing this file.
+Claims about verification, product behavior, and open risks should stay explicit here rather than living in memory.
+
+## Mission
+
+- Deliver trustworthy personal repository analytics without uploading source code or diff contents.
+- Keep live work, committed work, and pushed work separate throughout the product so the metrics mean something.
+- Reuse one Rust runtime across CLI, local web, and desktop surfaces instead of letting each surface fork behavior.
+- Keep the persistence model inspectable and rebuildable: raw events, derived rollups, and gamified score should remain distinct.
+- Make the repo easy for multiple contributors or agents to work in without blurring crate boundaries or documentation ownership.
+
+## Current Repository Snapshot
+
+### Active root
+
+- `BUILD.md` is the canonical execution and status ledger.
+- `README.md` is the user-facing overview and quick-start entrypoint.
+- `AGENTS.md` is the concise repo-memory companion for future coding passes.
+- `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, and `deny.toml` are the active Rust workspace and policy entrypoints.
+- `.github/workflows/ci.yml` is the current CI source of truth.
+- `migrations/0001_init.sql` is the active database schema baseline.
+- `gitpulse.example.toml` is the config example surface.
+- `apps/` contains product entrypoints.
+- `crates/` contains the active Rust implementation.
+- `docs/` contains supporting architecture and metric semantics docs.
+- `assets/` and `crates/gitpulse-web/templates/` contain the active UI assets and templates.
+
+### Active product surfaces
+
+- `apps/gitpulse-cli`
+  - Headless operator entrypoint for `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`.
+- `apps/gitpulse-desktop`
+  - Thin Tauri v2 shell that launches the same runtime and local web UI.
+- `crates/gitpulse-core`
+  - Domain models, settings types, score formula, streak logic, sessionization, and timezone/day-boundary rules.
+- `crates/gitpulse-infra`
+  - Config loading, app directories, SQLite/SQLx persistence, git CLI integration, exclusions, watcher bridge, and optional GitHub verification.
+- `crates/gitpulse-runtime`
+  - Repo discovery, add/import/refresh orchestration, push detection, analytics rebuilds, and high-level queries.
+- `crates/gitpulse-web`
+  - Axum routes, Askama templates, HTMX partials, and SVG chart rendering.
+
+### Current implemented state
+
+Implemented:
+
+- Local web dashboard with Axum + Askama + HTMX
+- Thin Tauri v2 desktop shell over the same runtime/web stack
+- Parent-folder repo discovery and direct repo add flows
+- Recent-history commit import for tracked repositories
+- Working-tree and staged diff snapshots
+- Untracked text-file line counting
+- Local push detection from ahead/behind transitions
+- Optional GitHub-based remote push confirmation
+- Focus sessions, daily rollups, streaks, goals, score, and achievements
+- Per-repo include/exclude override editing from the repository detail page
+- Explicit `rebuild-rollups` CLI maintenance path
+- CI wiring for format, clippy, nextest, and cargo-deny
+- Integration coverage for repo discovery, exclusions, commit import, push detection, runtime regressions, and route smoke tests
+
+Not implemented:
+
+- Team or cloud mode
+- Mobile client
+- Explicit history-purge UI
+- Retroactive rewrite of older stored file-activity history when repo-specific patterns change
+
+### Current strengths
+
+- The crate split is clean: `gitpulse-core` stays mostly pure, `gitpulse-infra` owns external boundaries, `gitpulse-runtime` orchestrates, and `gitpulse-web` stays presentation-focused.
+- The docs are unusually aligned for an early product: `README.md`, `AGENTS.md`, `docs/architecture.md`, `docs/metrics.md`, and this file describe the same product model.
+- The local-first story is consistent: primary functionality does not require an external service, and GitHub verification is optional rather than foundational.
+- Quality gates are real, not decorative: CI runs format, clippy, nextest, and cargo-deny for the main workspace path.
+
+### Current open product gaps
+
+- Repo-detail SVG labels still need hardening so repo-controlled labels are not injected as raw trusted SVG text.
+- `rebuild_analytics()` is still described as full-history and synchronous on the hot path, which may become a scale problem on longer-lived datasets.
+- Desktop confidence is better than before, but CI still excludes `gitpulse-desktop`, so release confidence remains lower there than for CLI/web.
+- Pattern overrides affect future refresh/import behavior plus immediate rescans, but they do not retroactively rewrite older file-activity history.
+- Rebuild currently upserts derived rollups but does not fully act like a pruning/garbage-collection pass for obsolete repo scopes.
+
+### Observed operator snapshot
 
 - Last reviewed directly in the repo on `2026-03-21`.
-- Host used for verification: macOS in `/Users/sawyer/github/gitpulse`.
-- Primary branch: `main`.
-- Observed toolchain during verification: `cargo 1.94.0`, `rustc 1.94.0`, `git 2.50.1`, `sqlite3 3.51.0`.
+- Host used for the earlier recorded verification passes: macOS in `/Users/sawyer/github/gitpulse`.
+- Current branch observed during this BUILD rewrite pass: `main`.
+- Observed `origin` remote matches the owner’s dual-push convention:
+  - fetch: `git@github.com-dunamismax:dunamismax/gitpulse.git`
+  - push: `git@github.com-dunamismax:dunamismax/gitpulse.git`
+  - push: `git@codeberg.org-dunamismax:dunamismax/gitpulse.git`
+- Observed toolchain during the recorded verification history: `cargo 1.94.0`, `rustc 1.94.0`, `git 2.50.1`, `sqlite3 3.51.0`.
 
-## 1. Project Baseline
+### Currently verified commands
 
-GitPulse is a local-first Rust workspace that tracks activity across one or many git repositories and renders the results in a server-rendered HTMX dashboard. It supports live and staged diff snapshots, imported commit history, local push detection, focus sessions, streaks, daily goals, score, achievements, and repo size/language snapshots.
+These commands are recorded as having actually passed in this repository.
+Do not silently add to this list unless the command was really run.
 
-### Major Components, Modules, and Entry Points
+Verified on `2026-03-20`:
 
-- `Cargo.toml`
-  - Workspace root manifest and shared dependency/tooling configuration.
-- `crates/gitpulse-core/src/`
-  - Domain models, settings types, streak logic, achievement rules, score formula, sessionization, and timezone/day-boundary helpers.
-- `crates/gitpulse-infra/src/config.rs`
-  - Layered config loading from defaults, config file, and environment.
-- `crates/gitpulse-infra/src/dirs.rs`
-  - OS-specific config/data/log path discovery.
-- `crates/gitpulse-infra/src/db.rs`
-  - SQLite/SQLx bootstrap, migrations, and persistence methods.
-- `crates/gitpulse-infra/src/git.rs`
-  - git CLI integration for repo discovery, status snapshots, untracked-text counting, commit import, and size/language snapshots.
-- `crates/gitpulse-infra/src/watcher.rs`
-  - Debounced watcher bridge that enqueues repo refresh signals.
-- `crates/gitpulse-runtime/src/lib.rs`
-  - High-level app orchestration:
-    - add target
-    - import history
-    - refresh repo
-    - detect push
-    - rebuild analytics
-    - serve dashboard data to CLI/web consumers
-- `crates/gitpulse-web/src/lib.rs`
-  - Axum routes, partial endpoints, Askama templates, and SVG chart rendering.
-- `apps/gitpulse-cli/src/main.rs`
-  - Headless entrypoint for `serve`, `add`, `rescan`, `import`, and `doctor`.
-- `apps/gitpulse-desktop/src/main.rs`
-  - Tauri v2 desktop shell and folder picker bridge.
-- `migrations/0001_init.sql`
-  - Source of truth for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings.
-- `assets/css/app.css`
-  - Shared UI styling.
-- `assets/js/app.js`
-  - Tiny desktop/web helper JS for the native folder picker bridge.
-- `assets/js/htmx.min.js`
-  - Vendored HTMX runtime.
+- `cargo check --workspace --exclude gitpulse-desktop`
+- `cargo test --workspace --exclude gitpulse-desktop`
+- `cargo nextest run --workspace --exclude gitpulse-desktop`
+- `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
+- `cargo test -p gitpulse-runtime --test runtime_integration`
+- `cargo clippy -p gitpulse-runtime --tests -- -D warnings`
+- `cargo check -p gitpulse-desktop`
+- `cargo run -p gitpulse-cli -- rebuild-rollups`
+- `cargo run -p gitpulse-cli -- doctor`
 
-### Current Implemented State
+Verified on `2026-03-21`:
 
-- Implemented:
-  - Local web dashboard with Axum + Askama + HTMX
-  - Dashboard, repositories, repo detail, sessions, achievements, and settings pages
-  - Real-time-ish refresh via watcher signals plus periodic polling
-  - Parent-folder repo discovery
-  - Initial recent-history import for tracked repos
-  - Working-tree and staged diff snapshotting
-  - Untracked text-file line counting
-  - Local push detection from ahead-count drops
-  - Optional GitHub-based remote push confirmation
-  - Daily rollups, sessions, streaks, score, goals, and achievements
-  - Explicit `rebuild-rollups` CLI command for manual analytics rebuilds
-  - Server-side SVG charts
-  - Clap CLI
-  - Tauri v2 shell scaffolded around the same runtime and web app
-  - Per-repo include/exclude pattern editor on the repository detail page
-  - CI, `cargo-deny`, and `cargo-nextest` config files
-  - Integration tests for repo discovery, exclusions, commit import, push detection, and route smoke coverage
-- Not implemented:
-  - Team or cloud mode
-  - Mobile client
-  - Explicit history purge UI
+- `cargo test -p gitpulse-runtime --test runtime_integration`
+- `cargo check -p gitpulse-runtime`
+- `cargo clippy -p gitpulse-runtime --tests -- -D warnings`
+- `cargo check -p gitpulse-desktop`
+- `cargo run -p gitpulse-cli -- doctor`
+- `cargo run -p gitpulse-desktop`
 
-## 2. Verified Build and Run Workflow
+CI is also wired to run `cargo fmt --all -- --check` and `cargo deny check`, but those are CI-configured gates, not part of the locally recorded command list above unless a future pass explicitly re-verifies them here.
 
-### Prerequisites and Environment Notes
+## Product Principles
 
-- Rust stable toolchain
-- git available on `PATH`
-- SQLite available locally
-- No external service is required for primary functionality
-- GitHub verification is optional and only relevant if a token is configured
+- Local-first first.
+  GitPulse should remain useful with no cloud service, no diff upload, and no token configured.
+- One product, multiple shells.
+  CLI, local web, and desktop should share the same runtime and data model rather than drifting apart.
+- Separate the ledgers.
+  Live work, commit history, push history, derived rollups, and score should stay conceptually separate.
+- Rebuildable analytics.
+  Raw events should remain rich enough that sessions, rollups, and achievements can be recalculated intentionally.
+- Thin surfaces.
+  `gitpulse-web` and `gitpulse-desktop` should stay thin compared with `gitpulse-runtime`, `gitpulse-infra`, and `gitpulse-core`.
+- Git truth comes from the git boundary.
+  Canonical repo state should come from git snapshots and persisted events, not from raw watcher noise.
+- Explicit caveats beat false precision.
+  Approximate metrics are fine if the approximation is documented and the UI does not pretend otherwise.
+- Repo-controlled strings are untrusted input.
+  Paths, file names, branch names, and language labels should not be treated as safe just because the app is local-first.
+- Docs and tests move with behavior.
+  If metric semantics, runtime behavior, or operator workflows change, update docs and regression coverage in the same pass.
 
-### Verified Commands
+## Source Of Truth By Concern
 
-These commands were actually run successfully in this repository on `2026-03-20`.
+- Project status, roadmap, verification history, and handoff rules:
+  - `BUILD.md`
+- User-facing product story and local run instructions:
+  - `README.md`
+- Concise repo memory for future contributors:
+  - `AGENTS.md`
+- Architecture boundaries and product flow:
+  - `docs/architecture.md`
+- Metric semantics, caveats, and interpretation:
+  - `docs/metrics.md`
+- Workspace members, dependency policy, lint policy, and release profile:
+  - `Cargo.toml`
+- Toolchain pinning and formatter/lint support files:
+  - `rust-toolchain.toml`
+  - `rustfmt.toml`
+  - `clippy.toml`
+  - `deny.toml`
+- CI truth for routine automated validation:
+  - `.github/workflows/ci.yml`
+- Database schema and table inventory:
+  - `migrations/0001_init.sql`
+- Domain rules for score, streaks, sessions, timezone/day-boundary handling, and shared types:
+  - `crates/gitpulse-core/src/*`
+- Config loading, app directories, database access, git integration, exclusions, watcher behavior, and optional GitHub verification:
+  - `crates/gitpulse-infra/src/config.rs`
+  - `crates/gitpulse-infra/src/dirs.rs`
+  - `crates/gitpulse-infra/src/db.rs`
+  - `crates/gitpulse-infra/src/git.rs`
+  - `crates/gitpulse-infra/src/watcher.rs`
+- Application orchestration and analytics rebuild flow:
+  - `crates/gitpulse-runtime/src/lib.rs`
+- Web routes and server-side page composition:
+  - `crates/gitpulse-web/src/lib.rs`
+- HTML templates and partials:
+  - `crates/gitpulse-web/templates/*`
+- Shared UI assets:
+  - `assets/css/app.css`
+  - `assets/js/app.js`
+  - `assets/js/htmx.min.js`
+- CLI and desktop entrypoint behavior:
+  - `apps/gitpulse-cli/src/main.rs`
+  - `apps/gitpulse-desktop/src/main.rs`
 
-| Purpose | Command | Result |
-| --- | --- | --- |
-| Headless workspace check | `cargo check --workspace --exclude gitpulse-desktop` | Passed |
-| Test suite | `cargo test --workspace --exclude gitpulse-desktop` | Passed |
-| Nextest suite | `cargo nextest run --workspace --exclude gitpulse-desktop` | Passed |
-| Lint | `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` | Passed |
-| Runtime integration regression suite | `cargo test -p gitpulse-runtime --test runtime_integration` | Passed |
-| Runtime test-target lint | `cargo clippy -p gitpulse-runtime --tests -- -D warnings` | Passed |
-| Desktop compile smoke | `cargo check -p gitpulse-desktop` | Passed |
-| Manual analytics rebuild | `cargo run -p gitpulse-cli -- rebuild-rollups` | Passed |
-| CLI diagnostics smoke test | `cargo run -p gitpulse-cli -- doctor` | Passed |
+## Target Architecture
 
-### Desktop Verification Note
+### Crate boundaries
 
-- `apps/gitpulse-desktop/` is implemented and wired to the shared runtime/web stack.
-- Re-verified in this pass:
-  - `cargo check -p gitpulse-desktop` passed.
-  - `cargo run -p gitpulse-desktop` launched successfully on this machine after the missing-repo startup guard landed; the process stayed up until it was intentionally terminated for the smoke test.
+- `gitpulse-core`
+  - Pure-ish domain rules and shared types.
+  - Score, streak, session, and timezone/day-boundary logic.
+  - Settings and analytics model types.
+- `gitpulse-infra`
+  - External boundaries.
+  - SQLite/SQLx, migrations, config, app directories, git parsing, repo discovery, exclusions, watchers, and optional GitHub verification.
+- `gitpulse-runtime`
+  - Application orchestration.
+  - Add target, discover repos, import history, refresh snapshots, detect pushes, rebuild analytics, and serve data to UI/CLI consumers.
+- `gitpulse-web`
+  - Axum routes, Askama templates, HTMX partials, and SVG chart rendering.
+  - Should stay presentation-oriented and avoid owning product rules.
+- `gitpulse-cli`
+  - Headless operator and diagnostics entrypoint.
+- `gitpulse-desktop`
+  - Thin Tauri shell that hosts the same localhost UI and exposes native folder picking where available.
 
-## 3. Source-of-Truth Notes
+### Data flow
 
-### Authoritative Files and Directories
+1. A repo root or parent folder is added through CLI or UI.
+2. The runtime discovers tracked repositories and persists them.
+3. Initial history import reads qualifying commit metadata through the git CLI.
+4. A debounced watcher plus periodic polling enqueues refresh work.
+5. Refreshes collect canonical repo state:
+   - branch/head/upstream metadata
+   - ahead/behind counts
+   - working-tree and staged numstat diffs
+   - untracked text additions
+   - periodic language/size snapshots
+6. The runtime writes snapshots and event records into SQLite.
+7. Analytics rebuilds derive sessions, daily rollups, streaks, score, goals, and achievements.
+8. Axum + Askama + HTMX pages read those derived views for dashboard and drill-down pages.
+9. The desktop shell reuses the same runtime and routes instead of introducing a separate product implementation.
 
-- `BUILD.md`
-  - Primary operational handoff document.
-- `AGENTS.md`
-  - Concise repo memory for future agents.
-- `README.md`
-  - User-facing project overview and run instructions.
-- `docs/architecture.md`
-  - Product and crate boundary overview.
-- `docs/metrics.md`
-  - Metric semantics and caveats.
-- `migrations/0001_init.sql`
-  - Database schema source of truth.
-- `crates/gitpulse-core/src/*`
-  - Product rules and analytics math.
-- `crates/gitpulse-infra/src/*`
-  - External integration boundaries and persistence.
-- `crates/gitpulse-runtime/src/lib.rs`
-  - Runtime orchestration source of truth.
-- `crates/gitpulse-web/src/lib.rs`
-  - Routes and page composition source of truth.
-- `crates/gitpulse-web/templates/*`
-  - Presentational template source of truth.
-- `assets/*`
-  - Shared UI assets.
+## How Agents Must Work
 
-### Config and Runtime Notes
+1. Read `BUILD.md` first for any substantial repo work.
+2. Then read `AGENTS.md`, `README.md`, `docs/architecture.md`, and `docs/metrics.md` before changing behavior that touches product semantics.
+3. Keep product rules in `gitpulse-core`, integration boundaries in `gitpulse-infra`, orchestration in `gitpulse-runtime`, and presentation logic in `gitpulse-web` or app shells.
+4. Treat `migrations/0001_init.sql` as the schema baseline; if the data model changes, migrate it deliberately and update docs in the same pass.
+5. If metric semantics change, update `docs/metrics.md`, relevant tests, and this file together.
+6. If git parsing, repo discovery, analytics rebuilds, or missing-repo handling change, prefer regression coverage in `crates/gitpulse-infra/tests/` or `crates/gitpulse-runtime/tests/`.
+7. If routes, templates, or HTMX partial behavior change, keep route smoke tests and template paths aligned.
+8. Do not mark work complete until the artifact exists and the commands that were actually run are recorded truthfully.
+9. When behavior intentionally changes or scope is consciously deferred, record it in the decision log instead of leaving it implicit.
+10. Treat repo-controlled labels and path-like values as untrusted input whenever they are rendered into HTML, SVG, or logs.
 
-- Config file path is resolved via platform `ProjectDirs(dev/GitPulse/GitPulse)`.
-- Data is stored locally in `gitpulse.sqlite3` under the platform data directory.
-- The runtime persists settings in the database as `app_settings`.
-- Per-repo include/exclude overrides are stored on the `repositories` rows as JSON and are combined with global settings patterns at snapshot time.
-- Excludes still win over includes after global and repo-specific pattern lists are merged.
-- The app auto-detects a default git author identity when no author emails are configured yet.
-- Daily rollups are derived from UTC timestamps using the configured timezone and day-boundary offset.
-- Live file activity is only recorded when a refresh meaningfully differs from the prior snapshot.
-- Saving repo-specific pattern overrides immediately rescans active repos, but it does not retroactively rewrite previously stored file-activity events.
+## Tracking Conventions
 
-### Git Remote Notes
+- Each phase has a `Status:` line.
+  Use `not started`, `in progress`, `done`, or `blocked`.
+- Checkboxes represent concrete deliverables.
+  Only check a box when the work is really landed or explicitly documented as complete.
+- The progress log is append-only.
+  Do not rewrite old history into a cleaner story after the fact.
+- If scope changes, update the relevant phase checklist before or alongside the code.
+- If something is blocked by a missing decision, put it in `Open decisions and unresolved scope` rather than relying on handoff memory.
 
-- This repo is intended to follow the owner’s dual-push convention:
-  - `origin` fetch: `git@github.com-dunamismax:dunamismax/gitpulse.git`
-  - `origin` push: `git@github.com-dunamismax:dunamismax/gitpulse.git`
-  - `origin` push: `git@codeberg.org-dunamismax:dunamismax/gitpulse.git`
+### Progress log format
 
-## 4. Code Review Findings and Status
+- `YYYY-MM-DD: scope - outcome. Verified with: <commands>. Next: <follow-up>.`
 
-### Positive State
+### Decision log format
 
-- The crate split is clean and legible: `gitpulse-core` stays mostly pure, `gitpulse-infra` owns external boundaries, `gitpulse-runtime` orchestrates, and `gitpulse-web` stays thin.
-- Docs are unusually well aligned for an early product: `README.md`, `docs/architecture.md`, `docs/metrics.md`, `AGENTS.md`, and this file describe the same mental model.
-- Quality gates are real, not decorative: CI runs format, clippy, nextest, and cargo-deny for the main workspace path.
-- Test coverage is small but meaningful. The current suite exercises repo discovery, exclusions, history import, push detection, pattern override flows, and route smoke tests.
-- Local-first product boundaries are consistent throughout the codebase. Source code stays local, GitHub verification is optional, and the desktop shell reuses the same runtime/web stack instead of forking behavior.
+- `YYYY-MM-DD: decision - rationale - consequence.`
 
-### 2026-03-20 Comprehensive Review Addendum
+## Phase Dashboard
 
-#### What was re-checked in this pass
+- Phase 0 - Product charter and source-of-truth capture. Status: done.
+- Phase 1 - Workspace, schema, and infrastructure foundation. Status: done.
+- Phase 2 - Runtime orchestration and analytics model. Status: done.
+- Phase 3 - Web dashboard and shared product surfaces. Status: done.
+- Phase 4 - Correctness hardening and regression coverage. Status: done.
+- Phase 5 - Trust and output hardening. Status: in progress.
+- Phase 6 - Performance and rebuild strategy. Status: not started.
+- Phase 7 - Desktop confidence and release operations. Status: in progress.
+- Phase 8 - Data lifecycle and operator controls. Status: not started.
+- Phase 9 - v1 stabilization and release readiness. Status: not started.
 
-- `cargo test --workspace --exclude gitpulse-desktop` ✅
-- `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` ✅
-- `cargo nextest run --workspace --exclude gitpulse-desktop` ✅
+## Parallel Work Lanes
 
-#### Specific findings
+- Lane A - docs, metrics semantics, and handoff accuracy.
+  - Expected write surface: `BUILD.md`, `README.md`, `AGENTS.md`, `docs/architecture.md`, `docs/metrics.md`.
+- Lane B - core product rules.
+  - Expected write surface: `crates/gitpulse-core/`.
+- Lane C - infra and persistence.
+  - Expected write surface: `crates/gitpulse-infra/`, `migrations/`.
+- Lane D - runtime orchestration and analytics rebuild logic.
+  - Expected write surface: `crates/gitpulse-runtime/`.
+- Lane E - web routes, templates, and assets.
+  - Expected write surface: `crates/gitpulse-web/`, `assets/`.
+- Lane F - desktop shell, CLI entrypoints, and CI/release plumbing.
+  - Expected write surface: `apps/`, `.github/workflows/`, workspace policy files.
 
-1. **High: repeated imports duplicate historical file-activity rows and inflate analytics.**
-   - `GitPulseRuntime::refresh_repository()` always calls `import_repo_history(repo_id, 2)`.
-   - `Database::insert_commits()` correctly uses `INSERT OR IGNORE`, but `import_repo_history()` still unconditionally writes `file_activity_events` for every imported commit, even when the commit already exists.
-   - Repro during this review on a temp repo: `commit_events` stayed `1` while `file_activity_events` increased `2 -> 3` after a second `gitpulse import --repo repo --days 30`.
-   - Impact: daily rollups, files-touched counts, focus sessions, and score can drift upward over time even when no new historical commits were added.
+### Coordination rules
 
-2. **High: dashboard staged totals are currently wrong.**
-   - `rebuild_analytics()` reads snapshot rows but never adds `staged_additions` or `staged_deletions` into `DailyAccumulator`, so rollups persist staged values as zero.
-   - Repro during this review: latest `repo_status_snapshots` row showed staged `(1, 0)` after staging a file, while the latest `daily_rollups` all-scope row remained `(0, 0)`.
-   - Impact: the dashboard `TodaySummary.staged_lines` can disagree with real repository state, which undercuts trust in the metrics model.
+- Keep file ownership disjoint when multiple contributors work in parallel.
+- If a change crosses crate boundaries, update the architecture notes or phase notes in this file in the same change set.
+- Prefer adding the regression test in the same lane that introduces the behavior change.
+- Avoid duplicating metric semantics across multiple docs; document them once in `docs/metrics.md` and link back here when needed.
 
-3. **Medium: analytics rebuild work is full-history and synchronous on the hot path.**
-   - Every refresh/import/settings update calls `rebuild_analytics()`, which full-scans snapshots, file events, commits, and pushes, then rewrites sessions and upserts rollups/achievements.
-   - This is acceptable for small datasets, but it will get slower as users track more repos and longer histories.
-   - Product risk: the current design may feel great in v1 demos and then become laggy on long-lived real usage.
+## Quality Gates
 
-4. **Medium: repo detail SVG charts currently trust unescaped labels.**
-   - `render_rank_bars()` interpolates file paths and language names directly into SVG text, and the templates render that SVG with `|safe`.
-   - File paths are repo-controlled input. On a local-only app this is less severe than a public web app, but it is still an avoidable XSS footgun.
+### Current recorded local gate
 
-5. **Medium: desktop confidence is materially lower than CLI/web confidence.**
-   - CI excludes `gitpulse-desktop`, and this review did not find an automated desktop smoke path.
-   - The desktop shell is intentionally thin, which is good, but release confidence is still mostly derived from CLI/web verification.
+- `cargo check --workspace --exclude gitpulse-desktop`
+- `cargo test --workspace --exclude gitpulse-desktop`
+- `cargo nextest run --workspace --exclude gitpulse-desktop`
+- `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
+- `cargo test -p gitpulse-runtime --test runtime_integration`
+- `cargo clippy -p gitpulse-runtime --tests -- -D warnings`
+- `cargo check -p gitpulse-desktop`
+- `cargo run -p gitpulse-cli -- rebuild-rollups`
+- `cargo run -p gitpulse-cli -- doctor`
 
-#### Test coverage gaps worth fixing next
+### CI-configured gate
 
-- No security-focused test around chart-label escaping.
-- No automated desktop verification path in CI.
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
+- `cargo nextest run --workspace --exclude gitpulse-desktop`
+- `cargo deny check`
 
-#### Implementation follow-up (`2026-03-20`, later pass)
+If a future command is expected but has not been run in a local verification pass, do not present it as locally verified; record it as CI-only or planned.
 
-- Implemented: `import_repo_history()` now only writes imported `file_activity_events` for commits that were newly inserted into `commit_events`, so repeated imports no longer inflate history-derived activity.
-- Implemented: `rebuild_analytics()` now carries the latest per-repo staged snapshot totals into repo-scoped and all-scope daily rollups, which fixes dashboard staged-line totals.
-- Added regression coverage in `crates/gitpulse-runtime/tests/runtime_integration.rs` for both import idempotency and staged-rollup propagation.
-- Verified in this pass:
-  - `cargo test -p gitpulse-runtime --test runtime_integration`
-  - `cargo test --workspace --exclude gitpulse-desktop`
-  - `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
-- Remaining notable work:
-  - escape or structurally render repo-detail SVG labels
-  - decide whether full-history synchronous `rebuild_analytics()` is still acceptable before larger datasets
+## Detailed Phase Plan
 
-#### Implementation follow-up (`2026-03-21`, missing-repo startup hardening)
+### Phase 0 - Product charter and source-of-truth capture
 
-- Implemented: startup watcher registration and refresh/import paths now disable repositories whose root path is missing or no longer a directory instead of bubbling an error that can abort desktop bootstrap.
-- Implemented: periodic/background enqueue and bulk rescan flows now skip repositories that are not actively monitored.
-- Added regression coverage in `crates/gitpulse-runtime/tests/runtime_integration.rs` for both bootstrap with a missing watched repo and refresh after a repo path disappears.
-- Verified in this pass:
-  - `cargo test -p gitpulse-runtime --test runtime_integration`
-  - `cargo check -p gitpulse-runtime`
-  - `cargo clippy -p gitpulse-runtime --tests -- -D warnings`
-  - `cargo check -p gitpulse-desktop`
-  - `cargo run -p gitpulse-cli -- doctor`
-  - `cargo run -p gitpulse-desktop`
-- Local data follow-up on this machine:
-  - backed up the live SQLite DB before edits
-  - removed one stale temp-repo row and its tracked-target row from the local app DB
-  - rebuilt analytics and manually removed the stale repo-scoped `daily_rollups` row that persisted because rebuild currently upserts derived rows but does not prune obsolete repo scopes
+Status: done
 
-### Known Limits
+- [x] Establish `BUILD.md` as the canonical handoff document.
+- [x] Establish `README.md` as the user-facing overview and quick-start doc.
+- [x] Establish `AGENTS.md` as concise repo memory for future contributors.
+- [x] Capture architecture and metric semantics in dedicated docs under `docs/`.
+- [x] Make the local-first, no-source-upload product stance explicit.
+- [x] Document that live work, committed work, and pushed work are separate product concepts.
 
-- Live line counts are approximate, especially around repeated edits and imported historical metadata.
-- Push detection is based on observed upstream state transitions rather than hooks or remote truth.
-- Repo-specific pattern changes only affect future refresh/import behavior plus the immediate active-repo rescan; prior stored activity rows remain as historical truth unless a deeper cleanup flow is added later.
-- The dashboard polls instead of using a more advanced streaming transport.
-- Tauri desktop verification still needs a fresh local end-to-end smoke pass.
+Exit criteria:
 
-## 5. Next Pass Priorities
+- [x] Contributors can tell what GitPulse is, how it is structured, and where truth lives without reverse-engineering the repo.
 
-1. Fix import idempotency so historical commit re-imports do not append duplicate `file_activity_events`, then add a regression test.
-2. Fix staged-line rollup aggregation so dashboard totals match the latest repository snapshot, then add coverage for `rebuild_analytics()`.
-3. Decide whether analytics rebuilds stay full-history for v1 or move to incremental rollups before larger real-world datasets make the refresh path feel slow.
-4. Escape or structurally render repo-detail chart labels instead of injecting raw SVG text from repo-controlled values.
-5. Re-verify the Tauri desktop shell end to end on this machine and document the exact command/result.
-6. Add a retroactive cleanup/reimport path for cases where repo-specific pattern overrides should be applied to previously stored activity history.
+### Phase 1 - Workspace, schema, and infrastructure foundation
 
-## 6. Next-Agent Checklist
+Status: done
 
-1. Read `BUILD.md` first.
-2. Then read:
-   - `AGENTS.md`
-   - `README.md`
-   - `docs/architecture.md`
-   - `docs/metrics.md`
-   - `crates/gitpulse-core/src/*`
-   - `crates/gitpulse-infra/src/*`
-   - `crates/gitpulse-runtime/src/lib.rs`
-   - `crates/gitpulse-web/src/lib.rs`
-3. Re-run:
-   - `cargo check --workspace --exclude gitpulse-desktop`
-   - `cargo test --workspace --exclude gitpulse-desktop`
-   - `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
-   - `cargo run -p gitpulse-cli -- rebuild-rollups`
-   - `cargo run -p gitpulse-cli -- doctor`
-4. If git parsing or rollup math changes, update tests in:
-   - `crates/gitpulse-infra/tests/`
-   - `crates/gitpulse-runtime/tests/`
-   - `crates/gitpulse-web/tests/routes.rs`
-5. If behavior or workflows change, update:
-   - `BUILD.md`
-   - `AGENTS.md`
-   - `README.md`
-   - `docs/architecture.md`
-   - `docs/metrics.md`
+- [x] Land the Rust workspace with the current app and crate split.
+- [x] Add the SQLite schema baseline under `migrations/0001_init.sql`.
+- [x] Wire config loading, app directories, and persistence bootstrapping.
+- [x] Implement git CLI integration for discovery, status snapshots, and history import.
+- [x] Implement watcher support and repo refresh enqueueing.
+- [x] Provide the CLI surface for operating the app locally.
+
+Exit criteria:
+
+- [x] A fresh clone has an understandable Rust-first entrypoint and a persistent local data model.
+
+### Phase 2 - Runtime orchestration and analytics model
+
+Status: done
+
+- [x] Add tracked-target and repository discovery flows.
+- [x] Add recent-history import for tracked repos.
+- [x] Add live working-tree and staged snapshotting.
+- [x] Add ahead/behind-based local push detection plus optional GitHub verification.
+- [x] Persist snapshots, file activity, commits, pushes, settings, sessions, rollups, and achievements.
+- [x] Rebuild analytics from ledger data into sessions, streaks, score, goals, and achievements.
+- [x] Keep timezone/day-boundary behavior explicit and configurable.
+
+Exit criteria:
+
+- [x] GitPulse can build a meaningful local analytics picture from tracked repositories and stored event data.
+
+### Phase 3 - Web dashboard and shared product surfaces
+
+Status: done
+
+- [x] Land the Axum + Askama + HTMX local web dashboard.
+- [x] Land dashboard, repositories, repo detail, sessions, achievements, and settings pages.
+- [x] Add server-side SVG chart rendering.
+- [x] Add repository detail editing for repo-specific include/exclude overrides.
+- [x] Keep the Tauri desktop shell thin and pointed at the same runtime/web surface.
+
+Exit criteria:
+
+- [x] The app has a usable local UI and a desktop shell without splitting the product into multiple implementations.
+
+### Phase 4 - Correctness hardening and regression coverage
+
+Status: done
+
+- [x] Fix repeated history imports so historical file-activity rows are not duplicated on re-import.
+- [x] Fix staged snapshot propagation into daily rollups so dashboard staged totals reflect reality.
+- [x] Add regression coverage for both import idempotency and staged-rollup behavior.
+- [x] Harden missing-repo startup handling so missing watched repos disable cleanly instead of aborting bootstrap.
+- [x] Make periodic/background enqueue and bulk rescan flows skip repositories that are not actively monitored.
+- [x] Add regression coverage for missing-repo bootstrap and refresh-after-disappearance behavior.
+
+Exit criteria:
+
+- [x] The known high-priority correctness issues from the 2026-03-20 review are fixed and covered by regression tests.
+
+### Phase 5 - Trust and output hardening
+
+Status: in progress
+
+- [ ] Escape or structurally render repo-detail SVG labels instead of injecting raw text into trusted SVG output.
+- [ ] Add regression coverage for chart-label escaping or equivalent safe rendering behavior.
+- [ ] Audit remaining repo-controlled strings rendered through templates, SVG helpers, or other trusted sinks.
+- [ ] Re-check docs wording so the app’s local-first trust story matches the implementation after the rendering hardening lands.
+
+Exit criteria:
+
+- [ ] Repo-controlled text is no longer treated as implicitly safe in rendered chart output.
+- [ ] There is at least one targeted regression test covering the resolved rendering path.
+
+### Phase 6 - Performance and rebuild strategy
+
+Status: not started
+
+- [ ] Decide whether full-history synchronous `rebuild_analytics()` remains acceptable for v1 datasets.
+- [ ] If not, design and implement an incremental or scoped rebuild strategy without losing auditability.
+- [ ] Add measurement or benchmark coverage for analytics rebuild cost on larger histories.
+- [ ] Document the operator story for expensive rebuilds, long import histories, and many-repo datasets.
+- [ ] Keep raw-event versus derived-rollup boundaries explicit even if rebuild implementation changes.
+
+Exit criteria:
+
+- [ ] The scalability story is explicit rather than assumed.
+- [ ] The repo has a believable answer for long-lived datasets beyond small demo usage.
+
+### Phase 7 - Desktop confidence and release operations
+
+Status: in progress
+
+- [x] Keep `gitpulse-desktop` as a thin shell over the shared runtime and local web UI.
+- [x] Maintain at least a desktop compile-check path.
+- [x] Re-verify a local desktop launch after the missing-repo startup guard landed.
+- [ ] Add an automated desktop smoke path or an explicit, repeatable local verification gate that is treated as release-critical.
+- [ ] Decide whether desktop remains excluded from CI by design or gains a dedicated CI lane.
+- [ ] Document desktop packaging and release expectations once they are real rather than implied.
+
+Exit criteria:
+
+- [ ] Desktop confidence no longer depends mostly on CLI/web inference plus manual spot checks.
+
+### Phase 8 - Data lifecycle and operator controls
+
+Status: not started
+
+- [ ] Decide whether repo-specific pattern changes need a retroactive cleanup/reimport workflow before v1.
+- [ ] Add a safe maintenance flow for stale repositories, removed targets, and obsolete repo-scoped rollups if the product wants that behavior in-app.
+- [ ] Decide whether explicit history purge stays out of scope or becomes a supported operator action.
+- [ ] If cleanup flows are added, document rebuild consequences and add regression coverage where appropriate.
+
+Exit criteria:
+
+- [ ] Operators can intentionally clean up or re-scope historical data without falling back to ad hoc DB edits.
+
+### Phase 9 - v1 stabilization and release readiness
+
+Status: not started
+
+- [ ] Align public docs, workspace metadata, and release posture with the actual shipping story.
+- [ ] Reconfirm privacy and optional-remote-verification claims against the implementation.
+- [ ] Freeze the minimum supported operator workflow and its known caveats.
+- [ ] Re-run and record the final quality gates that genuinely passed.
+- [ ] Produce a release checklist that matches the real supported surfaces.
+
+Exit criteria:
+
+- [ ] The repository tells a coherent, truthful, shippable story to both users and contributors.
+
+## Open Decisions And Unresolved Scope
+
+- Should `rebuild_analytics()` remain a full-history synchronous operation for v1, or is an incremental/scoped strategy necessary before real-world datasets get larger?
+- What is the right hardening path for repo-detail charts: escaping inside the current SVG renderer, structural rendering with safer primitives, or a different chart delivery path entirely?
+- Does `gitpulse-desktop` stay manually smoke-tested outside CI, or should it gain a dedicated automated lane before release confidence is claimed?
+- Do repo-specific include/exclude overrides need a first-class retroactive cleanup/reimport flow before v1, or is forward-only behavior acceptable if documented clearly?
+- Is explicit history purge intentionally out of scope for the first release, or does the product need a supported data-deletion/admin surface?
+
+## Risk Register
+
+- Full-history synchronous rebuilds may become noticeably slow as tracked repo count and commit history grow.
+- Repo-controlled text currently reaching trusted SVG output is an avoidable local XSS-style footgun even in a local-first app.
+- Desktop confidence remains lower than CLI/web confidence because CI excludes `gitpulse-desktop` and local launch verification is still limited.
+- Pattern override changes can surprise users because future behavior updates immediately but previously stored file-activity history remains as historical truth.
+- Rebuild behavior that upserts but does not fully prune obsolete repo scopes can leave confusing stale derived rows after local cleanup.
+- Push detection is based on observed upstream state transitions first and optional GitHub confirmation second, so remote truth is not guaranteed in every environment.
+- Line counts remain approximate operational telemetry and can still be distorted by large refactors, formatting churn, generated files, or deletions.
+
+## Decision Log
+
+- 2026-03-20: GitPulse is local-first and offline-first by default - keeps the product useful without external services and avoids source-upload pressure - optional GitHub verification stays supplemental rather than foundational.
+- 2026-03-20: Live work, committed work, and pushed work remain separate product concepts - this keeps the metrics interpretable instead of collapsing unlike activity into one number - docs and UI should preserve that separation.
+- 2026-03-20: Git CLI remains the repository truth boundary instead of switching to libgit2 - it keeps behavior closer to normal developer workflows and reduces v1 integration complexity - parsing and command coverage must stay well-tested.
+- 2026-03-20: The product uses one shared runtime for CLI, web, and desktop surfaces - this avoids forking business logic across shells - `gitpulse-desktop` should stay thin.
+- 2026-03-20: Global and repo-specific include/exclude patterns are merged with excludes winning - this keeps noisy paths reliably suppressible - repo-specific overrides do not retroactively rewrite old file-activity history.
+- 2026-03-20: Imported commit history must be idempotent with respect to history-derived file activity - repeated imports should not inflate analytics - regression coverage now exists for that rule.
+- 2026-03-20: Daily rollups must carry staged snapshot totals from the latest repo state - dashboard staged metrics should match real repository state - regression coverage now exists for that rule.
+- 2026-03-21: Missing or no-longer-directory repo roots disable monitoring instead of aborting desktop/runtime startup - this keeps one stale local path from breaking the app shell - background and bulk flows should skip inactive repos.
+
+## Immediate Next Moves
+
+1. Finish Phase 5 by hardening repo-detail chart rendering so repo-controlled labels are escaped or otherwise rendered safely.
+2. Resolve the Phase 6 strategy question: keep `rebuild_analytics()` full-history and synchronous for v1 with explicit bounds, or start the incremental/scoped redesign before scale makes the app feel laggy.
+3. Raise Phase 7 confidence by defining a repeatable desktop verification story that is stronger than ad hoc local launch checks.
+4. Decide whether Phase 8 cleanup/admin flows are real product scope for v1 or explicitly deferred so the repo stops carrying ambiguous expectations.
+
+## Progress Log
+
+- 2026-03-20: Reviewed the repository structure, documentation, and current product state, then recorded the main verified workspace commands plus the open correctness, safety, and confidence gaps. Verified with: `cargo check --workspace --exclude gitpulse-desktop`, `cargo test --workspace --exclude gitpulse-desktop`, `cargo nextest run --workspace --exclude gitpulse-desktop`, `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`. Next: fix the historical import duplication and staged-rollup correctness issues first.
+- 2026-03-20: Fixed repeated-import history inflation by ensuring imported `file_activity_events` are only written for newly inserted commits, and fixed staged snapshot propagation into daily rollups. Added targeted runtime regression coverage for both. Verified with: `cargo test -p gitpulse-runtime --test runtime_integration`, `cargo test --workspace --exclude gitpulse-desktop`, `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`. Next: address remaining rendering-safety, rebuild-scale, and desktop-confidence gaps.
+- 2026-03-21: Hardened missing-repo startup and refresh behavior so stale repo paths disable cleanly instead of aborting desktop bootstrap, and made periodic/background work skip repositories that are not actively monitored. Verified with: `cargo test -p gitpulse-runtime --test runtime_integration`, `cargo check -p gitpulse-runtime`, `cargo clippy -p gitpulse-runtime --tests -- -D warnings`, `cargo check -p gitpulse-desktop`, `cargo run -p gitpulse-cli -- doctor`, `cargo run -p gitpulse-desktop`. Next: tackle chart-label hardening, rebuild scalability, and a stronger desktop verification story.
+- 2026-03-21: Rewrote `BUILD.md` into a phase-based execution manual aligned with the repository’s current product state, source-of-truth files, verification history, and active risks. Verified with: documentation and repository-structure audit. Next: keep phase status, decision log, and verified command history current as the repo evolves.
