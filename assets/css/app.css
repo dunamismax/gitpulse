@@ -254,10 +254,12 @@ label {
   gap: 6px;
   height: 60px;
   margin: 18px 0;
+  overflow: hidden;
 }
 
 .sparkline span {
-  width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
   border-radius: 999px 999px 4px 4px;
   background: linear-gradient(180deg, var(--accent) 0%, #1d4ed8 100%);
 }

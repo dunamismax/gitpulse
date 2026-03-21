@@ -6,7 +6,7 @@
 
 ## Verification Snapshot
 
-- Last reviewed directly in the repo on `2026-03-20`.
+- Last reviewed directly in the repo on `2026-03-21`.
 - Host used for verification: macOS in `/Users/sawyer/github/gitpulse`.
 - Primary branch: `main`.
 - Observed toolchain during verification: `cargo 1.94.0`, `rustc 1.94.0`, `git 2.50.1`, `sqlite3 3.51.0`.
@@ -99,14 +99,18 @@ These commands were actually run successfully in this repository on `2026-03-20`
 | Test suite | `cargo test --workspace --exclude gitpulse-desktop` | Passed |
 | Nextest suite | `cargo nextest run --workspace --exclude gitpulse-desktop` | Passed |
 | Lint | `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` | Passed |
+| Runtime integration regression suite | `cargo test -p gitpulse-runtime --test runtime_integration` | Passed |
+| Runtime test-target lint | `cargo clippy -p gitpulse-runtime --tests -- -D warnings` | Passed |
+| Desktop compile smoke | `cargo check -p gitpulse-desktop` | Passed |
 | Manual analytics rebuild | `cargo run -p gitpulse-cli -- rebuild-rollups` | Passed |
 | CLI diagnostics smoke test | `cargo run -p gitpulse-cli -- doctor` | Passed |
 
 ### Desktop Verification Note
 
 - `apps/gitpulse-desktop/` is implemented and wired to the shared runtime/web stack.
-- A full end-to-end desktop launch was not re-verified in this pass because the local `cargo check -p gitpulse-desktop` compile path entered a long-running rustc phase and was not allowed to complete to a clean finish during verification.
-- Treat desktop support as present in code, but re-verify locally before release packaging.
+- Re-verified in this pass:
+  - `cargo check -p gitpulse-desktop` passed.
+  - `cargo run -p gitpulse-desktop` launched successfully on this machine after the missing-repo startup guard landed; the process stayed up until it was intentionally terminated for the smoke test.
 
 ## 3. Source-of-Truth Notes
 
@@ -217,7 +221,23 @@ These commands were actually run successfully in this repository on `2026-03-20`
 - Remaining notable work:
   - escape or structurally render repo-detail SVG labels
   - decide whether full-history synchronous `rebuild_analytics()` is still acceptable before larger datasets
-  - re-verify the desktop shell end to end
+
+#### Implementation follow-up (`2026-03-21`, missing-repo startup hardening)
+
+- Implemented: startup watcher registration and refresh/import paths now disable repositories whose root path is missing or no longer a directory instead of bubbling an error that can abort desktop bootstrap.
+- Implemented: periodic/background enqueue and bulk rescan flows now skip repositories that are not actively monitored.
+- Added regression coverage in `crates/gitpulse-runtime/tests/runtime_integration.rs` for both bootstrap with a missing watched repo and refresh after a repo path disappears.
+- Verified in this pass:
+  - `cargo test -p gitpulse-runtime --test runtime_integration`
+  - `cargo check -p gitpulse-runtime`
+  - `cargo clippy -p gitpulse-runtime --tests -- -D warnings`
+  - `cargo check -p gitpulse-desktop`
+  - `cargo run -p gitpulse-cli -- doctor`
+  - `cargo run -p gitpulse-desktop`
+- Local data follow-up on this machine:
+  - backed up the live SQLite DB before edits
+  - removed one stale temp-repo row and its tracked-target row from the local app DB
+  - rebuilt analytics and manually removed the stale repo-scoped `daily_rollups` row that persisted because rebuild currently upserts derived rows but does not prune obsolete repo scopes
 
 ### Known Limits
 

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{DailyRollup, FocusSession};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AchievementKind {
     FirstRepo,
     FirstCommitTracked,
@@ -174,7 +174,7 @@ pub fn evaluate_achievements(
         }
     }
 
-    awards.sort_by_key(|award| award.day);
+    awards.sort_by_key(|award| (award.kind, award.day));
     awards.dedup_by_key(|award| award.kind);
     awards
 }
@@ -254,5 +254,24 @@ mod tests {
         assert!(awards.iter().any(|award| award.kind == AchievementKind::FirstPushDetected));
         assert!(awards.iter().any(|award| award.kind == AchievementKind::Focus50));
         assert!(awards.iter().any(|award| award.kind == AchievementKind::Refactorer));
+    }
+
+    #[test]
+    fn achievements_dedup_duplicate_kinds_across_multiple_days() {
+        let base = NaiveDate::from_ymd_opt(2026, 3, 20).unwrap();
+        let awards = evaluate_achievements(
+            1,
+            0,
+            &[rollup(base, 0, 150, 0), rollup(base + Duration::days(1), 0, 200, 0)],
+            &[],
+        );
+        assert_eq!(
+            awards.iter().filter(|award| award.kind == AchievementKind::Lines100).count(),
+            1
+        );
+        assert_eq!(
+            awards.iter().find(|award| award.kind == AchievementKind::Lines100).unwrap().day,
+            Some(base)
+        );
     }
 }

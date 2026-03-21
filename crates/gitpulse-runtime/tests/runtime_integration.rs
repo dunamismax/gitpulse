@@ -205,3 +205,147 @@ async fn rebuild_analytics_carries_staged_snapshot_totals_into_rollups() {
     assert_eq!(overall_today.staged_additions, 1);
     assert_eq!(overall_today.staged_deletions, 0);
 }
+
+#[tokio::test]
+async fn rebuild_analytics_prunes_stale_repo_scoped_rollup_rows() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    runtime.add_target(&repo).await.unwrap();
+
+    let stale_scope = "stale-repo-scope";
+    sqlx::query("INSERT INTO daily_rollups (scope, day) VALUES (?1, ?2)")
+        .bind(stale_scope)
+        .bind("2099-01-01")
+        .execute(runtime.db().pool())
+        .await
+        .unwrap();
+
+    let stale_before =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM daily_rollups WHERE scope = ?1")
+            .bind(stale_scope)
+            .fetch_one(runtime.db().pool())
+            .await
+            .unwrap();
+    assert_eq!(stale_before, 1);
+
+    runtime.rebuild_analytics().await.unwrap();
+
+    let stale_after =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM daily_rollups WHERE scope = ?1")
+            .bind(stale_scope)
+            .fetch_one(runtime.db().pool())
+            .await
+            .unwrap();
+    assert_eq!(stale_after, 0);
+}
+
+#[tokio::test]
+async fn remove_repository_prunes_repo_scoped_rollups() {
+    let temp = tempdir().unwrap();
+    let workspace = temp.path().join("workspace");
+    let alpha = workspace.join("alpha");
+    let beta = workspace.join("beta");
+    std::fs::create_dir_all(&alpha).unwrap();
+    std::fs::create_dir_all(&beta).unwrap();
+    init_repo(&alpha);
+    init_repo(&beta);
+    write_and_commit(&alpha, "README.md", "alpha\n", "initial alpha");
+    write_and_commit(&beta, "README.md", "beta\n", "initial beta");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let tracked = runtime.add_target(&workspace).await.unwrap();
+    let beta_id = tracked.iter().find(|repo| repo.name == "beta").unwrap().id;
+    let alpha_id = tracked.iter().find(|repo| repo.name == "alpha").unwrap().id;
+
+    assert!(!runtime.db().list_daily_rollups(Some(beta_id), 10).await.unwrap().is_empty());
+
+    runtime.remove_repository(&beta_id.to_string()).await.unwrap();
+
+    let removed = runtime.get_repository(&beta_id.to_string()).await.unwrap().unwrap();
+    assert_eq!(removed.state, gitpulse_core::RepositoryState::Removed);
+    assert!(runtime.db().list_daily_rollups(Some(beta_id), 10).await.unwrap().is_empty());
+    assert!(!runtime.db().list_daily_rollups(Some(alpha_id), 10).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn bootstrap_with_missing_monitored_repo_disables_it_instead_of_failing() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let repo_id = {
+        let runtime = GitPulseRuntime::bootstrap_in(
+            test_paths(temp.path()),
+            config_with_test_author(),
+            BootstrapOptions { port_override: None, start_background_tasks: false },
+        )
+        .await
+        .unwrap();
+
+        let tracked = runtime.add_target(&repo).await.unwrap();
+        tracked[0].id
+    };
+
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: true },
+    )
+    .await
+    .unwrap();
+
+    let repo = runtime.get_repository(&repo_id.to_string()).await.unwrap().unwrap();
+    assert_eq!(repo.state, gitpulse_core::RepositoryState::Disabled);
+    assert!(!repo.is_monitored);
+}
+
+#[tokio::test]
+async fn refresh_with_missing_repo_disables_it_instead_of_erroring() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let tracked = runtime.add_target(&repo).await.unwrap();
+    let repo_id = tracked[0].id;
+
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    runtime.refresh_repository(repo_id, true).await.unwrap();
+
+    let repo = runtime.get_repository(&repo_id.to_string()).await.unwrap().unwrap();
+    assert_eq!(repo.state, gitpulse_core::RepositoryState::Disabled);
+    assert!(!repo.is_monitored);
+}

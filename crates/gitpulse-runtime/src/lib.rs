@@ -235,6 +235,9 @@ impl GitPulseRuntime {
         if repo.state != RepositoryState::Active {
             return Ok(());
         }
+        if self.disable_repository_if_root_missing(&repo, "refresh").await? {
+            return Ok(());
+        }
         let config = self.inner.config.read().await.clone();
         let filter = self.build_filter(repo_id, &config.settings).await?;
         let previous = self.inner.db.latest_snapshot(repo_id).await?;
@@ -321,6 +324,12 @@ impl GitPulseRuntime {
 
     pub async fn import_repo_history(&self, repo_id: Uuid, days: i64) -> Result<u64> {
         let repo = self.inner.db.get_repository(repo_id).await?;
+        if repo.state != RepositoryState::Active {
+            return Ok(0);
+        }
+        if self.disable_repository_if_root_missing(&repo, "import").await? {
+            return Ok(0);
+        }
         let config = self.inner.config.read().await.clone();
         let filter = self.build_filter(repo_id, &config.settings).await?;
         let imported = self
@@ -364,7 +373,7 @@ impl GitPulseRuntime {
 
     pub async fn rescan_all(&self) -> Result<()> {
         for repo in self.inner.db.list_repositories().await? {
-            if repo.state == RepositoryState::Active {
+            if repo.state == RepositoryState::Active && repo.is_monitored {
                 self.refresh_repository(repo.id, true).await?;
             }
         }
@@ -407,12 +416,14 @@ impl GitPulseRuntime {
             .await?
             .ok_or_else(|| anyhow!("repository not found: {selector}"))?;
         self.inner.db.set_repository_state(repo.id, RepositoryState::Removed, false).await?;
-        Ok(())
+        self.rebuild_analytics().await
     }
 
     pub async fn import_all(&self, days: i64) -> Result<()> {
         for repo in self.inner.db.list_repositories().await? {
-            self.import_repo_history(repo.id, days).await?;
+            if repo.state == RepositoryState::Active {
+                self.import_repo_history(repo.id, days).await?;
+            }
         }
         self.rebuild_analytics().await?;
         Ok(())
@@ -494,6 +505,8 @@ impl GitPulseRuntime {
                 Some(_) => RepoHealth::Healthy,
                 None => RepoHealth::Error,
             };
+            let sparkline_scores =
+                rollups.iter().take(7).map(|entry| entry.score).collect::<Vec<_>>();
             cards.push(RepoCard {
                 repo: repo.clone(),
                 snapshot: snapshot.clone(),
@@ -511,7 +524,7 @@ impl GitPulseRuntime {
                         .unwrap_or(0),
                     score_today: rollups.first().map(|entry| entry.score).unwrap_or(0),
                 },
-                sparkline: rollups.iter().take(7).map(|entry| entry.score).collect(),
+                sparkline: scale_sparkline(&sparkline_scores, 60),
             });
         }
         Ok(cards)
@@ -654,6 +667,12 @@ impl GitPulseRuntime {
     pub async fn rebuild_analytics(&self) -> Result<()> {
         let settings = self.inner.config.read().await.settings.clone();
         let score_formula = ScoreFormula::default();
+        let repositories = self.inner.db.list_repositories().await?;
+        let tracked_repo_ids = repositories
+            .iter()
+            .filter(|repo| repo.state != RepositoryState::Removed)
+            .map(|repo| repo.id)
+            .collect::<HashSet<_>>();
 
         let snapshot_rows = sqlx::query(
             "SELECT repo_id, observed_at_utc, language_breakdown_json, staged_additions, staged_deletions
@@ -686,6 +705,9 @@ impl GitPulseRuntime {
 
         for row in &snapshot_rows {
             let repo_id: Uuid = row.get("repo_id");
+            if !tracked_repo_ids.contains(&repo_id) {
+                continue;
+            }
             let observed_at_utc: DateTime<Utc> = row.get("observed_at_utc");
             let day = rollup_day(
                 observed_at_utc,
@@ -722,6 +744,9 @@ impl GitPulseRuntime {
 
         for row in &file_rows {
             let repo_id: Uuid = row.get("repo_id");
+            if !tracked_repo_ids.contains(&repo_id) {
+                continue;
+            }
             let observed_at_utc: DateTime<Utc> = row.get("observed_at_utc");
             let day = rollup_day(
                 observed_at_utc,
@@ -747,6 +772,9 @@ impl GitPulseRuntime {
 
         for row in &commit_rows {
             let repo_id: Uuid = row.get("repo_id");
+            if !tracked_repo_ids.contains(&repo_id) {
+                continue;
+            }
             let authored_at_utc: DateTime<Utc> = row.get("authored_at_utc");
             let day = rollup_day(
                 authored_at_utc,
@@ -774,6 +802,9 @@ impl GitPulseRuntime {
 
         for row in &push_rows {
             let repo_id: Uuid = row.get("repo_id");
+            if !tracked_repo_ids.contains(&repo_id) {
+                continue;
+            }
             let observed_at_utc: DateTime<Utc> = row.get("observed_at_utc");
             let kind: String = row.get("kind");
             if kind != "push_detected_local" {
@@ -810,6 +841,7 @@ impl GitPulseRuntime {
             }
         }
 
+        let mut rollups = Vec::with_capacity(by_scope.len());
         for ((repo_id, day), accumulator) in by_scope {
             let mut rollup = DailyRollup {
                 repo_id,
@@ -828,11 +860,19 @@ impl GitPulseRuntime {
                 score: 0,
             };
             rollup.score = score_formula.score(&rollup).total;
-            self.inner.db.upsert_daily_rollup(&rollup).await?;
+            rollups.push(rollup);
         }
+        self.inner.db.replace_daily_rollups(&rollups).await?;
 
-        let repo_count = self.inner.db.list_repositories().await?.len();
-        let push_count = self.inner.db.list_push_events(None, 1000).await?.len();
+        let repo_count = tracked_repo_ids.len();
+        let push_count = self
+            .inner
+            .db
+            .list_push_events(None, 1000)
+            .await?
+            .into_iter()
+            .filter(|push| tracked_repo_ids.contains(&push.repo_id))
+            .count();
         let overall_rollups = self.inner.db.list_daily_rollups(None, 365).await?;
         let achievements =
             evaluate_achievements(repo_count, push_count, &overall_rollups, &sessions);
@@ -907,8 +947,38 @@ impl GitPulseRuntime {
         Ok(())
     }
 
+    async fn disable_repository_if_root_missing(
+        &self,
+        repo: &Repository,
+        phase: &'static str,
+    ) -> Result<bool> {
+        match std::fs::metadata(&repo.root_path) {
+            Ok(metadata) if metadata.is_dir() => Ok(false),
+            Ok(_) => {
+                warn!(repo_id = %repo.id, path = %repo.root_path, phase, "repository root is not a directory; disabling repo");
+                self.inner
+                    .db
+                    .set_repository_state(repo.id, RepositoryState::Disabled, false)
+                    .await?;
+                Ok(true)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                warn!(repo_id = %repo.id, path = %repo.root_path, phase, "repository root is missing; disabling repo");
+                self.inner
+                    .db
+                    .set_repository_state(repo.id, RepositoryState::Disabled, false)
+                    .await?;
+                Ok(true)
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
     async fn watch_repository(&self, repo: &Repository) -> Result<()> {
-        if !repo.is_monitored {
+        if repo.state != RepositoryState::Active || !repo.is_monitored {
+            return Ok(());
+        }
+        if self.disable_repository_if_root_missing(repo, "watch").await? {
             return Ok(());
         }
         if let Some(watcher) = self.inner.watcher.lock().await.as_mut() {
@@ -919,7 +989,7 @@ impl GitPulseRuntime {
 
     async fn enqueue_all_active_repositories(&self) -> Result<()> {
         for repo in self.inner.db.list_repositories().await? {
-            if repo.state == RepositoryState::Active {
+            if repo.state == RepositoryState::Active && repo.is_monitored {
                 self.enqueue_refresh(repo.id).await;
             }
         }
@@ -1017,5 +1087,41 @@ fn to_trend(rollup: DailyRollup) -> TrendPoint {
         pushes: rollup.pushes,
         focus_minutes: rollup.focus_minutes,
         score: rollup.score,
+    }
+}
+
+fn scale_sparkline(values: &[i64], max_height: i64) -> Vec<i64> {
+    let max_value = values.iter().copied().max().unwrap_or(0);
+    if max_value <= 0 || max_height <= 0 {
+        return values.iter().map(|_| 0).collect();
+    }
+
+    values
+        .iter()
+        .map(|value| {
+            if *value <= 0 {
+                0
+            } else {
+                (((*value as f64 / max_value as f64) * max_height as f64).round() as i64)
+                    .clamp(6, max_height)
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::scale_sparkline;
+
+    #[test]
+    fn scale_sparkline_clamps_large_scores_into_card_height() {
+        let scaled = scale_sparkline(&[5_267, 3_670, 0], 60);
+        assert_eq!(scaled, vec![60, 42, 0]);
+    }
+
+    #[test]
+    fn scale_sparkline_returns_zeroes_when_no_positive_values_exist() {
+        let scaled = scale_sparkline(&[0, 0, 0], 60);
+        assert_eq!(scaled, vec![0, 0, 0]);
     }
 }

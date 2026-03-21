@@ -532,44 +532,36 @@ impl Database {
         rows.into_iter().map(map_session_row).collect()
     }
 
-    pub async fn upsert_daily_rollup(&self, rollup: &DailyRollup) -> Result<()> {
-        let scope = rollup.repo_id.map(|id| id.to_string()).unwrap_or_else(|| "all".into());
-        sqlx::query(
-            "INSERT INTO daily_rollups (
-                scope, day, live_additions, live_deletions, staged_additions, staged_deletions,
-                committed_additions, committed_deletions, commits, pushes, focus_minutes, files_touched,
-                languages_touched, score
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
-             ON CONFLICT(scope, day) DO UPDATE SET
-                live_additions = excluded.live_additions,
-                live_deletions = excluded.live_deletions,
-                staged_additions = excluded.staged_additions,
-                staged_deletions = excluded.staged_deletions,
-                committed_additions = excluded.committed_additions,
-                committed_deletions = excluded.committed_deletions,
-                commits = excluded.commits,
-                pushes = excluded.pushes,
-                focus_minutes = excluded.focus_minutes,
-                files_touched = excluded.files_touched,
-                languages_touched = excluded.languages_touched,
-                score = excluded.score",
-        )
-        .bind(scope)
-        .bind(rollup.day)
-        .bind(rollup.live_additions)
-        .bind(rollup.live_deletions)
-        .bind(rollup.staged_additions)
-        .bind(rollup.staged_deletions)
-        .bind(rollup.committed_additions)
-        .bind(rollup.committed_deletions)
-        .bind(rollup.commits)
-        .bind(rollup.pushes)
-        .bind(rollup.focus_minutes)
-        .bind(rollup.files_touched)
-        .bind(rollup.languages_touched)
-        .bind(rollup.score)
-        .execute(&self.pool)
-        .await?;
+    pub async fn replace_daily_rollups(&self, rollups: &[DailyRollup]) -> Result<()> {
+        let mut transaction = self.pool.begin().await?;
+        sqlx::query("DELETE FROM daily_rollups").execute(&mut *transaction).await?;
+        for rollup in rollups {
+            let scope = rollup.repo_id.map(|id| id.to_string()).unwrap_or_else(|| "all".into());
+            sqlx::query(
+                "INSERT INTO daily_rollups (
+                    scope, day, live_additions, live_deletions, staged_additions, staged_deletions,
+                    committed_additions, committed_deletions, commits, pushes, focus_minutes, files_touched,
+                    languages_touched, score
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            )
+            .bind(scope)
+            .bind(rollup.day)
+            .bind(rollup.live_additions)
+            .bind(rollup.live_deletions)
+            .bind(rollup.staged_additions)
+            .bind(rollup.staged_deletions)
+            .bind(rollup.committed_additions)
+            .bind(rollup.committed_deletions)
+            .bind(rollup.commits)
+            .bind(rollup.pushes)
+            .bind(rollup.focus_minutes)
+            .bind(rollup.files_touched)
+            .bind(rollup.languages_touched)
+            .bind(rollup.score)
+            .execute(&mut *transaction)
+            .await?;
+        }
+        transaction.commit().await?;
         Ok(())
     }
 
