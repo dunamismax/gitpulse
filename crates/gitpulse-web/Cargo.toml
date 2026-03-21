@@ -9,8 +9,8 @@ anyhow.workspace = true
 askama.workspace = true
 axum.workspace = true
 chrono.workspace = true
-gitpulse-core = { path = "../gitpulse-core" }
-gitpulse-runtime = { path = "../gitpulse-runtime" }
+gitpulse-core = { version = "1.0.0", path = "../gitpulse-core" }
+gitpulse-runtime = { version = "1.0.0", path = "../gitpulse-runtime" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
@@ -18,6 +18,6 @@ tower-http.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-gitpulse-infra = { path = "../gitpulse-infra" }
+gitpulse-infra = { version = "1.0.0", path = "../gitpulse-infra" }
 tempfile.workspace = true
 tower = "0.5.2"

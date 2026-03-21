@@ -10,7 +10,7 @@ chrono.workspace = true
 clap.workspace = true
 config.workspace = true
 directories.workspace = true
-gitpulse-core = { path = "../gitpulse-core" }
+gitpulse-core = { version = "1.0.0", path = "../gitpulse-core" }
 globset.workspace = true
 ignore.workspace = true
 mime_guess.workspace = true
