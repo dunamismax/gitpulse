@@ -1,4 +1,5 @@
 /target
+/target-desktop
 /.sqlx
 /.DS_Store
 /dist

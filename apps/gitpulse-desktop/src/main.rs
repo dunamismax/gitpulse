@@ -20,20 +20,18 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![pick_folder])
-        .setup(|app| {
+        .setup(|app| -> std::result::Result<(), Box<dyn std::error::Error>> {
             let runtime =
                 tauri::async_runtime::block_on(GitPulseRuntime::bootstrap(BootstrapOptions {
                     port_override: Some(0),
                     start_background_tasks: true,
                 }))
-                .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
+                .map_err(|error| std::io::Error::other(error.to_string()))?;
 
             let listener =
                 tauri::async_runtime::block_on(tokio::net::TcpListener::bind(("127.0.0.1", 0)))
-                    .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
-            let addr = listener
-                .local_addr()
-                .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
+                    .map_err(std::io::Error::other)?;
+            let addr = listener.local_addr().map_err(std::io::Error::other)?;
 
             let server_runtime = runtime.clone();
             tauri::async_runtime::spawn(async move {
