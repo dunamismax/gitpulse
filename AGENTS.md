@@ -6,6 +6,8 @@ This file is concise repo memory for future agents and developers. `BUILD.md` is
 
 GitPulse is a local-first Rust desktop and web app for tracking repository activity across one or many git repos. It focuses on live working-tree changes, staged work, qualifying commits, local push detection, sessions, streaks, goals, score, achievements, and lightweight historical analytics without uploading source code.
 
+The long-term vision extends to a plugin-extensible platform with a REST API, multi-device sync, IDE integrations, and optional team analytics — all while preserving local-first principles. See `ROADMAP.md` for the full picture.
+
 ## Architecture
 
 - `crates/gitpulse-core/`
@@ -17,13 +19,13 @@ GitPulse is a local-first Rust desktop and web app for tracking repository activ
 - `crates/gitpulse-web/`
   - Axum routes, Askama templates, HTMX partials, local assets, and server-side SVG chart rendering.
 - `apps/gitpulse-cli/`
-  - `serve`, `add`, `rescan`, `import`, and `doctor` commands.
+  - `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor` commands.
 - `apps/gitpulse-desktop/`
   - Thin Tauri v2 shell that hosts the same localhost UI and exposes a native folder picker bridge.
 - `migrations/0001_init.sql`
   - Source of truth for the SQLite schema.
 
-## Design Notes
+## Design notes
 
 - GitPulse keeps live work, committed work, and pushed work separate throughout the product.
 - Canonical accounting comes from git snapshots and persisted events, not raw filesystem watcher events.
@@ -32,8 +34,22 @@ GitPulse is a local-first Rust desktop and web app for tracking repository activ
 - Global include/exclude patterns are user-editable in settings, and per-repo overrides are editable from the repository detail page.
 - Repo-specific pattern changes immediately rescan active repos, but they do not retroactively rewrite previously stored file-activity history.
 - Analytics rebuilds remain full-history and synchronous for v1, and `gitpulse rebuild-rollups` reports scanned row counts plus elapsed time so operators can see rebuild cost.
+- Repo-controlled strings (paths, branch names, labels) are treated as untrusted input in all rendering contexts.
 
-## Verified Commands
+## Key documents
+
+| Document | Purpose |
+|----------|---------|
+| `BUILD.md` | Execution ledger, phase tracking (0-19), verification history, decision log |
+| `ROADMAP.md` | Public-facing product vision (v1/v2/v3) |
+| `CONTRIBUTING.md` | Development setup, architecture rules, contribution workflow |
+| `CHANGELOG.md` | Release history |
+| `docs/architecture.md` | Crate boundaries, data flow, future architecture |
+| `docs/metrics.md` | Metric definitions, semantics, caveats |
+| `docs/desktop-release.md` | Desktop packaging scope and operator workflow |
+| `docs/plugin-architecture.md` | Extension system design (planned for v2) |
+
+## Verified commands
 
 ```bash
 cargo check --workspace --exclude gitpulse-desktop
@@ -45,18 +61,21 @@ cargo check -p gitpulse-desktop
 ./scripts/desktop-smoke.sh
 ```
 
-## Current Gaps
+## Current gaps
 
 - There is no incremental or scoped analytics rebuild strategy yet; longer-lived datasets still rely on the full-history rebuild path.
 - Desktop packaging expectations are now documented around an operator-run macOS `.app` bundle flow, but CI still does not build bundles and signing/notarization remain out of scope.
 - There is no destructive history purge UI flow.
 - Push detection is local-state-based first and optional GitHub confirmation second.
+- No REST API exists yet (planned Phase 10).
+- No plugin system exists yet (planned Phase 11).
 
-## Working Agreement
+## Working agreement
 
-- Keep `BUILD.md`, `AGENTS.md`, `README.md`, `docs/metrics.md`, and `docs/desktop-release.md` aligned when product behavior or release workflow changes.
+- Keep `BUILD.md`, `AGENTS.md`, `README.md`, `ROADMAP.md`, `docs/metrics.md`, and `docs/desktop-release.md` aligned when product behavior or release workflow changes.
 - Prefer adding tests when changing git parsing, rollup math, or runtime orchestration.
 - If route or template behavior changes, keep the HTMX partial paths and route smoke tests in sync.
+- New phases or milestones should be reflected in both `BUILD.md` and `ROADMAP.md`.
 - Treat these files as first-update targets after meaningful behavior changes:
   - `crates/gitpulse-core/src/*`
   - `crates/gitpulse-infra/src/*`

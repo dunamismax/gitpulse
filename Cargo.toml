@@ -17,11 +17,15 @@ default-members = [
 resolver = "3"
 
 [workspace.package]
-version = "1.0.0"
+version = "0.1.0"
 edition = "2024"
 license = "MIT"
-authors = ["Sawyer"]
-repository = "https://example.invalid/gitpulse"
+authors = ["Stephen Sawyer <dunamismax>"]
+repository = "https://github.com/dunamismax/gitpulse"
+homepage = "https://github.com/dunamismax/gitpulse"
+description = "Local-first git activity analytics. Track commits, pushes, sessions, and streaks across repositories without uploading source code."
+keywords = ["git", "analytics", "developer-tools", "productivity", "local-first"]
+categories = ["development-tools", "command-line-utilities"]
 
 [workspace.dependencies]
 anyhow = "1.0.100"

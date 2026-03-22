@@ -1,10 +1,10 @@
 # GitPulse Build Plan
 
 Last updated: 2026-03-22
-Status: active product hardening and release-shaping
-Scope: local-first Rust desktop and web app for repository activity analytics
+Status: active product hardening, release-shaping, and long-term roadmap expansion
+Scope: local-first Rust desktop and web app for repository activity analytics, growing toward a plugin-extensible developer analytics platform
 Primary UI: localhost Axum + Askama + HTMX dashboard, with a thin Tauri desktop shell over the same runtime
-Primary delivery order: analytics correctness and trust first, then desktop confidence and release workflow, then rebuild scale and data-lifecycle cleanup
+Primary delivery order: v1 stabilization (performance, data lifecycle, release readiness), then API surface and plugin system, then multi-device sync and integrations
 
 ## Purpose
 
@@ -20,6 +20,8 @@ Claims about verification, product behavior, release posture, and open risks sho
 - Reuse one Rust runtime across CLI, local web, and desktop surfaces instead of letting each shell fork behavior.
 - Keep the persistence model inspectable and rebuildable: raw events, derived rollups, and gamified score should remain distinct.
 - Make the repo easy for multiple contributors or agents to work in without blurring crate boundaries or documentation ownership.
+- Grow toward a plugin-extensible platform with a REST API, multi-device sync, and IDE integrations — without abandoning local-first principles.
+- Keep team analytics opt-in and privacy-first if they're ever built. Never become surveillance tooling.
 
 ## Current Repository Snapshot
 
@@ -165,10 +167,16 @@ CI is also wired to run `cargo fmt --all -- --check`, `cargo deny check`, and a 
 
 ## Source Of Truth By Concern
 
-- Project status, roadmap, verification history, and handoff rules:
+- Project status, execution phases, verification history, and handoff rules:
   - `BUILD.md`
+- Public-facing product vision and milestones:
+  - `ROADMAP.md`
 - User-facing product story and local run instructions:
   - `README.md`
+- Development setup and contribution workflow:
+  - `CONTRIBUTING.md`
+- Release history:
+  - `CHANGELOG.md`
 - Concise repo memory for future contributors:
   - `AGENTS.md`
 - Architecture boundaries and product flow:
@@ -178,6 +186,8 @@ CI is also wired to run `cargo fmt --all -- --check`, `cargo deny check`, and a 
 - Desktop packaging scope and operator workflow:
   - `docs/desktop-release.md`
   - `scripts/desktop-package.sh`
+- Plugin/extension system design (planned):
+  - `docs/plugin-architecture.md`
 - Workspace members, dependency policy, lint policy, and release profile:
   - `Cargo.toml`
 - Toolchain pinning and formatter/lint support files:
@@ -285,6 +295,7 @@ CI is also wired to run `cargo fmt --all -- --check`, `cargo deny check`, and a 
 
 ## Phase Dashboard
 
+### v1 — Local-first foundation
 - Phase 0 - Product charter and source-of-truth capture. Status: done.
 - Phase 1 - Workspace, schema, and infrastructure foundation. Status: done.
 - Phase 2 - Runtime orchestration and analytics model. Status: done.
@@ -295,6 +306,20 @@ CI is also wired to run `cargo fmt --all -- --check`, `cargo deny check`, and a 
 - Phase 7 - Desktop confidence and release operations. Status: in progress.
 - Phase 8 - Data lifecycle and operator controls. Status: not started.
 - Phase 9 - v1 stabilization and release readiness. Status: not started.
+
+### v2 — Platform and extensibility
+- Phase 10 - REST API and programmatic access. Status: not started.
+- Phase 11 - Plugin and extension system. Status: not started.
+- Phase 12 - Advanced analytics and insights. Status: not started.
+- Phase 13 - Cross-platform desktop releases. Status: not started.
+- Phase 14 - Notifications and alerting. Status: not started.
+
+### v3 — Connectivity and ecosystem
+- Phase 15 - Multi-device sync (optional, encrypted). Status: not started.
+- Phase 16 - IDE integrations. Status: not started.
+- Phase 17 - External service integrations. Status: not started.
+- Phase 18 - Team and organization analytics (opt-in). Status: not started.
+- Phase 19 - Mobile companion. Status: not started.
 
 ## Parallel Work Lanes
 
@@ -492,12 +517,203 @@ Exit criteria:
 
 - [ ] The repository tells a coherent, truthful, shippable story to both users and contributors.
 
+### Phase 10 - REST API and programmatic access
+
+Status: not started
+
+- [ ] Design and document a versioned REST API surface (`/api/v1/`) exposing read access to repositories, snapshots, rollups, sessions, streaks, and achievements.
+- [ ] Add JSON response serialization for all analytics data currently rendered server-side.
+- [ ] Add API key authentication for local access (no cloud auth — just a bearer token in config).
+- [ ] Add OpenAPI/Swagger spec generation or a hand-maintained spec file.
+- [ ] Add rate limiting and request logging.
+- [ ] Add a `/api/v1/health` endpoint for monitoring and integration testing.
+- [ ] Add write endpoints for repo management (add, remove, update patterns) gated behind auth.
+- [ ] Add webhook support for external consumers to subscribe to events (commits, pushes, session boundaries).
+- [ ] Ensure the API surface is usable from scripts, CI pipelines, and external dashboards.
+
+Exit criteria:
+
+- [ ] GitPulse data is programmatically accessible without scraping the HTML dashboard.
+- [ ] The API is documented, versioned, and authenticated.
+
+### Phase 11 - Plugin and extension system
+
+Status: not started
+
+- [ ] Design a plugin architecture that allows extending GitPulse without forking (see `docs/plugin-architecture.md`).
+- [ ] Define plugin lifecycle: discovery, loading, initialization, teardown.
+- [ ] Define plugin capabilities: custom metrics, custom achievements, custom dashboard widgets, custom data sources.
+- [ ] Implement a plugin manifest format (TOML-based, declaring capabilities and dependencies).
+- [ ] Implement plugin isolation (separate process or WASM sandbox to prevent plugins from corrupting core state).
+- [ ] Ship at least two first-party plugins as proof-of-concept: a custom achievement pack and a data export plugin.
+- [ ] Add plugin management to the CLI (`gitpulse plugin install/list/remove`).
+- [ ] Add plugin configuration to `gitpulse.toml`.
+- [ ] Document the plugin development story for third-party authors.
+
+Exit criteria:
+
+- [ ] A third-party developer can write, package, and distribute a GitPulse plugin without modifying core.
+- [ ] The plugin boundary is clean enough that core upgrades don't break well-behaved plugins.
+
+### Phase 12 - Advanced analytics and insights
+
+Status: not started
+
+- [ ] Add time-of-day and day-of-week activity heatmaps with configurable time bucketing.
+- [ ] Add per-repository trend analysis: velocity changes, consistency scores, burnout indicators.
+- [ ] Add cross-repository correlation: which repos are worked on together, context-switching frequency.
+- [ ] Add code complexity tracking integration (optional — uses external tools like `tokei` extended metrics or language-specific analyzers).
+- [ ] Add configurable "developer profile" — personal analytics summary with exportable snapshots.
+- [ ] Add weekly/monthly digest generation (Markdown or HTML report output).
+- [ ] Add goal tracking history and trend visualization.
+- [ ] Keep all analytics derivable from stored events — no black-box ML, no opaque scoring.
+
+Exit criteria:
+
+- [ ] GitPulse provides genuinely useful insights beyond raw counters.
+- [ ] Analytics remain interpretable and rebuildable from event data.
+
+### Phase 13 - Cross-platform desktop releases
+
+Status: not started
+
+- [ ] Add Windows desktop build path (Tauri supports Windows natively).
+- [ ] Add Linux desktop build path (AppImage or .deb).
+- [ ] Set up CI-produced desktop artifacts for all three platforms.
+- [ ] Implement macOS code signing and notarization in CI.
+- [ ] Implement Windows code signing in CI.
+- [ ] Add auto-update support via Tauri's built-in updater.
+- [ ] Add updater key management and signing workflow.
+- [ ] Document the release workflow for all platforms.
+- [ ] Add platform-specific smoke tests in CI.
+
+Exit criteria:
+
+- [ ] Users on macOS, Windows, and Linux can download a signed, auto-updating desktop app.
+- [ ] The release pipeline is reproducible and CI-driven.
+
+### Phase 14 - Notifications and alerting
+
+Status: not started
+
+- [ ] Add configurable notifications for streak milestones, goal completion, and achievement unlocks.
+- [ ] Add native desktop notifications via Tauri notification API.
+- [ ] Add optional daily/weekly summary notifications.
+- [ ] Add inactivity alerts (configurable — "you haven't committed in X hours").
+- [ ] Add webhook-based notifications for external consumers (Slack, Discord, etc.).
+- [ ] Keep notifications opt-in and non-intrusive by default.
+- [ ] Add notification preferences to settings UI.
+
+Exit criteria:
+
+- [ ] GitPulse can proactively surface relevant information without requiring the user to check the dashboard.
+- [ ] Notifications are useful, not annoying. Defaults are conservative.
+
+### Phase 15 - Multi-device sync (optional, encrypted)
+
+Status: not started
+
+- [ ] Design a sync protocol that preserves local-first principles (CRDTs or operation-based sync).
+- [ ] Implement encrypted local export/import for manual device transfer.
+- [ ] Add optional sync server support (self-hostable, no vendor lock-in).
+- [ ] Ensure sync is end-to-end encrypted — the sync server never sees plaintext analytics data.
+- [ ] Add conflict resolution for overlapping sessions and rollups from different devices.
+- [ ] Add sync status UI in settings.
+- [ ] Keep GitPulse fully functional without sync enabled — sync is additive, not required.
+- [ ] Document the self-hosted sync server setup.
+
+Exit criteria:
+
+- [ ] A developer working across multiple machines sees a unified analytics picture.
+- [ ] Sync is optional, encrypted, and self-hostable. No cloud vendor dependency.
+
+### Phase 16 - IDE integrations
+
+Status: not started
+
+- [ ] Build a VS Code extension that shows GitPulse status in the status bar (current streak, session time, today's score).
+- [ ] Add VS Code sidebar panel with mini-dashboard (today's stats, active session, recent achievements).
+- [ ] Build a JetBrains plugin with equivalent status bar and tool window functionality.
+- [ ] Have IDE integrations communicate with the running GitPulse instance via the REST API (Phase 10).
+- [ ] Add "focus mode" integration — IDE can signal session start/end to GitPulse.
+- [ ] Keep IDE integrations lightweight — they read from GitPulse, they don't duplicate the runtime.
+- [ ] Publish extensions to VS Code Marketplace and JetBrains Marketplace.
+
+Exit criteria:
+
+- [ ] Developers see their GitPulse data where they already work without switching to a browser.
+- [ ] IDE integrations are thin API clients, not separate analytics engines.
+
+### Phase 17 - External service integrations
+
+Status: not started
+
+- [ ] Add GitLab push verification support (parallel to existing GitHub verification).
+- [ ] Add Gitea/Forgejo push verification support.
+- [ ] Add Bitbucket push verification support.
+- [ ] Add optional Jira/Linear/GitHub Issues integration for correlating commits with tickets.
+- [ ] Add calendar integration for correlating focus sessions with meeting schedules.
+- [ ] Design integration as a plugin capability so new services can be added without modifying core.
+- [ ] Keep all integrations opt-in and clearly documented about what data is sent.
+
+Exit criteria:
+
+- [ ] GitPulse works with the forges and tools developers actually use, not just GitHub.
+- [ ] Integration scope and data sharing are transparent and configurable.
+
+### Phase 18 - Team and organization analytics (opt-in)
+
+Status: not started
+
+- [ ] Design team analytics as an additive layer on top of personal analytics — never mandatory.
+- [ ] Add team creation and membership management.
+- [ ] Add aggregated team dashboards (anonymous by default — show team totals, not individual rankings).
+- [ ] Add configurable privacy controls — each developer chooses what to share with their team.
+- [ ] Add team goal setting and progress tracking.
+- [ ] Ensure team features work in self-hosted environments, not just cloud.
+- [ ] Explicitly avoid gamification that creates unhealthy competition (no individual leaderboards by default).
+- [ ] Document the privacy model and data sharing boundaries.
+
+Exit criteria:
+
+- [ ] Teams can see aggregate activity without surveillance. Individual privacy is the default.
+- [ ] Team features are opt-in at every level: the individual, the team, and the organization.
+
+### Phase 19 - Mobile companion
+
+Status: not started
+
+- [ ] Build a mobile companion app for viewing analytics on the go (read-only initially).
+- [ ] Use the REST API (Phase 10) or sync protocol (Phase 15) for data access.
+- [ ] Support iOS and Android (evaluate: native, React Native, or Tauri mobile).
+- [ ] Show daily summary, current streak, recent achievements, and session history.
+- [ ] Add push notifications for streak maintenance and achievement unlocks.
+- [ ] Keep the mobile app lightweight and focused — it's a viewer, not a full dashboard.
+
+Exit criteria:
+
+- [ ] Developers can check their stats from their phone.
+- [ ] The mobile app does not require the desktop/CLI to be running if sync is enabled.
+
 ## Open Decisions And Unresolved Scope
 
+### v1 scope
 - Should `rebuild_analytics()` remain a full-history synchronous operation for v1, or is an incremental/scoped strategy necessary before real-world datasets get larger?
 - Do repo-specific include/exclude overrides need a first-class retroactive cleanup/reimport flow before v1, or is forward-only behavior acceptable if documented clearly?
 - Is explicit history purge intentionally out of scope for the first release, or does the product need a supported data-deletion/admin surface?
 - Should bundle builds remain operator-local until signing/notarization are real scope, or does the project want a CI-produced unsigned artifact before then?
+
+### v2 scope
+- What is the right plugin isolation model? Separate processes (simpler, safer) vs WASM (more portable, sandboxed) vs dynamic linking (fastest, least safe)?
+- Should the REST API use an existing framework convention (JSON:API, OpenAPI-first) or stay minimal and custom?
+- When does the project need a proper website and docs site beyond the GitHub README?
+- Should advanced analytics (Phase 12) be built into core or designed as first-party plugins to prove the plugin system?
+
+### v3 scope
+- What sync protocol fits the local-first constraint? CRDTs, event sourcing with merge, or something simpler?
+- Should the sync server be a separate open-source project or live in this repo?
+- Is the mobile companion worth building natively, or is a PWA sufficient?
+- How do team analytics avoid becoming surveillance? What privacy defaults are non-negotiable?
 
 ## Risk Register
 
@@ -526,10 +742,18 @@ Exit criteria:
 
 ## Immediate Next Moves
 
+### v1 critical path
 1. Resolve the Phase 6 strategy question: keep `rebuild_analytics()` full-history and synchronous for v1 with explicit bounds, or start the incremental/scoped redesign before scale makes the app feel laggy.
 2. Run and record one real macOS bundle-build verification pass for `./scripts/desktop-package.sh`, or explicitly decide that bundle builds remain documented-but-unverified until release time.
 3. Decide whether Phase 8 cleanup/admin flows are real product scope for v1 or explicitly deferred so the repo stops carrying ambiguous expectations.
 4. Reconfirm release-facing docs and UI language after the remaining rebuild-strategy and desktop packaging decisions land.
+5. Cut v0.1.0 release once phases 6-9 are resolved.
+
+### v2 preparation
+6. Design the REST API surface (Phase 10) — this unblocks IDE integrations, mobile, and plugins.
+7. Prototype the plugin isolation model (Phase 11) — validate the process-based JSON-RPC approach with a simple first-party plugin.
+8. Set up cross-platform CI for desktop builds (Phase 13) — Windows and Linux Tauri builds.
+9. Evaluate auto-update infrastructure (Tauri updater, signing key management).
 
 ## Progress Log
 

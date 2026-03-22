@@ -1,27 +1,71 @@
+# GitPulse configuration
+# Copy this file to your platform's config directory and customize.
+#
+# Platform paths:
+#   macOS:   ~/Library/Application Support/dev.GitPulse.GitPulse/gitpulse.toml
+#   Linux:   ~/.config/dev/GitPulse/GitPulse/gitpulse.toml
+#   Windows: %APPDATA%\dev\GitPulse\GitPulse\config\gitpulse.toml
+#
+# All settings have sensible defaults. Only override what you need.
+# Environment variables: prefix any key with GITPULSE_ (e.g., GITPULSE_SERVER_PORT=8080)
+
+# --- Server ---
+# Host and port for the web dashboard.
 server_host = "127.0.0.1"
 server_port = 7467
 
+# --- Goals ---
+# Daily targets for the dashboard progress indicators.
+# These are personal motivation targets, not mandates.
 [settings.goals]
 changed_lines_per_day = 250
 commits_per_day = 3
 focus_minutes_per_day = 90
 
+# --- Monitoring ---
+# Controls how GitPulse discovers and watches repositories.
 [settings.monitoring]
+# How many days of commit history to import on first add.
 import_days = 30
+
+# Minutes of inactivity before a focus session boundary.
 session_gap_minutes = 15
+
+# How deep to search when discovering repos in a parent folder.
 repo_discovery_depth = 5
+
+# Debounce interval for filesystem watcher events (milliseconds).
 watcher_debounce_ms = 700
+
+# Polling interval when no active changes detected (seconds).
 idle_poll_seconds = 20
+
+# Polling interval during active work (seconds).
 live_poll_seconds = 2
 
+# --- UI ---
+# Timezone and day boundary affect streaks, goals, and "today" views.
 [settings.ui]
+# Your local timezone (IANA format). Affects daily rollups and streak calculation.
+# Examples: "America/New_York", "Europe/London", "Asia/Tokyo"
 timezone = "UTC"
+
+# Offset in minutes from midnight for the day boundary.
+# Set to 240 (4 AM) if you code late and want your night session to count as "today".
 day_boundary_minutes = 0
 
+# --- GitHub ---
+# Optional GitHub integration for push verification.
+# GitPulse works fully without this — it's supplemental, not required.
 [settings.github]
 enabled = false
+# token = "ghp_your_token_here"  # Personal access token (read-only scope sufficient)
 verify_remote_pushes = false
 
+# --- Patterns ---
+# Global include/exclude patterns for file activity tracking.
+# Excludes always win over includes when both match.
+# Per-repo overrides can be set from the repository detail page in the dashboard.
 [settings.patterns]
 include = []
 exclude = [
@@ -41,8 +85,27 @@ exclude = [
   "**/*.jpeg",
   "**/*.gif",
   "**/*.pdf",
+  "**/*.woff",
+  "**/*.woff2",
+  "**/*.ttf",
+  "**/*.eot",
+  "**/*.ico",
+  "**/*.svg",
+  "**/*.mp4",
+  "**/*.mp3",
+  "**/*.zip",
+  "**/*.tar.gz",
+  "**/*.wasm",
 ]
 
+# --- Author identities ---
+# GitPulse uses these to filter commit/push history.
+# Live working-tree activity always counts regardless of author config.
+# Add multiple entries if you use different emails across repos.
 [[settings.authors]]
 email = "you@example.com"
 name = "Your Name"
+
+# [[settings.authors]]
+# email = "you@work.com"
+# name = "Your Work Name"

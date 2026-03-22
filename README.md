@@ -1,132 +1,165 @@
 # GitPulse
 
-GitPulse is a local-first Rust desktop and web app for tracking git activity across one or many repositories. It watches live working-tree changes, imports recent history, and serves the same localhost UI to the browser and the thin Tauri desktop shell without uploading source code or diffs.
+**Local-first git activity analytics for developers who care about their craft.**
 
-## Current state
+GitPulse watches your repositories, tracks your commits, sessions, and streaks, and gives you an honest picture of how you work — without uploading a single line of source code.
 
-GitPulse is already a real local product surface, not just a metrics sketch.
+[![CI](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-It currently includes:
+## Why GitPulse
 
-- a local Axum + Askama + HTMX dashboard
-- a thin Tauri v2 desktop shell over the same runtime and routes
-- direct repo add plus parent-folder discovery flows
-- live working-tree and staged snapshotting
-- recent-history import for tracked repositories
-- local push detection, focus sessions, streaks, goals, score, achievements, and rollups
-- repo-specific include/exclude overrides from the repository detail page
+Most developer analytics tools want your code in their cloud. GitPulse doesn't.
 
-It is intentionally:
+- **Your code stays on your machine.** No source upload, no diff content persistence, no telemetry phone-home.
+- **Three ledgers, not one number.** Live work, committed work, and pushed work are tracked separately because they mean different things.
+- **One runtime, every surface.** CLI, browser dashboard, and native desktop app all share the same engine and data.
+- **Works offline.** No GitHub token required. No internet required. GitHub integration is optional and supplemental.
+- **Honest metrics.** Line counts are approximate operational telemetry, not a measure of your worth. The UI says so.
 
-- local-first and offline-first by default
-- focused on personal repository analytics rather than team or cloud workflows
-- built around metadata and derived analytics, not source-code upload
+## What it does
 
-It does **not** currently include:
-
-- team or cloud mode
-- a mobile client
-- an explicit history-purge UI flow
+- Watches live working-tree and staged changes across tracked repositories
+- Imports recent commit history with configurable lookback
+- Detects local pushes from upstream state transitions
+- Optionally verifies pushes against the GitHub API
+- Computes focus sessions, daily rollups, streaks, goals, and score
+- Generates server-side SVG charts for activity trends, heatmaps, and language breakdowns
+- Supports per-repo include/exclude pattern overrides
+- Serves everything through a local Axum + Askama + HTMX dashboard
+- Wraps the same UI in a thin Tauri v2 desktop shell with native folder picking
 
 ## Quick start
 
-Run the local web app:
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (stable, 1.85+)
+- Git (2.30+)
+- SQLite (bundled via SQLx)
+
+### Run the dashboard
 
 ```bash
+git clone https://github.com/dunamismax/gitpulse.git
+cd gitpulse
 cargo run -p gitpulse-cli -- serve
 ```
 
-Useful CLI commands:
+Open `http://127.0.0.1:7467` in your browser.
+
+### Track repositories
 
 ```bash
-cargo run -p gitpulse-cli -- add /path/to/repo-or-folder
-cargo run -p gitpulse-cli -- rescan --all
+# Add a single repo
+cargo run -p gitpulse-cli -- add /path/to/your/repo
+
+# Or discover all repos under a folder
+cargo run -p gitpulse-cli -- add /path/to/projects
+
+# Import last 30 days of history
 cargo run -p gitpulse-cli -- import --all --days 30
-cargo run -p gitpulse-cli -- rebuild-rollups
-cargo run -p gitpulse-cli -- doctor
+
+# Rescan all tracked repos
+cargo run -p gitpulse-cli -- rescan --all
 ```
 
-`gitpulse serve` starts the dashboard on `127.0.0.1:7467` by default.
+### CLI reference
 
-Run the desktop shell:
+| Command | Purpose |
+|---------|---------|
+| `serve` | Start the web dashboard on localhost:7467 |
+| `add <path>` | Track a repo or discover repos in a folder |
+| `rescan --all\|--repo <id>` | Refresh repository snapshots |
+| `import --all\|--repo <id> --days N` | Import historical commits |
+| `rebuild-rollups` | Rebuild all derived analytics from raw events |
+| `doctor` | Run diagnostic checks |
+
+### Desktop app
 
 ```bash
 cargo run -p gitpulse-desktop
 ```
 
-The desktop app launches the same GitPulse runtime on a random localhost port, loads the same UI in a Tauri window, and exposes a native folder-picker bridge when the desktop shell is available.
+The desktop shell launches the same runtime on a random localhost port, loads the dashboard in a native window, and adds a native folder picker. See [docs/desktop-release.md](docs/desktop-release.md) for packaging.
 
-For a repeatable desktop startup check, run:
+## Architecture
 
-```bash
-./scripts/desktop-smoke.sh
+```
+                    CLI / Web / Desktop
+                          |
+                    gitpulse-runtime     ← orchestration
+                     /          \
+            gitpulse-core    gitpulse-infra   ← domain + boundaries
+                                |
+                    gitpulse-web             ← presentation
 ```
 
-For the currently supported macOS bundle flow, use:
+| Crate | Responsibility |
+|-------|---------------|
+| `gitpulse-core` | Domain models, score formula, streak logic, sessions, timezone handling, achievements |
+| `gitpulse-infra` | SQLite persistence, config loading, git CLI integration, file watching, GitHub API, exclusion patterns |
+| `gitpulse-runtime` | Repo discovery, import/refresh orchestration, push detection, analytics rebuilds, query API |
+| `gitpulse-web` | Axum routes, Askama templates, HTMX partials, SVG chart rendering |
+| `gitpulse-cli` | Headless CLI entrypoint |
+| `gitpulse-desktop` | Thin Tauri v2 shell over the same runtime |
 
-```bash
-./scripts/desktop-package.sh
-```
-
-That packaging path is intentionally limited to an unsigned macOS `.app` bundle for now. See [docs/desktop-release.md](docs/desktop-release.md).
+Full architecture details: [docs/architecture.md](docs/architecture.md)
 
 ## Product model
 
-GitPulse keeps three ledgers separate on purpose:
+GitPulse keeps three activity ledgers separate on purpose:
 
-- live work in the working tree
-- committed work
-- pushed work
+| Ledger | Question it answers |
+|--------|-------------------|
+| **Live work** | What am I actively changing right now? |
+| **Committed work** | What did I actually commit? |
+| **Pushed work** | What has moved toward a remote? |
 
-That separation is part of the product, not a reporting accident. The app is trying to answer different questions cleanly:
-
-- what am I actively changing right now?
-- what did I actually commit?
-- what has really moved toward a remote?
-
-It also stays deliberately local-first:
-
-- no source code upload
-- no diff content persistence
-- optional GitHub verification only when explicitly configured
-
-## Architecture overview
-
-- `gitpulse-core`
-  - Domain models, score formula, streak logic, sessionization, timezone/day-boundary helpers, and achievement rules.
-- `gitpulse-infra`
-  - App directories, layered config loading, SQLite/SQLx persistence, migrations, git CLI integration, exclusions, watcher service, and optional GitHub verification.
-- `gitpulse-runtime`
-  - Repo discovery, add/import/refresh orchestration, push detection, analytics rebuilds, and high-level queries for the CLI, web UI, and desktop shell.
-- `gitpulse-web`
-  - Axum routes, Askama templates, HTMX partials, local assets, and server-side SVG chart generation.
-- `apps/gitpulse-cli`
-  - `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor` commands.
-- `apps/gitpulse-desktop`
-  - Thin Tauri v2 shell that hosts the same localhost UI and exposes a native folder picker bridge.
-
-More detail lives in [docs/architecture.md](docs/architecture.md).
+This separation is the product, not a reporting accident. Collapsing them into one number would destroy the signal.
 
 ## Configuration
 
-GitPulse uses layered config:
+GitPulse uses layered config with sensible defaults:
 
-1. internal defaults
-2. `gitpulse.toml`
+1. Internal defaults
+2. `gitpulse.toml` (platform-specific location)
 3. `GITPULSE_*` environment variables
-4. CLI overrides where applicable
+4. CLI overrides
 
-Sample config: [gitpulse.example.toml](gitpulse.example.toml)
+See [gitpulse.example.toml](gitpulse.example.toml) for all options.
 
-Platform-specific locations:
+**Platform paths:**
 
-- config: `ProjectDirs(dev/GitPulse/GitPulse)/config/gitpulse.toml`
-- data: `ProjectDirs(dev/GitPulse/GitPulse)/data/gitpulse.sqlite3`
-- logs: `ProjectDirs(dev/GitPulse/GitPulse)/data/logs/`
+| Platform | Config | Data |
+|----------|--------|------|
+| macOS | `~/Library/Application Support/dev.GitPulse.GitPulse/gitpulse.toml` | `~/Library/Application Support/dev.GitPulse.GitPulse/gitpulse.sqlite3` |
+| Linux | `~/.config/dev/GitPulse/GitPulse/gitpulse.toml` | `~/.local/share/dev/GitPulse/GitPulse/gitpulse.sqlite3` |
+| Windows | `%APPDATA%\dev\GitPulse\GitPulse\config\gitpulse.toml` | `%APPDATA%\dev\GitPulse\GitPulse\data\gitpulse.sqlite3` |
+
+## Privacy and data model
+
+- **Offline-first by default.** No external service required.
+- **No source code upload.** Only metadata: repo identity, file paths, timestamps, line counts, commit hashes, branch info.
+- **No diff content persistence.** Diffs are read, counted, and discarded.
+- **GitHub verification is opt-in.** Only sends commit metadata needed to check remote reachability.
+- **All data is local SQLite.** Inspect it, back it up, delete it — it's your file.
+
+## Metrics and scoring
+
+GitPulse tracks:
+
+- **Live/staged line changes** — current working-tree snapshot, not accumulated
+- **Commit totals** — filtered by configured author identities
+- **Push detection** — from ahead/behind state transitions + optional GitHub confirmation
+- **Focus sessions** — contiguous activity windows (default: 15-min gap threshold)
+- **Streaks** — consecutive qualifying days (commits, lines, or focus time)
+- **Score** — momentum metric: `floor(lines/20) + 50*commits + 80*pushes + 2*focus_minutes`
+
+Score is not a proxy for code quality. The UI makes that clear.
+
+Full metric semantics: [docs/metrics.md](docs/metrics.md)
 
 ## Local verification
-
-Common local verification paths:
 
 ```bash
 cargo check --workspace --exclude gitpulse-desktop
@@ -134,52 +167,42 @@ cargo test --workspace --exclude gitpulse-desktop
 cargo nextest run --workspace --exclude gitpulse-desktop
 cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings
 cargo run -p gitpulse-cli -- doctor
-cargo run -p gitpulse-cli -- rebuild-rollups
-cargo check -p gitpulse-desktop
 ./scripts/desktop-smoke.sh
 ```
 
-CI keeps the main Linux lane focused on CLI/web checks and runs a dedicated macOS desktop compile lane separately. Bundle builds are still operator-run on macOS rather than CI-produced release artifacts. See [BUILD.md](BUILD.md) for the reviewed command history and current open risks.
+## Roadmap
 
-## Data and privacy model
+GitPulse is under active development. See [ROADMAP.md](ROADMAP.md) for the full vision.
 
-- offline-first by default
-- no source code upload
-- no diff content persistence
-- only metadata is stored:
-  - repo identity and normalized paths
-  - relative file paths
-  - timestamps
-  - additions/deletions counts
-  - commit hashes and branch/upstream metadata
-  - sessions, rollups, achievements, and settings
-- optional GitHub verification is opt-in and only sends commit metadata needed to verify remote reachability for GitHub remotes
+**Current focus:** v1 stabilization — performance, data lifecycle, release readiness.
 
-## Current caveats
+**Coming next:**
 
-- Live line counts are approximate and reflect current working-tree or imported diff metadata, not code value.
-- Untracked files count as additions only when they look like text and stay under a simple size threshold.
-- Binary churn, generated paths, vendored content, lockfiles, and common build outputs are excluded by default.
-- Global patterns can be overridden per repository from the detail page, but excludes still win over includes.
-- Commit and push history totals are filtered by configured author identities. Live local activity always counts.
-- Changing repo-specific patterns immediately rescans active repos, but it does not retroactively rewrite previously stored file-activity history.
-- Analytics rebuilds are still full-history and synchronous for now.
+- Incremental analytics rebuilds for large datasets
+- REST API for external integrations
+- Plugin/extension system
+- Multi-device sync (optional, encrypted, local-first)
+- Cross-platform desktop installers (signed and notarized)
+- IDE integrations (VS Code, JetBrains)
 
-More detail lives in [docs/metrics.md](docs/metrics.md).
+## Contributing
 
-## Repo docs
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture guidelines, and contribution workflow.
 
-- [BUILD.md](BUILD.md)
-  - canonical operational handoff, phase/status tracking, verification history, and current risks
-- [AGENTS.md](AGENTS.md)
-  - concise repo memory for future coding passes
-- [docs/architecture.md](docs/architecture.md)
-  - crate boundaries and runtime design
-- [docs/metrics.md](docs/metrics.md)
-  - metric semantics and caveats
-- [docs/desktop-release.md](docs/desktop-release.md)
-  - current desktop packaging scope and operator workflow
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [BUILD.md](BUILD.md) | Execution ledger, phase tracking, verification history, decision log |
+| [ROADMAP.md](ROADMAP.md) | Public-facing product vision and milestones |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup and contribution guidelines |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [AGENTS.md](AGENTS.md) | Concise repo memory for AI-assisted development |
+| [docs/architecture.md](docs/architecture.md) | Crate boundaries and data flow |
+| [docs/metrics.md](docs/metrics.md) | Metric definitions, semantics, and caveats |
+| [docs/desktop-release.md](docs/desktop-release.md) | Desktop packaging scope and workflow |
+| [docs/plugin-architecture.md](docs/plugin-architecture.md) | Extension system design (planned) |
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. See [LICENSE](LICENSE).
