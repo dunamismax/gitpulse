@@ -33,7 +33,7 @@ Deliver trustworthy personal repository analytics without uploading source code 
 
 ## Repo snapshot
 
-**Current phase: v1 stabilization — Phase 7 (Desktop confidence) in progress**
+**Current phase: v0.1.0 released — v2 preparation**
 
 Last reviewed: 2026-03-22
 Host: macOS, `/Users/sawyer/github/gitpulse`
@@ -235,6 +235,10 @@ Verified on `2026-03-22`:
 - `cargo nextest run --workspace --exclude gitpulse-desktop`
 - `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
 - `./scripts/desktop-smoke.sh`
+- `cargo clippy -p gitpulse-runtime --tests -- -D warnings`
+- `cargo run -p gitpulse-cli -- rebuild-rollups`
+- `cargo run -p gitpulse-cli -- doctor`
+- `cargo run -p gitpulse-cli -- serve` (HTTP 200 confirmed via curl to http://127.0.0.1:7467)
 
 ---
 
@@ -312,7 +316,7 @@ Verified on `2026-03-22`:
 | 6 | Performance and rebuild strategy | Deferred (v0.1 ships with full-history rebuild) |
 | 7 | Desktop confidence and release operations | **Done** |
 | 8 | Data lifecycle and operator controls | Deferred to post-v0.1 |
-| 9 | v1 stabilization and release readiness | **In progress** |
+| 9 | v1 stabilization and release readiness | **Done** |
 
 ### v2 — Platform and extensibility
 
@@ -493,17 +497,17 @@ Risks:
 ---
 
 ### Phase 9 — v1 stabilization and release readiness
-**Status: not started**
+**Status: done**
 
 Goals:
-- [ ] Align public docs, workspace metadata, and release posture with the actual shipping story
-- [ ] Reconfirm privacy and optional-remote-verification claims against the implementation
-- [ ] Freeze the minimum supported operator workflow and its known caveats
-- [ ] Re-run and record the final quality gates that genuinely passed
-- [ ] Produce a release checklist that matches the real supported surfaces
+- [x] Align public docs, workspace metadata, and release posture with the actual shipping story
+- [x] Reconfirm privacy and optional-remote-verification claims against the implementation
+- [x] Freeze the minimum supported operator workflow and its known caveats
+- [x] Re-run and record the final quality gates that genuinely passed
+- [x] Produce a release checklist that matches the real supported surfaces
 
 Exit criteria:
-- [ ] The repository tells a coherent, truthful, shippable story to both users and contributors
+- [x] The repository tells a coherent, truthful, shippable story to both users and contributors
 
 ---
 
@@ -740,10 +744,10 @@ This section names the concrete boundary for the first public release. Anything 
 - [x] Internal crate version references match workspace version (0.1.0)
 - [x] README quick-start instructions are accurate and tested
 - [x] BUILD.md scope section names exactly what ships and what doesn't
-- [ ] Desktop smoke test passes (`./scripts/desktop-smoke.sh`)
-- [ ] `cargo run -p gitpulse-cli -- doctor` passes
-- [ ] One successful `cargo run -p gitpulse-cli -- serve` → browser visit confirmed
-- [ ] Tag `v0.1.0` and push
+- [x] Desktop smoke test passes (`./scripts/desktop-smoke.sh`)
+- [x] `cargo run -p gitpulse-cli -- doctor` passes
+- [x] One successful `cargo run -p gitpulse-cli -- serve` → browser visit confirmed (HTTP 200, HTML dashboard)
+- [x] Tag `v0.1.0` and push
 
 ---
 
@@ -807,18 +811,16 @@ This section names the concrete boundary for the first public release. Anything 
 
 ## Immediate next moves
 
-### v0.1 release path
+### v0.1 released
 
-1. Run `./scripts/desktop-smoke.sh` and `cargo run -p gitpulse-cli -- doctor` on a clean state and record the results.
-2. Confirm one successful `cargo run -p gitpulse-cli -- serve` → browser visit.
-3. Tag `v0.1.0` and push.
+v0.1.0 tagged and pushed on 2026-03-22. All release checklist items verified and recorded.
 
 ### v2 preparation
 
-4. Design the REST API surface (Phase 10) — this unblocks IDE integrations, mobile, and plugins.
-5. Prototype the plugin isolation model (Phase 11) — validate the process-based JSON-RPC approach with a simple first-party plugin.
-6. Set up cross-platform CI for desktop builds (Phase 13) — Windows and Linux Tauri builds.
-7. Evaluate auto-update infrastructure (Tauri updater, signing key management).
+1. Design the REST API surface (Phase 10) — this unblocks IDE integrations, mobile, and plugins.
+2. Prototype the plugin isolation model (Phase 11) — validate the process-based JSON-RPC approach with a simple first-party plugin.
+3. Set up cross-platform CI for desktop builds (Phase 13) — Windows and Linux Tauri builds.
+4. Evaluate auto-update infrastructure (Tauri updater, signing key management).
 
 ---
 
@@ -832,3 +834,4 @@ This section names the concrete boundary for the first public release. Anything 
 - 2026-03-22: Landed a repeatable desktop smoke gate by teaching `gitpulse-desktop` to self-verify startup under `GITPULSE_DESKTOP_SMOKE_TEST`, added `scripts/desktop-smoke.sh` as the release-critical local check, and added a dedicated `desktop-macos` CI compile lane. Verified with: `cargo fmt --all`, `cargo check -p gitpulse-desktop`, `./scripts/desktop-smoke.sh`. Next: document packaging/release-bundle expectations so Phase 7 can close cleanly.
 - 2026-03-22: Documented the current desktop packaging scope around an operator-run unsigned macOS `.app` bundle, added `docs/desktop-release.md`, and added `./scripts/desktop-package.sh` as the release-host helper. Verified with: documentation and script audit. Next: record one real bundle-build verification pass or explicitly keep packaging as documented-but-unverified.
 - 2026-03-22: Fixed build-breaking version mismatch — all internal crate dependency versions were `1.0.0` but workspace version is `0.1.0`. Locked v0.1 scope with explicit in/out decisions. Tightened README quick-start and status language. Verified with: `cargo fmt --all -- --check`, `cargo build --workspace --exclude gitpulse-desktop`, `cargo test --workspace --exclude gitpulse-desktop` (36 passed), `cargo nextest run --workspace --exclude gitpulse-desktop` (35 passed), `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` (clean), `cargo check -p gitpulse-desktop`. Next: run remaining v0.1 release checklist items and tag.
+- 2026-03-22: v0.1 release — ran full local quality gate and all three remaining release checklist items. All passed. Verified with: `cargo fmt --all -- --check` (clean), `cargo check --workspace --exclude gitpulse-desktop`, `cargo test --workspace --exclude gitpulse-desktop` (36 passed), `cargo nextest run --workspace --exclude gitpulse-desktop` (35/35 passed), `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` (clean), `cargo test -p gitpulse-runtime --test runtime_integration` (14 passed), `cargo clippy -p gitpulse-runtime --tests -- -D warnings` (clean), `cargo check -p gitpulse-desktop`, `cargo run -p gitpulse-cli -- rebuild-rollups` (14 repos, 91ms), `cargo run -p gitpulse-cli -- doctor` (14 tracked repos), `./scripts/desktop-smoke.sh` (smoke check passed), `cargo run -p gitpulse-cli -- serve` + `curl http://127.0.0.1:7467` (HTTP 200, HTML dashboard). Tagged v0.1.0 and pushed.
