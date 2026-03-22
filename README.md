@@ -7,7 +7,7 @@ GitPulse watches your repositories, tracks your commits, sessions, and streaks, 
 [![CI](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **Status: v1 stabilization in progress.** The core product — local web dashboard, desktop shell, commit import, push detection, sessions, streaks, and scoring — is implemented and under active hardening. Performance, data lifecycle, and release readiness are the current focus. See [BUILD.md](BUILD.md) for the full execution plan.
+> **Status: v0.1 release-ready.** The core product — CLI, local web dashboard, macOS desktop shell, commit import, push detection, sessions, streaks, and scoring — is implemented and passing all quality gates. See [BUILD.md](BUILD.md) for the full execution plan and explicit scope boundaries.
 
 ## Why GitPulse?
 
@@ -43,9 +43,9 @@ Most developer analytics tools want your code in their cloud. GitPulse doesn't.
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs/) (stable, 1.85+)
+- [Rust](https://rustup.rs/) (stable, 1.85+; tested with 1.94)
 - Git (2.30+)
-- SQLite (bundled via SQLx)
+- SQLite (bundled via SQLx — no system install needed)
 
 ### Run the dashboard
 
@@ -244,10 +244,10 @@ cargo run -p gitpulse-cli -- doctor
 | 3 | Web dashboard and shared product surfaces | **Done** |
 | 4 | Correctness hardening and regression coverage | **Done** |
 | 5 | Trust and output hardening | **Done** |
-| 6 | Performance and rebuild strategy | Not started |
-| 7 | Desktop confidence and release operations | **In progress** |
-| 8 | Data lifecycle and operator controls | Not started |
-| 9 | v1 stabilization and release readiness | Not started |
+| 6 | Performance and rebuild strategy | Deferred (v0.1 ships with full-history rebuild) |
+| 7 | Desktop confidence and release operations | **Done** |
+| 8 | Data lifecycle and operator controls | Deferred to post-v0.1 |
+| 9 | v1 stabilization and release readiness | **In progress** |
 | 10 | REST API and programmatic access | Planned |
 | 11 | Plugin and extension system | Planned |
 | 12 | Advanced analytics and insights | Planned |

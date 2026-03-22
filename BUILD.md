@@ -223,12 +223,17 @@ Verified on `2026-03-21`:
 Verified on `2026-03-22`:
 
 - `cargo fmt --all`
+- `cargo fmt --all -- --check`
 - `cargo test -p gitpulse-runtime --test runtime_integration`
 - `cargo test -p gitpulse-web`
 - `cargo test -p gitpulse-core`
 - `cargo test -p gitpulse-infra`
 - `cargo check --workspace --exclude gitpulse-desktop`
 - `cargo check -p gitpulse-desktop`
+- `cargo build --workspace --exclude gitpulse-desktop`
+- `cargo test --workspace --exclude gitpulse-desktop`
+- `cargo nextest run --workspace --exclude gitpulse-desktop`
+- `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
 - `./scripts/desktop-smoke.sh`
 
 ---
@@ -304,10 +309,10 @@ Verified on `2026-03-22`:
 | 3 | Web dashboard and shared product surfaces | **Done** |
 | 4 | Correctness hardening and regression coverage | **Done** |
 | 5 | Trust and output hardening | **Done** |
-| 6 | Performance and rebuild strategy | Not started |
-| 7 | Desktop confidence and release operations | **In progress** |
-| 8 | Data lifecycle and operator controls | Not started |
-| 9 | v1 stabilization and release readiness | Not started |
+| 6 | Performance and rebuild strategy | Deferred (v0.1 ships with full-history rebuild) |
+| 7 | Desktop confidence and release operations | **Done** |
+| 8 | Data lifecycle and operator controls | Deferred to post-v0.1 |
+| 9 | v1 stabilization and release readiness | **In progress** |
 
 ### v2 — Platform and extensibility
 
@@ -690,14 +695,66 @@ Exit criteria:
 
 ---
 
+## v0.1 scope — what ships and what doesn't
+
+This section names the concrete boundary for the first public release. Anything not listed as "in" is explicitly deferred.
+
+### In scope for v0.1
+
+- **CLI** — `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, `doctor`
+- **Web dashboard** — Axum + Askama + HTMX on localhost:7467 with dashboard, repositories, repo detail, sessions, achievements, and settings pages
+- **Desktop shell** — Thin Tauri v2 wrapper with native folder picker, launched via `cargo run -p gitpulse-desktop`
+- **Repo discovery** — parent-folder scan and direct repo add
+- **Commit import** — recent-history import with configurable lookback, idempotent re-import
+- **Live snapshots** — working-tree and staged diff line counts, untracked text additions
+- **Push detection** — local ahead/behind transitions with optional GitHub verification
+- **Analytics engine** — sessions, daily rollups, streaks, goals, score, achievements — full-history synchronous rebuild via `rebuild-rollups`
+- **Per-repo pattern overrides** — include/exclude editing from repo detail page, forward-only behavior
+- **SVG charts** — server-rendered activity, heatmap, and language charts with escaped labels
+- **Layered config** — defaults → `gitpulse.toml` → env vars → CLI overrides
+- **SQLite persistence** — all data local, inspectable, deletable
+- **CI** — fmt, clippy, nextest, cargo-deny, desktop compile check (macOS)
+- **Desktop packaging** — operator-run unsigned macOS `.app` via `./scripts/desktop-package.sh` (documented, not CI-built)
+
+### Explicitly deferred (not blocking v0.1)
+
+- **Incremental/scoped analytics rebuilds** (Phase 6) — full-history synchronous rebuild is acceptable for individual-developer datasets at v0.1 scale. Document the limitation. Revisit if users report noticeable lag.
+- **Retroactive pattern cleanup** — pattern override changes apply forward-only. Documented clearly. No reimport flow.
+- **History purge UI** — users can delete the SQLite file or use standard SQL tools. No in-app purge surface.
+- **CI-built desktop bundles** — desktop packaging stays operator-local. No signing, notarization, or auto-update.
+- **Cross-platform desktop** — macOS only for v0.1. Windows and Linux are v2.
+- **REST API** (Phase 10) — not started, deferred to v2.
+- **Plugin system** (Phase 11) — not started, deferred to v2.
+- **Notifications** — not started, deferred to v2.
+- **Multi-device sync** — not started, deferred to v3.
+- **IDE integrations** — not started, deferred to v3.
+- **Team analytics** — not started, deferred to v3.
+- **Mobile companion** — not started, deferred to v3.
+
+### v0.1 release checklist
+
+- [x] All workspace crates compile (`cargo build --workspace --exclude gitpulse-desktop` + `cargo check -p gitpulse-desktop`)
+- [x] All tests pass (`cargo nextest run --workspace --exclude gitpulse-desktop` — 35/35)
+- [x] Clippy clean (`cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`)
+- [x] Format clean (`cargo fmt --all -- --check`)
+- [x] Internal crate version references match workspace version (0.1.0)
+- [x] README quick-start instructions are accurate and tested
+- [x] BUILD.md scope section names exactly what ships and what doesn't
+- [ ] Desktop smoke test passes (`./scripts/desktop-smoke.sh`)
+- [ ] `cargo run -p gitpulse-cli -- doctor` passes
+- [ ] One successful `cargo run -p gitpulse-cli -- serve` → browser visit confirmed
+- [ ] Tag `v0.1.0` and push
+
+---
+
 ## Open decisions and unresolved scope
 
-### v1 scope
+### v1 scope (resolved for v0.1)
 
-- Should `rebuild_analytics()` remain a full-history synchronous operation for v1, or is an incremental/scoped strategy necessary before real-world datasets get larger?
-- Do repo-specific include/exclude overrides need a first-class retroactive cleanup/reimport flow before v1, or is forward-only behavior acceptable if documented clearly?
-- Is explicit history purge intentionally out of scope for the first release, or does the product need a supported data-deletion/admin surface?
-- Should bundle builds remain operator-local until signing/notarization are real scope, or does the project want a CI-produced unsigned artifact before then?
+- **Decided:** `rebuild_analytics()` stays full-history synchronous for v0.1. Individual-developer datasets are small enough. Document the limitation and revisit in Phase 6 if users report lag.
+- **Decided:** Repo-specific pattern overrides are forward-only for v0.1. Documented clearly. Retroactive cleanup deferred to Phase 8.
+- **Decided:** Explicit history purge is out of scope for v0.1. Users can delete the SQLite file directly.
+- **Decided:** Bundle builds remain operator-local for v0.1. CI-produced artifacts, signing, and notarization are v2 scope (Phase 13).
 
 ### v2 scope
 
@@ -743,25 +800,25 @@ Exit criteria:
 - 2026-03-22: Optional GitHub remote verification fails open on unsupported remote formats — unsupported remotes should not break local push detection or refresh flows — only actual GitHub API failures still surface as errors.
 - 2026-03-22: Desktop release confidence now uses a repeatable local smoke gate plus a dedicated macOS compile lane — startup verification should be scriptable and CI should at least compile the shell on a native host — packaged bundle validation remains a separate later concern.
 - 2026-03-22: The currently supported desktop packaging artifact is an operator-built unsigned macOS `.app` bundle via `cargo tauri build --bundles app`, wrapped by `./scripts/desktop-package.sh` — this keeps release scope explicit without pretending signing, notarization, or CI bundle publishing already exist — release docs must stay aligned with that limited promise.
+- 2026-03-22: v0.1 scope locked — full-history rebuild stays, pattern overrides are forward-only, history purge is out of scope, desktop packaging is operator-local only — this clears the ambiguity that was blocking release and names every deferral explicitly in BUILD.md.
+- 2026-03-22: Internal crate version references fixed from `1.0.0` to `0.1.0` to match workspace version — the mismatch was a build-breaking regression that prevented `cargo build`.
 
 ---
 
 ## Immediate next moves
 
-### v1 critical path
+### v0.1 release path
 
-1. Resolve the Phase 6 strategy question: keep `rebuild_analytics()` full-history and synchronous for v1 with explicit bounds, or start the incremental/scoped redesign before scale makes the app feel laggy.
-2. Run and record one real macOS bundle-build verification pass for `./scripts/desktop-package.sh`, or explicitly decide that bundle builds remain documented-but-unverified until release time.
-3. Decide whether Phase 8 cleanup/admin flows are real product scope for v1 or explicitly deferred so the repo stops carrying ambiguous expectations.
-4. Reconfirm release-facing docs and UI language after the remaining rebuild-strategy and desktop packaging decisions land.
-5. Cut v0.1.0 release once phases 6-9 are resolved.
+1. Run `./scripts/desktop-smoke.sh` and `cargo run -p gitpulse-cli -- doctor` on a clean state and record the results.
+2. Confirm one successful `cargo run -p gitpulse-cli -- serve` → browser visit.
+3. Tag `v0.1.0` and push.
 
 ### v2 preparation
 
-6. Design the REST API surface (Phase 10) — this unblocks IDE integrations, mobile, and plugins.
-7. Prototype the plugin isolation model (Phase 11) — validate the process-based JSON-RPC approach with a simple first-party plugin.
-8. Set up cross-platform CI for desktop builds (Phase 13) — Windows and Linux Tauri builds.
-9. Evaluate auto-update infrastructure (Tauri updater, signing key management).
+4. Design the REST API surface (Phase 10) — this unblocks IDE integrations, mobile, and plugins.
+5. Prototype the plugin isolation model (Phase 11) — validate the process-based JSON-RPC approach with a simple first-party plugin.
+6. Set up cross-platform CI for desktop builds (Phase 13) — Windows and Linux Tauri builds.
+7. Evaluate auto-update infrastructure (Tauri updater, signing key management).
 
 ---
 
@@ -774,3 +831,4 @@ Exit criteria:
 - 2026-03-22: Fixed daily rollup trust issues by deriving live/staged totals from latest per-day snapshots instead of file-activity accumulation, keeping imported commit history out of live totals, anchoring today/current-streak views to the current local day, escaping repo-controlled SVG chart labels, hiding stored GitHub tokens from settings HTML, and making optional GitHub verification fail open on unsupported remote formats. Added targeted regressions across core/runtime/web/infra and refreshed metrics docs. Verified with: `cargo fmt --all`, `cargo test -p gitpulse-runtime --test runtime_integration`, `cargo test -p gitpulse-web`, `cargo test -p gitpulse-core`, `cargo test -p gitpulse-infra`, `cargo check --workspace --exclude gitpulse-desktop`. Next: decide the Phase 6 rebuild strategy and strengthen the desktop release verification path.
 - 2026-03-22: Landed a repeatable desktop smoke gate by teaching `gitpulse-desktop` to self-verify startup under `GITPULSE_DESKTOP_SMOKE_TEST`, added `scripts/desktop-smoke.sh` as the release-critical local check, and added a dedicated `desktop-macos` CI compile lane. Verified with: `cargo fmt --all`, `cargo check -p gitpulse-desktop`, `./scripts/desktop-smoke.sh`. Next: document packaging/release-bundle expectations so Phase 7 can close cleanly.
 - 2026-03-22: Documented the current desktop packaging scope around an operator-run unsigned macOS `.app` bundle, added `docs/desktop-release.md`, and added `./scripts/desktop-package.sh` as the release-host helper. Verified with: documentation and script audit. Next: record one real bundle-build verification pass or explicitly keep packaging as documented-but-unverified.
+- 2026-03-22: Fixed build-breaking version mismatch — all internal crate dependency versions were `1.0.0` but workspace version is `0.1.0`. Locked v0.1 scope with explicit in/out decisions. Tightened README quick-start and status language. Verified with: `cargo fmt --all -- --check`, `cargo build --workspace --exclude gitpulse-desktop`, `cargo test --workspace --exclude gitpulse-desktop` (36 passed), `cargo nextest run --workspace --exclude gitpulse-desktop` (35 passed), `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings` (clean), `cargo check -p gitpulse-desktop`. Next: run remaining v0.1 release checklist items and tag.

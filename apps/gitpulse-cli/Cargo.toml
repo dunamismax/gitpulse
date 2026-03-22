@@ -7,8 +7,8 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
-gitpulse-runtime = { version = "1.0.0", path = "../../crates/gitpulse-runtime" }
-gitpulse-web = { version = "1.0.0", path = "../../crates/gitpulse-web" }
+gitpulse-runtime = { version = "0.1.0", path = "../../crates/gitpulse-runtime" }
+gitpulse-web = { version = "0.1.0", path = "../../crates/gitpulse-web" }
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

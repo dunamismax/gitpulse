@@ -7,8 +7,8 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true
-gitpulse-core = { version = "1.0.0", path = "../gitpulse-core" }
-gitpulse-infra = { version = "1.0.0", path = "../gitpulse-infra" }
+gitpulse-core = { version = "0.1.0", path = "../gitpulse-core" }
+gitpulse-infra = { version = "0.1.0", path = "../gitpulse-infra" }
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
