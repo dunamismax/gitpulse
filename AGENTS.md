@@ -40,11 +40,13 @@ cargo test --workspace --exclude gitpulse-desktop
 cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings
 cargo run -p gitpulse-cli -- rebuild-rollups
 cargo run -p gitpulse-cli -- doctor
+cargo check -p gitpulse-desktop
+./scripts/desktop-smoke.sh
 ```
 
 ## Current Gaps
 
-- Tauri desktop shell is included and wired up, but a full end-to-end desktop launch was not re-verified in this pass.
+- Desktop has a repeatable local smoke gate plus a dedicated macOS compile lane in CI, but packaged desktop release verification is still not documented.
 - There is no destructive history purge UI flow.
 - Push detection is local-state-based first and optional GitHub confirmation second.
 

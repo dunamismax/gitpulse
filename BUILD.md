@@ -1,6 +1,6 @@
 # GitPulse Build Plan
 
-Last updated: 2026-03-21
+Last updated: 2026-03-22
 Status: active product hardening and release-shaping
 Scope: local-first Rust desktop and web app for repository activity analytics
 Primary UI: localhost Axum + Askama + HTMX dashboard, with a thin Tauri desktop shell over the same runtime
@@ -82,19 +82,17 @@ Not implemented:
 - The crate split is clean: `gitpulse-core` stays mostly pure, `gitpulse-infra` owns external boundaries, `gitpulse-runtime` orchestrates, and `gitpulse-web` stays presentation-focused.
 - The docs are unusually aligned for an early product: `README.md`, `AGENTS.md`, `docs/architecture.md`, `docs/metrics.md`, and this file describe the same product model.
 - The local-first story is consistent: primary functionality does not require an external service, and GitHub verification is optional rather than foundational.
-- Quality gates are real, not decorative: CI runs format, clippy, nextest, and cargo-deny for the main workspace path.
+- Quality gates are real, not decorative: CI runs format, clippy, nextest, and cargo-deny for the main workspace path plus a native macOS desktop compile lane.
 
 ### Current open product gaps
 
-- Repo-detail SVG labels still need hardening so repo-controlled labels are not injected as raw trusted SVG text.
 - `rebuild_analytics()` is still described as full-history and synchronous on the hot path, which may become a scale problem on longer-lived datasets.
-- Desktop confidence is better than before, but CI still excludes `gitpulse-desktop`, so release confidence remains lower there than for CLI/web.
+- Desktop startup confidence is now better than before thanks to a repeatable smoke gate plus a macOS compile lane, but packaged release verification is still not yet defined.
 - Pattern overrides affect future refresh/import behavior plus immediate rescans, but they do not retroactively rewrite older file-activity history.
-- Rebuild currently upserts derived rollups but does not fully act like a pruning/garbage-collection pass for obsolete repo scopes.
 
 ### Observed operator snapshot
 
-- Last reviewed directly in the repo on `2026-03-21`.
+- Last reviewed directly in the repo on `2026-03-22`.
 - Host used for the earlier recorded verification passes: macOS in `/Users/sawyer/github/gitpulse`.
 - Current branch observed during this BUILD rewrite pass: `main`.
 - Observed `origin` remote matches the owner’s dual-push convention:
@@ -129,7 +127,18 @@ Verified on `2026-03-21`:
 - `cargo run -p gitpulse-cli -- doctor`
 - `cargo run -p gitpulse-desktop`
 
-CI is also wired to run `cargo fmt --all -- --check` and `cargo deny check`, but those are CI-configured gates, not part of the locally recorded command list above unless a future pass explicitly re-verifies them here.
+Verified on `2026-03-22`:
+
+- `cargo fmt --all`
+- `cargo test -p gitpulse-runtime --test runtime_integration`
+- `cargo test -p gitpulse-web`
+- `cargo test -p gitpulse-core`
+- `cargo test -p gitpulse-infra`
+- `cargo check --workspace --exclude gitpulse-desktop`
+- `cargo check -p gitpulse-desktop`
+- `./scripts/desktop-smoke.sh`
+
+CI is also wired to run `cargo fmt --all -- --check`, `cargo deny check`, and a native `cargo check -p gitpulse-desktop` lane on `macos-latest`, but those are CI-configured gates, not part of the locally recorded command list above unless a future pass explicitly re-verifies them here.
 
 ## Product Principles
 
@@ -275,7 +284,7 @@ CI is also wired to run `cargo fmt --all -- --check` and `cargo deny check`, but
 - Phase 2 - Runtime orchestration and analytics model. Status: done.
 - Phase 3 - Web dashboard and shared product surfaces. Status: done.
 - Phase 4 - Correctness hardening and regression coverage. Status: done.
-- Phase 5 - Trust and output hardening. Status: in progress.
+- Phase 5 - Trust and output hardening. Status: done.
 - Phase 6 - Performance and rebuild strategy. Status: not started.
 - Phase 7 - Desktop confidence and release operations. Status: in progress.
 - Phase 8 - Data lifecycle and operator controls. Status: not started.
@@ -314,6 +323,7 @@ CI is also wired to run `cargo fmt --all -- --check` and `cargo deny check`, but
 - `cargo test -p gitpulse-runtime --test runtime_integration`
 - `cargo clippy -p gitpulse-runtime --tests -- -D warnings`
 - `cargo check -p gitpulse-desktop`
+- `./scripts/desktop-smoke.sh`
 - `cargo run -p gitpulse-cli -- rebuild-rollups`
 - `cargo run -p gitpulse-cli -- doctor`
 
@@ -323,6 +333,7 @@ CI is also wired to run `cargo fmt --all -- --check` and `cargo deny check`, but
 - `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`
 - `cargo nextest run --workspace --exclude gitpulse-desktop`
 - `cargo deny check`
+- `cargo check -p gitpulse-desktop` on `macos-latest`
 
 If a future command is expected but has not been run in a local verification pass, do not present it as locally verified; record it as CI-only or planned.
 
@@ -405,17 +416,17 @@ Exit criteria:
 
 ### Phase 5 - Trust and output hardening
 
-Status: in progress
+Status: done
 
-- [ ] Escape or structurally render repo-detail SVG labels instead of injecting raw text into trusted SVG output.
-- [ ] Add regression coverage for chart-label escaping or equivalent safe rendering behavior.
-- [ ] Audit remaining repo-controlled strings rendered through templates, SVG helpers, or other trusted sinks.
-- [ ] Re-check docs wording so the app’s local-first trust story matches the implementation after the rendering hardening lands.
+- [x] Escape or structurally render repo-detail SVG labels instead of injecting raw text into trusted SVG output.
+- [x] Add regression coverage for chart-label escaping or equivalent safe rendering behavior.
+- [x] Audit remaining repo-controlled strings rendered through templates, SVG helpers, or other trusted sinks.
+- [x] Re-check docs wording so the app’s local-first trust story matches the implementation after the rendering hardening lands.
 
 Exit criteria:
 
-- [ ] Repo-controlled text is no longer treated as implicitly safe in rendered chart output.
-- [ ] There is at least one targeted regression test covering the resolved rendering path.
+- [x] Repo-controlled text is no longer treated as implicitly safe in rendered chart output.
+- [x] There is at least one targeted regression test covering the resolved rendering path.
 
 ### Phase 6 - Performance and rebuild strategy
 
@@ -439,8 +450,8 @@ Status: in progress
 - [x] Keep `gitpulse-desktop` as a thin shell over the shared runtime and local web UI.
 - [x] Maintain at least a desktop compile-check path.
 - [x] Re-verify a local desktop launch after the missing-repo startup guard landed.
-- [ ] Add an automated desktop smoke path or an explicit, repeatable local verification gate that is treated as release-critical.
-- [ ] Decide whether desktop remains excluded from CI by design or gains a dedicated CI lane.
+- [x] Add an automated desktop smoke path or an explicit, repeatable local verification gate that is treated as release-critical.
+- [x] Decide whether desktop remains excluded from CI by design or gains a dedicated CI lane.
 - [ ] Document desktop packaging and release expectations once they are real rather than implied.
 
 Exit criteria:
@@ -477,18 +488,14 @@ Exit criteria:
 ## Open Decisions And Unresolved Scope
 
 - Should `rebuild_analytics()` remain a full-history synchronous operation for v1, or is an incremental/scoped strategy necessary before real-world datasets get larger?
-- What is the right hardening path for repo-detail charts: escaping inside the current SVG renderer, structural rendering with safer primitives, or a different chart delivery path entirely?
-- Does `gitpulse-desktop` stay manually smoke-tested outside CI, or should it gain a dedicated automated lane before release confidence is claimed?
 - Do repo-specific include/exclude overrides need a first-class retroactive cleanup/reimport flow before v1, or is forward-only behavior acceptable if documented clearly?
 - Is explicit history purge intentionally out of scope for the first release, or does the product need a supported data-deletion/admin surface?
 
 ## Risk Register
 
 - Full-history synchronous rebuilds may become noticeably slow as tracked repo count and commit history grow.
-- Repo-controlled text currently reaching trusted SVG output is an avoidable local XSS-style footgun even in a local-first app.
-- Desktop confidence remains lower than CLI/web confidence because CI excludes `gitpulse-desktop` and local launch verification is still limited.
+- Desktop startup confidence is now stronger thanks to the repeatable smoke gate and macOS compile lane, but packaged release confidence still depends on future bundle-specific verification work.
 - Pattern override changes can surprise users because future behavior updates immediately but previously stored file-activity history remains as historical truth.
-- Rebuild behavior that upserts but does not fully prune obsolete repo scopes can leave confusing stale derived rows after local cleanup.
 - Push detection is based on observed upstream state transitions first and optional GitHub confirmation second, so remote truth is not guaranteed in every environment.
 - Line counts remain approximate operational telemetry and can still be distorted by large refactors, formatting churn, generated files, or deletions.
 
@@ -502,13 +509,18 @@ Exit criteria:
 - 2026-03-20: Imported commit history must be idempotent with respect to history-derived file activity - repeated imports should not inflate analytics - regression coverage now exists for that rule.
 - 2026-03-20: Daily rollups must carry staged snapshot totals from the latest repo state - dashboard staged metrics should match real repository state - regression coverage now exists for that rule.
 - 2026-03-21: Missing or no-longer-directory repo roots disable monitoring instead of aborting desktop/runtime startup - this keeps one stale local path from breaking the app shell - background and bulk flows should skip inactive repos.
+- 2026-03-22: Daily live rollups derive from the latest observed snapshot per repo-day instead of summing file-activity events - this preserves the ledger split between live work and imported/committed work and prevents repeated refresh inflation - live, committed, and pushed totals stay interpretable.
+- 2026-03-22: Current-day summaries and current streaks are anchored to the current local rollup day - this avoids showing stale historical days as “today” - older streaks still count toward best streak only.
+- 2026-03-22: Repo-controlled chart labels must be escaped before entering trusted SVG output, and stored GitHub tokens should not be reflected back into rendered settings HTML - this removes an avoidable local rendering footgun and secret disclosure path - blank token submissions now preserve the stored token.
+- 2026-03-22: Optional GitHub remote verification fails open on unsupported remote formats - unsupported remotes should not break local push detection or refresh flows - only actual GitHub API failures still surface as errors.
+- 2026-03-22: Desktop release confidence now uses a repeatable local smoke gate plus a dedicated macOS compile lane - startup verification should be scriptable and CI should at least compile the shell on a native host - packaged bundle validation remains a separate later concern.
 
 ## Immediate Next Moves
 
-1. Finish Phase 5 by hardening repo-detail chart rendering so repo-controlled labels are escaped or otherwise rendered safely.
-2. Resolve the Phase 6 strategy question: keep `rebuild_analytics()` full-history and synchronous for v1 with explicit bounds, or start the incremental/scoped redesign before scale makes the app feel laggy.
-3. Raise Phase 7 confidence by defining a repeatable desktop verification story that is stronger than ad hoc local launch checks.
-4. Decide whether Phase 8 cleanup/admin flows are real product scope for v1 or explicitly deferred so the repo stops carrying ambiguous expectations.
+1. Resolve the Phase 6 strategy question: keep `rebuild_analytics()` full-history and synchronous for v1 with explicit bounds, or start the incremental/scoped redesign before scale makes the app feel laggy.
+2. Define the remaining Phase 7 packaging and release-bundle expectations now that startup smoke verification and a macOS desktop CI lane exist.
+3. Decide whether Phase 8 cleanup/admin flows are real product scope for v1 or explicitly deferred so the repo stops carrying ambiguous expectations.
+4. Reconfirm release-facing docs and UI language after the remaining desktop packaging and rebuild-strategy decisions land.
 
 ## Progress Log
 
@@ -516,3 +528,5 @@ Exit criteria:
 - 2026-03-20: Fixed repeated-import history inflation by ensuring imported `file_activity_events` are only written for newly inserted commits, and fixed staged snapshot propagation into daily rollups. Added targeted runtime regression coverage for both. Verified with: `cargo test -p gitpulse-runtime --test runtime_integration`, `cargo test --workspace --exclude gitpulse-desktop`, `cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings`. Next: address remaining rendering-safety, rebuild-scale, and desktop-confidence gaps.
 - 2026-03-21: Hardened missing-repo startup and refresh behavior so stale repo paths disable cleanly instead of aborting desktop bootstrap, and made periodic/background work skip repositories that are not actively monitored. Verified with: `cargo test -p gitpulse-runtime --test runtime_integration`, `cargo check -p gitpulse-runtime`, `cargo clippy -p gitpulse-runtime --tests -- -D warnings`, `cargo check -p gitpulse-desktop`, `cargo run -p gitpulse-cli -- doctor`, `cargo run -p gitpulse-desktop`. Next: tackle chart-label hardening, rebuild scalability, and a stronger desktop verification story.
 - 2026-03-21: Rewrote `BUILD.md` into a phase-based execution manual aligned with the repository’s current product state, source-of-truth files, verification history, and active risks. Verified with: documentation and repository-structure audit. Next: keep phase status, decision log, and verified command history current as the repo evolves.
+- 2026-03-22: Fixed daily rollup trust issues by deriving live/staged totals from latest per-day snapshots instead of file-activity accumulation, keeping imported commit history out of live totals, anchoring today/current-streak views to the current local day, escaping repo-controlled SVG chart labels, hiding stored GitHub tokens from settings HTML, and making optional GitHub verification fail open on unsupported remote formats. Added targeted regressions across core/runtime/web/infra and refreshed metrics docs. Verified with: `cargo fmt --all`, `cargo test -p gitpulse-runtime --test runtime_integration`, `cargo test -p gitpulse-web`, `cargo test -p gitpulse-core`, `cargo test -p gitpulse-infra`, `cargo check --workspace --exclude gitpulse-desktop`. Next: decide the Phase 6 rebuild strategy and strengthen the desktop release verification path.
+- 2026-03-22: Landed a repeatable desktop smoke gate by teaching `gitpulse-desktop` to self-verify startup under `GITPULSE_DESKTOP_SMOKE_TEST`, added `scripts/desktop-smoke.sh` as the release-critical local check, and added a dedicated `desktop-macos` CI compile lane. Updated the desktop verification story in repo docs. Verified with: `cargo fmt --all`, `cargo check -p gitpulse-desktop`, `./scripts/desktop-smoke.sh`. Next: document packaging/release-bundle expectations so Phase 7 can close cleanly.

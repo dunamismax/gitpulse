@@ -54,7 +54,7 @@
       <label class="checkbox"><input type="checkbox" name="github_enabled" {% if view.settings.github.enabled %}checked{% endif %}/> Enable GitHub metadata lookups</label>
       <label class="checkbox"><input type="checkbox" name="github_verify_remote_pushes" {% if view.settings.github.verify_remote_pushes %}checked{% endif %}/> Confirm pushes remotely when possible</label>
       <label>GitHub Token</label>
-      <input type="password" name="github_token" value="{% match view.settings.github.token %}{% when Some with (token) %}{{ token }}{% when None %}{% endmatch %}" />
+      <input type="password" name="github_token" value="" autocomplete="new-password" placeholder="Leave blank to keep the current token" />
       <div class="meta-list">
         <span>Config: {{ view.config_path }}</span>
         <span>Data: {{ view.data_path }}</span>

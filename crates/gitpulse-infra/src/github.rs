@@ -24,8 +24,9 @@ impl GithubVerifier {
         sha: &str,
         token: &str,
     ) -> Result<Option<String>> {
-        let (owner, repo) =
-            parse_github_remote(remote_url).ok_or_else(|| anyhow!("not a github remote"))?;
+        let Some((owner, repo)) = parse_github_remote(remote_url) else {
+            return Ok(None);
+        };
         let url = format!("https://api.github.com/repos/{owner}/{repo}/commits/{sha}");
         let response =
             self.client.get(url).bearer_auth(token).header("User-Agent", "gitpulse").send().await?;
@@ -71,5 +72,11 @@ mod tests {
             parse_github_remote("git@github.com:example/project.git"),
             Some(("example".into(), "project".into()))
         );
+    }
+
+    #[test]
+    fn unsupported_remote_formats_fail_open() {
+        assert_eq!(parse_github_remote("git@github.com-dunamismax:example/project.git"), None);
+        assert_eq!(parse_github_remote("ssh://codeberg.org/example/project.git"), None);
     }
 }

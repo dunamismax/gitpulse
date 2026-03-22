@@ -57,6 +57,14 @@ cargo run -p gitpulse-desktop
 
 The desktop app launches the same GitPulse runtime/server on a random localhost port and loads it in a Tauri window. The web UI can also use the desktop-only native folder picker bridge when `window.__TAURI__.core.invoke` is available.
 
+For a repeatable desktop self-check, run:
+
+```bash
+./scripts/desktop-smoke.sh
+```
+
+That smoke gate boots the Tauri shell, waits for the localhost UI to answer, prints the bound URL, and exits on its own with a non-zero status if startup never becomes healthy.
+
 ## Why The Product Model Matters
 
 GitPulse keeps three categories separate on purpose:
@@ -149,9 +157,11 @@ cargo nextest run --workspace --exclude gitpulse-desktop
 cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings
 cargo run -p gitpulse-cli -- doctor
 cargo run -p gitpulse-cli -- rebuild-rollups
+cargo check -p gitpulse-desktop
+./scripts/desktop-smoke.sh
 ```
 
-The desktop shell also has a separate compile and launch path. See [BUILD.md](BUILD.md) for the reviewed command set and current verification notes.
+CI keeps the main Linux lane focused on CLI/web checks and runs a dedicated macOS desktop compile check separately. The desktop smoke script remains the release-critical local startup gate. See [BUILD.md](BUILD.md) for the reviewed command set and current verification notes.
 
 ## Data And Privacy Model
 

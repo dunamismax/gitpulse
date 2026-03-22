@@ -8,6 +8,7 @@ license.workspace = true
 anyhow.workspace = true
 gitpulse-runtime = { version = "1.0.0", path = "../../crates/gitpulse-runtime" }
 gitpulse-web = { version = "1.0.0", path = "../../crates/gitpulse-web" }
+reqwest.workspace = true
 serde.workspace = true
 tauri = { version = "2.10.3", features = [] }
 tauri-plugin-dialog = "2.6.0"

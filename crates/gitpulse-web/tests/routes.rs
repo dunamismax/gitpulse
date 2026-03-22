@@ -1,5 +1,5 @@
 use axum::{
-    body::Body,
+    body::{Body, to_bytes},
     http::{Request, StatusCode, header},
 };
 use gitpulse_infra::{AppConfig, AppPaths};
@@ -93,4 +93,33 @@ async fn repository_pattern_form_updates_repo_overrides() {
     let detail = runtime.repo_detail(&repo_id).await.unwrap();
     assert_eq!(detail.pattern_overrides.include, vec!["src/**"]);
     assert_eq!(detail.pattern_overrides.exclude, vec!["fixtures/**", "generated/**"]);
+}
+
+#[tokio::test]
+async fn settings_page_does_not_reflect_stored_github_token() {
+    let temp = tempdir().unwrap();
+    let mut config = AppConfig::default();
+    config.settings.github.enabled = true;
+    config.settings.github.verify_remote_pushes = true;
+    config.settings.github.token = Some("super-secret-token".into());
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config,
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+    let app = gitpulse_web::router(runtime);
+
+    let response = app
+        .oneshot(Request::builder().uri("/settings").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = String::from_utf8(body.to_vec()).unwrap();
+    assert!(!body.contains("super-secret-token"));
+    assert!(body.contains("name=\"github_token\""));
 }

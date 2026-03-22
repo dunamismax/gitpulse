@@ -24,3 +24,12 @@ jobs:
         run: cargo nextest run --workspace --exclude gitpulse-desktop
       - name: Deny
         run: cargo deny check
+
+  desktop-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Desktop compile check
+        run: cargo check -p gitpulse-desktop

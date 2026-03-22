@@ -182,6 +182,7 @@ async fn update_settings(
     Form(form): Form<SettingsForm>,
 ) -> Result<Redirect, WebError> {
     let mut settings = state.runtime.settings_view().await?.settings;
+    let existing_github_token = settings.github.token.clone();
     settings.authors = form
         .authors
         .lines()
@@ -204,8 +205,11 @@ async fn update_settings(
     settings.patterns.exclude = parse_patterns(&form.exclude_patterns);
     settings.github.enabled = form.github_enabled.is_some();
     settings.github.verify_remote_pushes = form.github_verify_remote_pushes.is_some();
-    settings.github.token =
-        if form.github_token.trim().is_empty() { None } else { Some(form.github_token) };
+    settings.github.token = if form.github_token.trim().is_empty() {
+        existing_github_token
+    } else {
+        Some(form.github_token)
+    };
     state.runtime.update_settings(settings).await?;
     Ok(Redirect::to("/settings"))
 }
@@ -437,9 +441,19 @@ fn render_heatmap(points: &[gitpulse_core::TrendPoint]) -> String {
     )
 }
 
+fn escape_svg_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
 fn render_rank_bars(label: &str, values: &[(String, i64)]) -> String {
+    let safe_label = escape_svg_text(label);
     if values.is_empty() {
-        return format!("<div class=\"empty-chart\">No {label} data yet.</div>");
+        return format!("<div class=\"empty-chart\">No {safe_label} data yet.</div>");
     }
     let max = values.iter().map(|(_, value)| *value).max().unwrap_or(1).max(1) as f32;
     let bars = values
@@ -449,8 +463,9 @@ fn render_rank_bars(label: &str, values: &[(String, i64)]) -> String {
         .map(|(index, (name, value))| {
             let y = 30 + (index as i64 * 28);
             let width = ((*value as f32 / max) * 220.0).max(12.0);
+            let safe_name = escape_svg_text(name);
             format!(
-                "<text x=\"16\" y=\"{text_y}\" fill=\"#cbd5e1\" font-size=\"12\">{name}</text>
+                "<text x=\"16\" y=\"{text_y}\" fill=\"#cbd5e1\" font-size=\"12\">{safe_name}</text>
                  <rect x=\"150\" y=\"{bar_y}\" width=\"{width:.1}\" height=\"14\" rx=\"7\" fill=\"#1d4ed8\" />",
                 text_y = y,
                 bar_y = y - 12
@@ -458,9 +473,21 @@ fn render_rank_bars(label: &str, values: &[(String, i64)]) -> String {
         })
         .collect::<String>();
     format!(
-        "<svg viewBox=\"0 0 420 280\" class=\"chart-svg\" role=\"img\" aria-label=\"{label}\">
+        "<svg viewBox=\"0 0 420 280\" class=\"chart-svg\" role=\"img\" aria-label=\"{safe_label}\">
             <rect x=\"0\" y=\"0\" width=\"420\" height=\"280\" rx=\"18\" fill=\"#10151f\" />
             {bars}
         </svg>"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_rank_bars;
+
+    #[test]
+    fn rank_bar_svg_escapes_repo_controlled_labels() {
+        let svg = render_rank_bars("Files", &[("<script>alert(1)</script>&\"'".into(), 12)]);
+        assert!(svg.contains("&lt;script&gt;alert(1)&lt;/script&gt;&amp;&quot;&#39;"));
+        assert!(!svg.contains("<script>alert(1)</script>"));
+    }
 }

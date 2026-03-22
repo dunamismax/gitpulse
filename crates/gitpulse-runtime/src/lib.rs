@@ -11,7 +11,7 @@ use gitpulse_core::{
     ActivityKind, ActivityPoint, AppSettings, DailyRollup, GoalProgress, PushEvent, PushEventKind,
     RepoCard, RepoDetailView, RepoHealth, RepoPatternSettings, RepoStatusSnapshot, Repository,
     RepositoryMetrics, RepositoryState, SessionSummary, TodaySummary, TrendPoint,
-    metrics::{compute_streaks, evaluate_achievements},
+    metrics::{compute_streaks_as_of, evaluate_achievements},
     scoring::ScoreFormula,
     sessionize,
     time::{format_local, rollup_day},
@@ -440,9 +440,12 @@ impl GitPulseRuntime {
 
     pub async fn dashboard_view(&self) -> Result<DashboardView> {
         let config = self.inner.config.read().await.clone();
+        let current_day = current_rollup_day(&config.settings);
         let rollups = self.inner.db.list_daily_rollups(None, 90).await?;
-        let today = rollups.first().cloned().unwrap_or_else(today_empty_rollup);
-        let streaks = compute_streaks(&rollups);
+        let today = rollup_for_day(&rollups, current_day)
+            .cloned()
+            .unwrap_or_else(|| today_empty_rollup(current_day));
+        let streaks = compute_streaks_as_of(&rollups, current_day);
         let goal_progress = vec![
             GoalProgress {
                 label: "Changed Lines".into(),
@@ -494,11 +497,16 @@ impl GitPulseRuntime {
     }
 
     pub async fn repository_cards(&self) -> Result<Vec<RepoCard>> {
+        let current_day = {
+            let config = self.inner.config.read().await;
+            current_rollup_day(&config.settings)
+        };
         let repos = self.inner.db.list_repositories().await?;
         let mut cards = Vec::new();
         for repo in repos {
             let snapshot = self.inner.db.latest_snapshot(repo.id).await?;
             let rollups = self.inner.db.list_daily_rollups(Some(repo.id), 14).await?;
+            let today = rollup_for_day(&rollups, current_day);
             let health = match snapshot.as_ref() {
                 Some(snapshot) if snapshot.is_detached => RepoHealth::DetachedHead,
                 Some(snapshot) if snapshot.upstream_ref.is_none() => RepoHealth::MissingUpstream,
@@ -512,17 +520,11 @@ impl GitPulseRuntime {
                 snapshot: snapshot.clone(),
                 health,
                 metrics: RepositoryMetrics {
-                    commits_today: rollups.first().map(|entry| entry.commits).unwrap_or(0),
-                    pushes_today: rollups.first().map(|entry| entry.pushes).unwrap_or(0),
-                    files_touched_today: rollups
-                        .first()
-                        .map(|entry| entry.files_touched)
-                        .unwrap_or(0),
-                    focus_minutes_today: rollups
-                        .first()
-                        .map(|entry| entry.focus_minutes)
-                        .unwrap_or(0),
-                    score_today: rollups.first().map(|entry| entry.score).unwrap_or(0),
+                    commits_today: today.map(|entry| entry.commits).unwrap_or(0),
+                    pushes_today: today.map(|entry| entry.pushes).unwrap_or(0),
+                    files_touched_today: today.map(|entry| entry.files_touched).unwrap_or(0),
+                    focus_minutes_today: today.map(|entry| entry.focus_minutes).unwrap_or(0),
+                    score_today: today.map(|entry| entry.score).unwrap_or(0),
                 },
                 sparkline: scale_sparkline(&sparkline_scores, 60),
             });
@@ -595,13 +597,19 @@ impl GitPulseRuntime {
     }
 
     pub async fn achievements_view(&self) -> Result<AchievementsView> {
+        let current_day = {
+            let config = self.inner.config.read().await;
+            current_rollup_day(&config.settings)
+        };
         let rollups = self.inner.db.list_daily_rollups(None, 120).await?;
-        let streaks = compute_streaks(&rollups);
+        let streaks = compute_streaks_as_of(&rollups, current_day);
         Ok(AchievementsView {
             achievements: self.inner.db.list_achievements().await?,
             streak_current: streaks.current_days,
             streak_best: streaks.best_days,
-            today_score: rollups.first().map(|entry| entry.score).unwrap_or(0),
+            today_score: rollup_for_day(&rollups, current_day)
+                .map(|entry| entry.score)
+                .unwrap_or(0),
         })
     }
 
@@ -675,7 +683,7 @@ impl GitPulseRuntime {
             .collect::<HashSet<_>>();
 
         let snapshot_rows = sqlx::query(
-            "SELECT repo_id, observed_at_utc, language_breakdown_json, staged_additions, staged_deletions
+            "SELECT repo_id, observed_at_utc, language_breakdown_json, live_additions, live_deletions, staged_additions, staged_deletions
              FROM repo_status_snapshots ORDER BY observed_at_utc ASC",
         )
         .fetch_all(self.inner.db.pool())
@@ -701,7 +709,8 @@ impl GitPulseRuntime {
 
         let mut activity = Vec::<ActivityPoint>::new();
         let mut by_scope = BTreeMap::<(Option<Uuid>, NaiveDate), DailyAccumulator>::new();
-        let mut latest_staged_by_repo_day = BTreeMap::<(Uuid, NaiveDate), (i64, i64)>::new();
+        let mut latest_snapshot_by_repo_day =
+            BTreeMap::<(Uuid, NaiveDate), (i64, i64, i64, i64, i64)>::new();
 
         for row in &snapshot_rows {
             let repo_id: Uuid = row.get("repo_id");
@@ -718,28 +727,37 @@ impl GitPulseRuntime {
                 row.get::<String, _>("language_breakdown_json").as_str(),
             )
             .unwrap_or_default();
-            by_scope.entry((Some(repo_id), day)).or_default().languages_touched = by_scope
-                .entry((Some(repo_id), day))
-                .or_default()
-                .languages_touched
-                .max(language_breakdown.len() as i64);
-            by_scope.entry((None, day)).or_default().languages_touched = by_scope
-                .entry((None, day))
-                .or_default()
-                .languages_touched
-                .max(language_breakdown.len() as i64);
-            latest_staged_by_repo_day
-                .insert((repo_id, day), (row.get("staged_additions"), row.get("staged_deletions")));
+            latest_snapshot_by_repo_day.insert(
+                (repo_id, day),
+                (
+                    row.get("live_additions"),
+                    row.get("live_deletions"),
+                    row.get("staged_additions"),
+                    row.get("staged_deletions"),
+                    language_breakdown.len() as i64,
+                ),
+            );
         }
 
-        for ((repo_id, day), (staged_additions, staged_deletions)) in latest_staged_by_repo_day {
+        for (
+            (repo_id, day),
+            (live_additions, live_deletions, staged_additions, staged_deletions, languages_touched),
+        ) in latest_snapshot_by_repo_day
+        {
             let repo_accumulator = by_scope.entry((Some(repo_id), day)).or_default();
+            repo_accumulator.live_additions = live_additions;
+            repo_accumulator.live_deletions = live_deletions;
             repo_accumulator.staged_additions = staged_additions;
             repo_accumulator.staged_deletions = staged_deletions;
+            repo_accumulator.languages_touched = languages_touched;
 
             let all_accumulator = by_scope.entry((None, day)).or_default();
+            all_accumulator.live_additions += live_additions;
+            all_accumulator.live_deletions += live_deletions;
             all_accumulator.staged_additions += staged_additions;
             all_accumulator.staged_deletions += staged_deletions;
+            all_accumulator.languages_touched =
+                all_accumulator.languages_touched.max(languages_touched);
         }
 
         for row in &file_rows {
@@ -756,16 +774,19 @@ impl GitPulseRuntime {
             let additions: i64 = row.get("additions");
             let deletions: i64 = row.get("deletions");
             let relative_path: String = row.get("relative_path");
+            let kind: String = row.get("kind");
             for scope in [Some(repo_id), None] {
                 let accumulator = by_scope.entry((scope, day)).or_default();
-                accumulator.live_additions += additions;
-                accumulator.live_deletions += deletions;
                 accumulator.files_touched.insert(relative_path.clone());
             }
             activity.push(ActivityPoint {
                 repo_id,
                 observed_at_utc,
-                kind: ActivityKind::Refresh,
+                kind: match kind.as_str() {
+                    "import" => ActivityKind::Import,
+                    "manual_rescan" => ActivityKind::ManualRescan,
+                    _ => ActivityKind::Refresh,
+                },
                 changed_lines: additions + deletions,
             });
         }
@@ -1060,10 +1081,18 @@ fn normalize_path(path: &Path) -> Result<PathBuf> {
     }
 }
 
-fn today_empty_rollup() -> DailyRollup {
+fn current_rollup_day(settings: &AppSettings) -> NaiveDate {
+    rollup_day(Utc::now(), &settings.ui.timezone, settings.ui.day_boundary_minutes)
+}
+
+fn rollup_for_day(rollups: &[DailyRollup], day: NaiveDate) -> Option<&DailyRollup> {
+    rollups.iter().find(|entry| entry.day == day)
+}
+
+fn today_empty_rollup(day: NaiveDate) -> DailyRollup {
     DailyRollup {
         repo_id: None,
-        day: Utc::now().date_naive(),
+        day,
         live_additions: 0,
         live_deletions: 0,
         staged_additions: 0,

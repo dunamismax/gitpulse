@@ -1,5 +1,6 @@
 use std::{path::Path, process::Command};
 
+use chrono::{Duration, Utc};
 use gitpulse_core::{AuthorIdentity, RepoPatternSettings};
 use gitpulse_infra::{AppConfig, AppPaths};
 use gitpulse_runtime::{BootstrapOptions, GitPulseRuntime};
@@ -168,6 +169,105 @@ async fn import_history_is_idempotent_for_file_activity_rows() {
 }
 
 #[tokio::test]
+async fn rebuild_analytics_keeps_imported_commit_history_out_of_live_daily_totals() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let tracked = runtime.add_target(&repo).await.unwrap();
+    let repo_id = tracked[0].id;
+
+    let repo_rollup = runtime.db().list_daily_rollups(Some(repo_id), 1).await.unwrap();
+    let repo_today = repo_rollup.first().unwrap();
+    assert_eq!(repo_today.live_additions, 0);
+    assert_eq!(repo_today.live_deletions, 0);
+    assert_eq!(repo_today.commits, 1);
+    assert_eq!(repo_today.committed_additions, 1);
+
+    let overall_rollup = runtime.db().list_daily_rollups(None, 1).await.unwrap();
+    let overall_today = overall_rollup.first().unwrap();
+    assert_eq!(overall_today.live_additions, 0);
+    assert_eq!(overall_today.live_deletions, 0);
+    assert_eq!(overall_today.commits, 1);
+}
+
+#[tokio::test]
+async fn rebuild_analytics_uses_latest_snapshot_for_staged_only_days() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+
+    std::fs::write(repo.join("README.md"), "hello\n").unwrap();
+    git(&["add", "README.md"], &repo);
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let tracked = runtime.add_target(&repo).await.unwrap();
+    let repo_id = tracked[0].id;
+
+    let repo_rollup = runtime.db().list_daily_rollups(Some(repo_id), 1).await.unwrap();
+    let repo_today = repo_rollup.first().unwrap();
+    assert_eq!(repo_today.commits, 0);
+    assert_eq!(repo_today.committed_additions, 0);
+    assert_eq!(repo_today.live_additions, 1);
+    assert_eq!(repo_today.live_deletions, 0);
+    assert_eq!(repo_today.staged_additions, 1);
+    assert_eq!(repo_today.staged_deletions, 0);
+}
+
+#[tokio::test]
+async fn rebuild_analytics_uses_latest_refresh_snapshot_instead_of_summing_same_day_refreshes() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let tracked = runtime.add_target(&repo).await.unwrap();
+    let repo_id = tracked[0].id;
+
+    std::fs::write(repo.join("README.md"), "hello\nworld\n").unwrap();
+    runtime.refresh_repository(repo_id, true).await.unwrap();
+
+    std::fs::write(repo.join("README.md"), "hello\nworld\nagain\n").unwrap();
+    runtime.refresh_repository(repo_id, true).await.unwrap();
+
+    let snapshot = runtime.db().latest_snapshot(repo_id).await.unwrap().unwrap();
+    assert_eq!(snapshot.live_stats.additions, 2);
+    assert_eq!(snapshot.live_stats.deletions, 0);
+
+    let repo_rollup = runtime.db().list_daily_rollups(Some(repo_id), 1).await.unwrap();
+    let repo_today = repo_rollup.first().unwrap();
+    assert_eq!(repo_today.live_additions, 2);
+    assert_eq!(repo_today.live_deletions, 0);
+}
+
+#[tokio::test]
 async fn rebuild_analytics_carries_staged_snapshot_totals_into_rollups() {
     let temp = tempdir().unwrap();
     let repo = temp.path().join("repo");
@@ -284,6 +384,46 @@ async fn remove_repository_prunes_repo_scoped_rollups() {
     assert_eq!(removed.state, gitpulse_core::RepositoryState::Removed);
     assert!(runtime.db().list_daily_rollups(Some(beta_id), 10).await.unwrap().is_empty());
     assert!(!runtime.db().list_daily_rollups(Some(alpha_id), 10).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn dashboard_and_achievements_ignore_stale_rollups_for_today_metrics_and_current_streak() {
+    let temp = tempdir().unwrap();
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    let stale_day = Utc::now().date_naive() - Duration::days(2);
+    sqlx::query(
+        "INSERT INTO daily_rollups (
+            scope, day, live_additions, live_deletions, commits, focus_minutes, score
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )
+    .bind("all")
+    .bind(stale_day)
+    .bind(200_i64)
+    .bind(0_i64)
+    .bind(1_i64)
+    .bind(30_i64)
+    .bind(999_i64)
+    .execute(runtime.db().pool())
+    .await
+    .unwrap();
+
+    let dashboard = runtime.dashboard_view().await.unwrap();
+    assert_eq!(dashboard.today.live_lines, 0);
+    assert_eq!(dashboard.today.commits_today, 0);
+    assert_eq!(dashboard.today.today_score, 0);
+    assert_eq!(dashboard.today.streak_days, 0);
+
+    let achievements = runtime.achievements_view().await.unwrap();
+    assert_eq!(achievements.today_score, 0);
+    assert_eq!(achievements.streak_current, 0);
+    assert_eq!(achievements.streak_best, 1);
 }
 
 #[tokio::test]

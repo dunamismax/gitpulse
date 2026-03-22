@@ -13,6 +13,7 @@ Definition:
 Interpretation:
 
 - This is a current-work snapshot, not a value judgement
+- Daily rollups use the latest observed live snapshot for that local day instead of summing every refresh or import event together
 - It can rise and fall throughout the day as you edit or discard work
 
 ## Staged Changed Lines
@@ -81,6 +82,8 @@ A day qualifies when any of the default thresholds are met:
 - at least 1 qualifying commit
 - or at least 100 changed live lines
 - or at least 25 focus minutes
+
+The current streak counts consecutive qualifying days ending on the current local day. If today has not qualified yet, the current streak is 0 even when an older streak exists in history.
 
 ## Score
 

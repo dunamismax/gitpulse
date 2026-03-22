@@ -1,4 +1,6 @@
-use chrono::NaiveDate;
+use std::collections::BTreeSet;
+
+use chrono::{Duration, NaiveDate};
 use serde::{Deserialize, Serialize};
 
 use crate::models::{DailyRollup, FocusSession};
@@ -46,8 +48,43 @@ pub struct StreakSummary {
 }
 
 pub fn compute_streaks(days: &[DailyRollup]) -> StreakSummary {
-    if days.is_empty() {
+    let Some((qualifying, best_days)) = qualifying_days_and_best(days) else {
         return StreakSummary::default();
+    };
+
+    let mut current_days = 1_i64;
+    for window in qualifying.windows(2).rev() {
+        if let [left, right] = window {
+            if (*right - *left).num_days() == 1 {
+                current_days += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    StreakSummary { current_days, best_days }
+}
+
+pub fn compute_streaks_as_of(days: &[DailyRollup], as_of: NaiveDate) -> StreakSummary {
+    let Some((qualifying, best_days)) = qualifying_days_and_best(days) else {
+        return StreakSummary::default();
+    };
+
+    let qualifying_days = qualifying.into_iter().collect::<BTreeSet<_>>();
+    let mut current_days = 0_i64;
+    let mut cursor = as_of;
+    while qualifying_days.contains(&cursor) {
+        current_days += 1;
+        cursor -= Duration::days(1);
+    }
+
+    StreakSummary { current_days, best_days }
+}
+
+fn qualifying_days_and_best(days: &[DailyRollup]) -> Option<(Vec<NaiveDate>, i64)> {
+    if days.is_empty() {
+        return None;
     }
 
     let mut ordered = days.to_vec();
@@ -63,34 +100,23 @@ pub fn compute_streaks(days: &[DailyRollup]) -> StreakSummary {
         .collect();
 
     if qualifying.is_empty() {
-        return StreakSummary::default();
+        return None;
     }
 
-    let mut current = 1_i64;
-    let mut best = 1_i64;
+    let mut best_days = 1_i64;
+    let mut streak = 1_i64;
     for window in qualifying.windows(2) {
         if let [left, right] = window {
             if (*right - *left).num_days() == 1 {
-                current += 1;
-                best = best.max(current);
+                streak += 1;
+                best_days = best_days.max(streak);
             } else {
-                current = 1;
+                streak = 1;
             }
         }
     }
 
-    let mut tail = 1_i64;
-    for window in qualifying.windows(2).rev() {
-        if let [left, right] = window {
-            if (*right - *left).num_days() == 1 {
-                tail += 1;
-            } else {
-                break;
-            }
-        }
-    }
-
-    StreakSummary { current_days: tail, best_days: best.max(tail) }
+    Some((qualifying, best_days))
 }
 
 pub fn evaluate_achievements(
@@ -184,7 +210,7 @@ mod tests {
     use chrono::{Duration, NaiveDate, Utc};
     use uuid::Uuid;
 
-    use super::{AchievementKind, compute_streaks, evaluate_achievements};
+    use super::{AchievementKind, compute_streaks, compute_streaks_as_of, evaluate_achievements};
     use crate::models::{DailyRollup, FocusSession};
 
     fn rollup(day: NaiveDate, commits: i64, live: i64, focus: i64) -> DailyRollup {
@@ -216,6 +242,37 @@ mod tests {
         ]);
         assert_eq!(streak.current_days, 3);
         assert_eq!(streak.best_days, 3);
+    }
+
+    #[test]
+    fn streaks_as_of_today_drop_to_zero_when_latest_qualifying_day_is_stale() {
+        let base = NaiveDate::from_ymd_opt(2026, 3, 18).unwrap();
+        let streak = compute_streaks_as_of(
+            &[
+                rollup(base, 1, 0, 0),
+                rollup(base + Duration::days(1), 0, 101, 0),
+                rollup(base + Duration::days(2), 0, 0, 30),
+            ],
+            base + Duration::days(4),
+        );
+        assert_eq!(streak.current_days, 0);
+        assert_eq!(streak.best_days, 3);
+    }
+
+    #[test]
+    fn streaks_as_of_today_only_count_consecutive_days_ending_today() {
+        let base = NaiveDate::from_ymd_opt(2026, 3, 18).unwrap();
+        let streak = compute_streaks_as_of(
+            &[
+                rollup(base, 1, 0, 0),
+                rollup(base + Duration::days(1), 0, 101, 0),
+                rollup(base + Duration::days(3), 0, 0, 30),
+                rollup(base + Duration::days(4), 1, 0, 0),
+            ],
+            base + Duration::days(4),
+        );
+        assert_eq!(streak.current_days, 2);
+        assert_eq!(streak.best_days, 2);
     }
 
     #[test]
