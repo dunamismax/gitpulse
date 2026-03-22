@@ -134,3 +134,9 @@ Line counts are intentionally treated as approximate operational telemetry.
 - They are useful for momentum and pattern detection
 - They are not a measure of quality, complexity, or impact
 - They can be skewed by formatting, generated files, large refactors, or deletions
+
+## Analytics Rebuilds
+
+- Sessions, daily rollups, streaks, score, and achievements are derived from persisted snapshots and event ledgers rather than from ad hoc counters.
+- `gitpulse rebuild-rollups` currently replays that full local history synchronously for v1.
+- The command now reports scanned row counts and elapsed time so rebuild cost is visible before an incremental/scoped redesign is introduced.

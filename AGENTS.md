@@ -31,6 +31,7 @@ GitPulse is a local-first Rust desktop and web app for tracking repository activ
 - The app is useful with no GitHub token configured.
 - Global include/exclude patterns are user-editable in settings, and per-repo overrides are editable from the repository detail page.
 - Repo-specific pattern changes immediately rescan active repos, but they do not retroactively rewrite previously stored file-activity history.
+- Analytics rebuilds remain full-history and synchronous for v1, and `gitpulse rebuild-rollups` reports scanned row counts plus elapsed time so operators can see rebuild cost.
 
 ## Verified Commands
 
@@ -46,13 +47,14 @@ cargo check -p gitpulse-desktop
 
 ## Current Gaps
 
-- Desktop has a repeatable local smoke gate plus a dedicated macOS compile lane in CI, but packaged desktop release verification is still not documented.
+- There is no incremental or scoped analytics rebuild strategy yet; longer-lived datasets still rely on the full-history rebuild path.
+- Desktop packaging expectations are now documented around an operator-run macOS `.app` bundle flow, but CI still does not build bundles and signing/notarization remain out of scope.
 - There is no destructive history purge UI flow.
 - Push detection is local-state-based first and optional GitHub confirmation second.
 
 ## Working Agreement
 
-- Keep `BUILD.md`, `AGENTS.md`, `README.md`, and `docs/metrics.md` aligned when product behavior changes.
+- Keep `BUILD.md`, `AGENTS.md`, `README.md`, `docs/metrics.md`, and `docs/desktop-release.md` aligned when product behavior or release workflow changes.
 - Prefer adding tests when changing git parsing, rollup math, or runtime orchestration.
 - If route or template behavior changes, keep the HTMX partial paths and route smoke tests in sync.
 - Treat these files as first-update targets after meaningful behavior changes:
@@ -64,3 +66,4 @@ cargo check -p gitpulse-desktop
   - `BUILD.md`
   - `docs/architecture.md`
   - `docs/metrics.md`
+  - `docs/desktop-release.md`

@@ -3,6 +3,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::{Context, Result, anyhow};
@@ -28,6 +29,9 @@ use tokio::{
 };
 use tracing::{error, warn};
 use uuid::Uuid;
+
+const FULL_HISTORY_REBUILD_STRATEGY: &str = "full_history_synchronous";
+const SLOW_REBUILD_WARNING_MS: u64 = 1_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivityFeedItem {
@@ -673,6 +677,11 @@ impl GitPulseRuntime {
     }
 
     pub async fn rebuild_analytics(&self) -> Result<()> {
+        self.rebuild_analytics_report().await.map(|_| ())
+    }
+
+    pub async fn rebuild_analytics_report(&self) -> Result<RebuildReport> {
+        let started_at = Instant::now();
         let settings = self.inner.config.read().await.settings.clone();
         let score_formula = ScoreFormula::default();
         let repositories = self.inner.db.list_repositories().await?;
@@ -706,6 +715,10 @@ impl GitPulseRuntime {
         )
         .fetch_all(self.inner.db.pool())
         .await?;
+        let snapshot_rows_count = snapshot_rows.len() as i64;
+        let file_rows_count = file_rows.len() as i64;
+        let commit_rows_count = commit_rows.len() as i64;
+        let push_rows_count = push_rows.len() as i64;
 
         let mut activity = Vec::<ActivityPoint>::new();
         let mut by_scope = BTreeMap::<(Option<Uuid>, NaiveDate), DailyAccumulator>::new();
@@ -738,6 +751,7 @@ impl GitPulseRuntime {
                 ),
             );
         }
+        let snapshot_repo_days = latest_snapshot_by_repo_day.len() as i64;
 
         for (
             (repo_id, day),
@@ -846,8 +860,10 @@ impl GitPulseRuntime {
                 changed_lines: 0,
             });
         }
+        let activity_points = activity.len() as i64;
 
         let sessions = sessionize(&activity, settings.monitoring.session_gap_minutes);
+        let sessions_written = sessions.len() as i64;
         self.inner.db.replace_focus_sessions(&sessions).await?;
         for session in &sessions {
             let day = rollup_day(
@@ -883,6 +899,7 @@ impl GitPulseRuntime {
             rollup.score = score_formula.score(&rollup).total;
             rollups.push(rollup);
         }
+        let rollups_written = rollups.len() as i64;
         self.inner.db.replace_daily_rollups(&rollups).await?;
 
         let repo_count = tracked_repo_ids.len();
@@ -897,9 +914,40 @@ impl GitPulseRuntime {
         let overall_rollups = self.inner.db.list_daily_rollups(None, 365).await?;
         let achievements =
             evaluate_achievements(repo_count, push_count, &overall_rollups, &sessions);
+        let achievements_written = achievements.len() as i64;
         self.inner.db.replace_achievements(&achievements).await?;
 
-        Ok(())
+        let report = RebuildReport {
+            strategy: FULL_HISTORY_REBUILD_STRATEGY.into(),
+            tracked_repository_count: tracked_repo_ids.len() as i64,
+            snapshot_rows: snapshot_rows_count,
+            snapshot_repo_days,
+            file_activity_rows: file_rows_count,
+            commit_rows: commit_rows_count,
+            push_rows: push_rows_count,
+            activity_points,
+            sessions_written,
+            rollups_written,
+            achievements_written,
+            elapsed_ms: started_at.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
+        };
+
+        if report.elapsed_ms >= SLOW_REBUILD_WARNING_MS {
+            warn!(
+                strategy = report.strategy.as_str(),
+                elapsed_ms = report.elapsed_ms,
+                tracked_repositories = report.tracked_repository_count,
+                snapshot_rows = report.snapshot_rows,
+                file_activity_rows = report.file_activity_rows,
+                commit_rows = report.commit_rows,
+                push_rows = report.push_rows,
+                rollups_written = report.rollups_written,
+                sessions_written = report.sessions_written,
+                "analytics rebuild completed slowly"
+            );
+        }
+
+        Ok(report)
     }
 
     async fn ensure_author_identity(&self) -> Result<()> {
@@ -1054,6 +1102,22 @@ pub struct DoctorReport {
     pub config_path: String,
     pub watched_repositories: Vec<String>,
     pub repository_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RebuildReport {
+    pub strategy: String,
+    pub tracked_repository_count: i64,
+    pub snapshot_rows: i64,
+    pub snapshot_repo_days: i64,
+    pub file_activity_rows: i64,
+    pub commit_rows: i64,
+    pub push_rows: i64,
+    pub activity_points: i64,
+    pub sessions_written: i64,
+    pub rollups_written: i64,
+    pub achievements_written: i64,
+    pub elapsed_ms: u64,
 }
 
 #[derive(Default)]

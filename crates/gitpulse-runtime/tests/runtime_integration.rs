@@ -352,6 +352,52 @@ async fn rebuild_analytics_prunes_stale_repo_scoped_rollup_rows() {
 }
 
 #[tokio::test]
+async fn rebuild_analytics_report_matches_loaded_rows_and_outputs() {
+    let temp = tempdir().unwrap();
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    write_and_commit(&repo, "README.md", "hello\n", "initial");
+
+    let runtime = GitPulseRuntime::bootstrap_in(
+        test_paths(temp.path()),
+        config_with_test_author(),
+        BootstrapOptions { port_override: None, start_background_tasks: false },
+    )
+    .await
+    .unwrap();
+
+    runtime.add_target(&repo).await.unwrap();
+
+    let report = runtime.rebuild_analytics_report().await.unwrap();
+
+    let focus_sessions = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM focus_sessions")
+        .fetch_one(runtime.db().pool())
+        .await
+        .unwrap();
+    let daily_rollups = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM daily_rollups")
+        .fetch_one(runtime.db().pool())
+        .await
+        .unwrap();
+    let achievements = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM achievements")
+        .fetch_one(runtime.db().pool())
+        .await
+        .unwrap();
+
+    assert_eq!(report.strategy, "full_history_synchronous");
+    assert_eq!(report.tracked_repository_count, 1);
+    assert_eq!(report.snapshot_rows, 1);
+    assert_eq!(report.snapshot_repo_days, 1);
+    assert_eq!(report.file_activity_rows, 1);
+    assert_eq!(report.commit_rows, 1);
+    assert_eq!(report.push_rows, 0);
+    assert_eq!(report.activity_points, 2);
+    assert_eq!(report.sessions_written, focus_sessions);
+    assert_eq!(report.rollups_written, daily_rollups);
+    assert_eq!(report.achievements_written, achievements);
+}
+
+#[tokio::test]
 async fn remove_repository_prunes_repo_scoped_rollups() {
     let temp = tempdir().unwrap();
     let workspace = temp.path().join("workspace");

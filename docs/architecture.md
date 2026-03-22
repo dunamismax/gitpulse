@@ -23,6 +23,12 @@ GitPulse is structured as a Rust-first local analytics system with a thin HTML/H
    - achievements
 8. Axum + Askama pages and HTMX partials read the resulting analytics for dashboard and drill-down views.
 
+## Analytics Rebuild Strategy
+
+- Sessions, daily rollups, and achievements are still rebuilt from the full local snapshot/event history for v1.
+- The explicit `gitpulse rebuild-rollups` maintenance path reports scanned row counts, derived output counts, and elapsed time so rebuild cost is operator-visible.
+- This keeps the raw-event versus derived-rollup split inspectable while deferring incremental/scoped rebuild complexity until measured operator pain justifies it.
+
 ## Crate Boundaries
 
 ### `gitpulse-core`
