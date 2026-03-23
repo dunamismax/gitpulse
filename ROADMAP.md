@@ -1,6 +1,6 @@
 # GitPulse Roadmap
 
-This is the product roadmap, not the execution ledger. For the current repo state and verification history, read [BUILD.md](BUILD.md). For the active migration checklist, read [REWRITE_TRACKER.md](REWRITE_TRACKER.md).
+This is the product roadmap, not the execution ledger. For the current repo state and verification history, read [BUILD.md](BUILD.md). For the current implementation checklist, read [REWRITE_TRACKER.md](REWRITE_TRACKER.md).
 
 ## Vision
 
@@ -10,20 +10,18 @@ Long term, it can grow into an extensible platform with APIs, plugins, and optio
 
 ## Current reality
 
-The repository now reflects the Go rewrite directly:
+The repository currently centers on:
 
 - Go runtime and CLI
 - PostgreSQL persistence
 - raw SQL via `pgx/v5`
 - local web dashboard rendered from server-side templates
-- no native desktop shell currently in-tree
 
 Near-term roadmap decisions:
 
 - stabilize the Go CLI + local web dashboard first
 - prove the PostgreSQL-backed happy path end to end
-- only revisit native-shell packaging after the core runtime is solid
-- treat Zig/C as the only future native path if one is still needed
+- treat packaging as optional follow-on work, not a current product surface
 
 ## Milestone 1 — operator-ready Go runtime
 
@@ -51,7 +49,7 @@ Still needed:
 
 **Status:** Planned
 
-Goal: make the rewritten app resilient and pleasant to operate.
+Goal: make the app resilient and pleasant to operate.
 
 Possible scope:
 

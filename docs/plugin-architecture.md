@@ -114,7 +114,7 @@ gitpulse plugin info weekend-warrior
 
 ## Dashboard integration
 
-Custom widgets would return data or HTML fragments that the local web dashboard can render inside a plugin container. If a future native shell exists, it should reuse the same web surface rather than invent a second plugin rendering model.
+Custom widgets would return data or HTML fragments that the local web dashboard can render inside a plugin container.
 
 ## Open questions
 

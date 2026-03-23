@@ -8,11 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Document the repository truth as Go + PostgreSQL + raw SQL + local web UI only.
-- Align README, BUILD, rewrite tracker, architecture notes, and contributor docs with the current stack.
-- Remove Tauri-specific folder-picker behavior from the remaining frontend helper script.
+- Document the repository as a Go + PostgreSQL + raw SQL + local web UI project.
+- Align README, BUILD, rewrite tracker, architecture notes, and contributor docs with the current implementation.
+- Tighten release and packaging docs so they only describe workflows the repo actually has.
 
 ### Removed
-- Legacy Rust/Tauri workspace under `apps/` and `crates/`.
-- Cargo manifests, Rust toolchain/config files, and Rust-era desktop helper scripts.
-- Stale docs that implied a supported Rust/Tauri desktop packaging workflow.
+- Stale migration-cleanup narration from active docs.
+- Outdated packaging and toolchain references that no longer describe the current repo.

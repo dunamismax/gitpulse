@@ -1,6 +1,6 @@
 # Contributing to GitPulse
 
-GitPulse is mid-rewrite. Read [BUILD.md](BUILD.md) first, then [REWRITE_TRACKER.md](REWRITE_TRACKER.md), then [docs/architecture.md](docs/architecture.md).
+GitPulse is an active Go application. Read [BUILD.md](BUILD.md) first, then [REWRITE_TRACKER.md](REWRITE_TRACKER.md), then [docs/architecture.md](docs/architecture.md).
 
 ## Development setup
 
@@ -60,7 +60,7 @@ Rules:
 - Use raw SQL via `pgx/v5`; do not add an ORM.
 - Keep repo-controlled strings treated as untrusted input.
 - Keep docs aligned when product behavior changes.
-- Do not imply a desktop shell or release flow that is not present in-tree.
+- Do not document release workflows that are not present in-tree.
 
 ## Quality gates
 
@@ -80,7 +80,7 @@ Update docs in the same change when behavior shifts:
 
 - `README.md` for user-facing behavior
 - `BUILD.md` for execution truth and verification
-- `REWRITE_TRACKER.md` for resumable rewrite state
+- `REWRITE_TRACKER.md` for resumable implementation state
 - `docs/architecture.md` for active structure
 - `gitpulse.example.toml` for config surface changes
 

@@ -8,9 +8,6 @@ The active stack is:
 - PostgreSQL for all persisted state
 - raw SQL via `pgx/v5`
 - plain HTML templates plus lightweight browser-side JS where needed
-- Zig/C reserved only for a future thin native shell, not implemented in this repo today
-
-Rust/Tauri code is no longer part of the tree.
 
 ## System overview
 
@@ -88,7 +85,7 @@ Sessionization logic over activity points.
 
 ## Persistence model
 
-Current Go rewrite tables:
+Current tables:
 
 - `tracked_targets`
 - `repositories`
@@ -103,8 +100,8 @@ Current Go rewrite tables:
 
 Schema sources:
 
-- `internal/db/schema.sql` for the embedded startup migration path
-- `migrations/001_init.sql` for explicit repo-visible schema history
+- `internal/db/schema.sql` for the embedded startup schema path
+- `migrations/0001_init.sql` and `migrations/001_init.sql` for repo-visible SQL migration files
 
 ## Design constraints
 
@@ -112,4 +109,4 @@ Schema sources:
 - PostgreSQL is the only supported database target.
 - No ORM layer should be introduced.
 - Keep repo-controlled strings treated as untrusted input.
-- Do not imply a desktop shell or packaging workflow until code for it actually exists.
+- Document new runtime or release surfaces only when code for them exists.

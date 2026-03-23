@@ -2,19 +2,23 @@
 
 Local-first git activity analytics for developers who want honest signals without uploading source code.
 
-GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is the Go rewrite: Go runtime, PostgreSQL, raw SQL via `pgx/v5`, and a local web dashboard rendered with plain HTML templates.
+GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by PostgreSQL, with raw SQL via `pgx/v5`, a Cobra CLI, and a local web dashboard rendered with plain HTML templates.
 
 [![CI](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Status
 
-GitPulse is still mid-rewrite, but the repository truth is now clean:
+GitPulse is active and usable as a Go CLI plus local web dashboard.
 
-- active stack: Go 1.25+, PostgreSQL 14+, `pgx/v5`, Cobra, `net/http`, plain HTML templates
-- no legacy Rust/Tauri source or Rust toolchain files remain in-tree
-- no native desktop shell is implemented in this repo right now
-- future native packaging, if it still matters, should be a thin Zig/C wrapper over the Go runtime
+Active stack:
+
+- Go 1.25+
+- PostgreSQL 14+
+- `pgx/v5`
+- Cobra
+- `net/http`
+- plain HTML templates
 
 What exists today:
 
@@ -30,12 +34,12 @@ What exists today:
 
 What is not finished yet:
 
-- live PostgreSQL smoke validation captured in-repo as repeatable integration coverage
+- broader repeatable live PostgreSQL smoke coverage captured in-repo
 - background watcher / continuous monitoring loop
 - settings persistence from the web form
-- any future Zig/C native shell or packaging workflow
+- packaged desktop release workflow
 
-For the execution ledger and next steps, see [BUILD.md](BUILD.md). For the rewrite checklist, see [REWRITE_TRACKER.md](REWRITE_TRACKER.md).
+For the execution ledger and next steps, see [BUILD.md](BUILD.md). For the current implementation tracker, see [REWRITE_TRACKER.md](REWRITE_TRACKER.md).
 
 ## Why GitPulse?
 
@@ -134,18 +138,18 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── internal/web/              # net/http handlers and render helpers
 ├── templates/                 # HTML pages and partials
 ├── assets/                    # Static assets used by the local web UI
-├── migrations/001_init.sql    # PostgreSQL schema baseline
+├── migrations/                # PostgreSQL migration files
 ├── docs/architecture.md       # Current architecture notes
 ├── BUILD.md                   # Execution manual and verification log
-└── REWRITE_TRACKER.md         # Rewrite progress and next-step ledger
+└── REWRITE_TRACKER.md         # Current implementation tracker
 ```
 
-## Verification in this cleanup pass
+## Verification
 
 - `go test ./...`
 - `go build ./cmd/gitpulse`
 - `go run ./cmd/gitpulse --help`
-- stale-reference scan for Rust/Cargo/Tauri terms across tracked docs/config
+- tracked-docs scan for stale toolchain and packaging references
 
 ## License
 

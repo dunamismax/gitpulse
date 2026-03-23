@@ -4,7 +4,7 @@ Read `BUILD.md` first. It is the execution manual and current handoff ledger.
 
 ## Repo state
 
-GitPulse is a Go-first local analytics tool in active rewrite/hardening.
+GitPulse is a Go-first local analytics tool for repository activity.
 
 Current implementation path:
 
@@ -21,15 +21,13 @@ Current implementation path:
 - `internal/web/`
 - `templates/`
 - `assets/`
-- `migrations/001_init.sql`
-
-Rust/Tauri source and Rust toolchain files have been removed from the repo. Do not reintroduce them casually.
+- `migrations/`
 
 New work goes into Go, with PostgreSQL via `pgx/v5` and raw SQL only.
 
 ## Current product shape
 
-What exists in the Go rewrite today:
+What exists today:
 
 - Cobra CLI entrypoint with `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
 - PostgreSQL schema + raw SQL query layer
@@ -41,14 +39,14 @@ What exists in the Go rewrite today:
 What is not complete yet:
 
 - file watcher / background monitoring loop
-- end-to-end integration tests against a live PostgreSQL instance
+- broader end-to-end integration coverage against a live PostgreSQL instance
 - persistent settings writes from the web UI
-- any Zig/C native shell or packaging path
+- packaged desktop release workflow
 
 ## Working rules
 
 - Keep `README.md`, `BUILD.md`, `REWRITE_TRACKER.md`, and `docs/architecture.md` aligned with code.
-- Treat `REWRITE_TRACKER.md` as the resume point for the rewrite.
+- Treat `REWRITE_TRACKER.md` as the resume point for the current implementation work.
 - Prefer the narrowest truthful verification first: `go test ./...`, then `go build ./cmd/gitpulse`, then a focused CLI smoke command.
 - For database work, keep SQL explicit in `internal/db/`; no ORM.
-- If you decide to reintroduce native packaging in the future, document it as new work. Do not imply it already exists.
+- Do not document packaging or release behavior that the repo does not implement.
