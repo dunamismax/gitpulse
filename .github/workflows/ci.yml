@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  go:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -13,7 +13,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_DB: gitpulse_ci
         ports:
           - 5432:5432
         options: >-
@@ -22,30 +22,14 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      GITPULSE_DATABASE__DSN: postgres://postgres:postgres@localhost:5432/gitpulse_ci?sslmode=disable
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
         with:
-          components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest,cargo-deny
-      - name: Format
-        run: cargo fmt --all -- --check
-      - name: Lint
-        run: cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings
-      - name: Nextest
-        run: cargo nextest run --workspace --exclude gitpulse-desktop
-      - name: Deny
-        run: cargo deny check
-
-  desktop-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Desktop compile check
-        run: cargo check -p gitpulse-desktop
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test ./...
+      - name: CLI build smoke
+        run: go build ./cmd/gitpulse

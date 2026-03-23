@@ -1,0 +1,132 @@
+{{define "content"}}
+<section class="page-head spread">
+  <div>
+    <p class="eyebrow">Repository Detail</p>
+    <h2>{{.View.Card.Repo.Name}}</h2>
+    <p class="muted">{{.View.Card.Repo.RootPath}}</p>
+  </div>
+  <div class="button-row">
+    <form method="post" action="/repositories/{{.View.Card.Repo.ID}}/refresh">
+      <button type="submit">Rescan</button>
+    </form>
+  </div>
+</section>
+
+<section class="grid three">
+  <article class="stat-card">
+    <span>Branch</span>
+    {{if .View.Card.Snapshot}}
+    <strong>{{if .View.Card.Snapshot.Branch}}{{.View.Card.Snapshot.Branch}}{{else}}(detached){{end}}</strong>
+    <small>{{if .View.Card.Snapshot.UpstreamRef}}{{.View.Card.Snapshot.UpstreamRef}}{{else}}no upstream{{end}}</small>
+    {{else}}
+    <strong>unknown</strong>
+    {{end}}
+  </article>
+  <article class="stat-card">
+    <span>Live / Staged</span>
+    {{if .View.Card.Snapshot}}
+    <strong>{{add .View.Card.Snapshot.LiveAdditions .View.Card.Snapshot.LiveDeletions}} / {{add .View.Card.Snapshot.StagedAdditions .View.Card.Snapshot.StagedDeletions}}</strong>
+    {{else}}
+    <strong>0 / 0</strong>
+    {{end}}
+    <small>Changed lines</small>
+  </article>
+  <article class="stat-card">
+    <span>Health</span>
+    <strong>{{.View.Card.Health}}</strong>
+    {{if .View.Card.Metrics}}
+    <small>Score: {{.View.Card.Metrics.Score}}</small>
+    {{end}}
+  </article>
+</section>
+
+<section class="grid two">
+  <article class="panel">
+    <header class="panel-head">
+      <div>
+        <h3>Pattern Overrides</h3>
+        <p class="muted">These patterns apply only to this repository. Excludes always win over includes.</p>
+      </div>
+    </header>
+    <form method="post" action="/repositories/{{.View.Card.Repo.ID}}/patterns">
+      <label>Repo Include Patterns</label>
+      <textarea name="include_patterns" rows="5" placeholder="src/**&#10;docs/**">{{join .View.IncludePatterns "\n"}}</textarea>
+      <label>Repo Exclude Patterns</label>
+      <textarea name="exclude_patterns" rows="7" placeholder="generated/**&#10;fixtures/**">{{join .View.ExcludePatterns "\n"}}</textarea>
+      <p class="field-note">Saving applies new filters to future refreshes for this repository.</p>
+      <div class="button-row">
+        <button type="submit">Save Repo Patterns</button>
+      </div>
+    </form>
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Language Breakdown</h3>
+    </header>
+    <div class="lang-list">
+      {{range .View.LanguageBreakdown}}
+      <div class="lang-row">
+        <span>{{.Language}}</span>
+        <strong>{{.Code}} lines</strong>
+      </div>
+      {{else}}
+      <p class="muted">No language data available.</p>
+      {{end}}
+    </div>
+  </article>
+</section>
+
+<section class="grid two">
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Recent Commits</h3>
+    </header>
+    <table class="table">
+      <thead>
+        <tr><th>SHA</th><th>Summary</th><th>Lines</th><th>When</th></tr>
+      </thead>
+      <tbody>
+        {{range .View.RecentCommits}}
+        <tr>
+          <td><code>{{slice .CommitSHA 0 7}}</code></td>
+          <td>{{.Summary}}</td>
+          <td>{{add .Additions .Deletions}}</td>
+          <td>{{formatTime .AuthoredAt}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4" class="muted">No commits imported yet.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Recent Sessions</h3>
+    </header>
+    <div class="session-list">
+      {{range .View.RecentSessions}}
+      <div class="session-row">
+        <strong>{{.ActiveMinutes}} min</strong>
+        <span>{{formatTime .StartedAt}}</span>
+        <span class="chip">{{.TotalChangedLines}} lines</span>
+      </div>
+      {{else}}
+      <p class="muted">No sessions recorded for this repository.</p>
+      {{end}}
+    </div>
+  </article>
+</section>
+
+<section class="panel">
+  <header class="panel-head">
+    <h3>Top Files Touched</h3>
+  </header>
+  <div class="file-list">
+    {{range .View.TopFiles}}
+    <div class="file-row"><code>{{.}}</code></div>
+    {{else}}
+    <p class="muted">No file activity recorded.</p>
+    {{end}}
+  </div>
+</section>
+{{end}}

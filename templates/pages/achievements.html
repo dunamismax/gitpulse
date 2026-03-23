@@ -1,0 +1,38 @@
+{{define "content"}}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Achievements</p>
+    <h2>Consistency, not gimmicks</h2>
+    <p class="muted">Score is separate from raw stats and the badge set stays intentionally grounded.</p>
+  </div>
+</section>
+
+<section class="grid three">
+  <article class="stat-card">
+    <span>Current Streak</span>
+    <strong>{{.Streaks.CurrentDays}} days</strong>
+  </article>
+  <article class="stat-card">
+    <span>Best Streak</span>
+    <strong>{{.Streaks.BestDays}} days</strong>
+  </article>
+  <article class="stat-card">
+    <span>Today's Score</span>
+    <strong>{{.TodayScore}}</strong>
+  </article>
+</section>
+
+<section class="badge-grid">
+  {{range .Achievements}}
+  <article class="badge-card">
+    <h3>{{.Kind}}</h3>
+    <p>{{.Reason}}</p>
+    <small>
+      {{if .Day}}Unlocked on {{.Day}}{{else}}Unlocked recently{{end}}
+    </small>
+  </article>
+  {{else}}
+  <p class="muted">No achievements unlocked yet. Keep coding.</p>
+  {{end}}
+</section>
+{{end}}

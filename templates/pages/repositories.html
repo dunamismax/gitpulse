@@ -1,0 +1,63 @@
+{{define "content"}}
+<section class="page-head spread">
+  <div>
+    <p class="eyebrow">Tracked Targets</p>
+    <h2>Repositories</h2>
+    <p class="muted">Add a single repo or a parent folder. Nested repos are discovered and tracked individually.</p>
+  </div>
+  <form class="inline-form" method="post" action="/repositories/add">
+    <input type="text" name="path" placeholder="/Users/you/code" required />
+    <button type="submit">Add Target</button>
+  </form>
+</section>
+
+<section class="panel">
+  <header class="panel-head">
+    <h3>All Repositories</h3>
+    <span class="chip">{{len .Cards}} total</span>
+  </header>
+  <div class="repo-grid">
+    {{range .Cards}}
+    <article class="repo-card">
+      <header>
+        <div>
+          <h4><a href="/repositories/{{.Repo.ID}}">{{.Repo.Name}}</a></h4>
+          <p>{{.Repo.RootPath}}</p>
+        </div>
+        <span class="badge">{{.Health}}</span>
+      </header>
+      <div class="repo-stats">
+        {{if .Metrics}}
+        <span>{{.Metrics.Commits}} commits</span>
+        <span>{{.Metrics.Pushes}} pushes</span>
+        <span>{{.Metrics.FilesTouched}} files</span>
+        <span>{{.Metrics.Score}} score</span>
+        {{else}}
+        <span class="muted">No data yet</span>
+        {{end}}
+      </div>
+      <div class="sparkline">
+        {{range .Sparkline}}
+        <span style="height: {{.}}px"></span>
+        {{end}}
+      </div>
+      <div class="button-row">
+        <form method="post" action="/repositories/{{.Repo.ID}}/refresh">
+          <button type="submit">Rescan</button>
+        </form>
+        <form method="post" action="/repositories/{{.Repo.ID}}/toggle">
+          <button type="submit" class="secondary">
+            {{if .Repo.IsMonitored}}Disable{{else}}Enable{{end}}
+          </button>
+        </form>
+        <form method="post" action="/repositories/{{.Repo.ID}}/remove">
+          <button type="submit" class="danger">Remove</button>
+        </form>
+      </div>
+    </article>
+    {{else}}
+    <p class="muted">No repositories tracked yet. Add a path above to get started.</p>
+    {{end}}
+  </div>
+</section>
+{{end}}

@@ -1,0 +1,86 @@
+{{define "content"}}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Today</p>
+    <h2>What are you changing right now?</h2>
+    <p class="muted">GitPulse keeps live work, committed work, and pushed work separate so the signal stays honest.</p>
+  </div>
+</section>
+
+<div id="dashboard-summary"
+     hx-get="/partials/dashboard-summary"
+     hx-trigger="load, every 2s"
+     hx-swap="innerHTML">
+  {{template "dashboard_summary.html" (index .View.Summary)}}
+</div>
+
+<section class="grid two">
+  <article class="panel">
+    <header class="panel-head">
+      <h3>30 Day Trend</h3>
+      <span class="chip">Changed lines + score</span>
+    </header>
+    <div class="trend-chart">
+      {{range .View.TrendPoints}}
+      <div class="trend-bar" style="height: {{.Score}}px" title="{{.Day}}: score {{.Score}}, {{.ChangedLines}} lines"></div>
+      {{end}}
+    </div>
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <h3>12 Week Heatmap</h3>
+      <span class="chip">Consistency</span>
+    </header>
+    <div class="heatmap">
+      {{range .View.HeatmapDays}}
+      <div class="heat-cell {{heatmapClass .Score}}" title="{{.Day}}: score {{.Score}}"></div>
+      {{end}}
+    </div>
+  </article>
+</section>
+
+<section class="grid two">
+  <article class="panel"
+           id="activity-feed"
+           hx-get="/partials/activity-feed"
+           hx-trigger="load, every 2s"
+           hx-swap="innerHTML">
+    <header class="panel-head">
+      <h3>Activity Feed</h3>
+      <span class="chip">Live</span>
+    </header>
+    {{template "activity_feed.html" (index .View.ActivityFeed)}}
+  </article>
+  <article class="panel">
+    <header class="panel-head">
+      <h3>Goals</h3>
+      <span class="chip">Transparent scoring</span>
+    </header>
+    <div class="goal-stack">
+      {{range .View.Summary.Goals}}
+      <div class="goal-row">
+        <div class="goal-meta">
+          <span>{{.Label}}</span>
+          <strong>{{.Current}}/{{.Target}}</strong>
+        </div>
+        <div class="progress">
+          <span style="width: {{percentOf .Current .Target}}%"></span>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </article>
+</section>
+
+<section class="panel"
+         id="repo-cards"
+         hx-get="/partials/repo-cards"
+         hx-trigger="load, every 10s"
+         hx-swap="innerHTML">
+  <header class="panel-head">
+    <h3>Repository Pulse</h3>
+    <span class="chip">{{len .View.RepoCards}} tracked</span>
+  </header>
+  {{template "repo_cards.html" (index .View.RepoCards)}}
+</section>
+{{end}}

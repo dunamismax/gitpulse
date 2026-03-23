@@ -1,157 +1,115 @@
 # GitPulse Architecture
 
-GitPulse is structured as a Rust-first local analytics system with a thin HTML/HTMX presentation layer and a clean crate hierarchy that supports future extension.
+GitPulse is being rebuilt as a local-first Go application with PostgreSQL persistence and plain HTML templates.
+
+The active stack is:
+
+- Go for CLI, runtime, web server, git integration, analytics, and data access
+- PostgreSQL for all persisted state
+- Raw SQL via `pgx/v5`
+- Plain HTML templates plus HTMX-style partial responses
+- Existing CSS/JS assets reused where they still fit
+- Zig/C reserved for future thin native shell work, not yet implemented in this repo
+
+Legacy Rust/Tauri code remains in the repository only as a migration reference.
 
 ## System overview
 
+```text
+┌──────────────────────────────────────────────────────────┐
+│                         surfaces                         │
+│                  CLI + local web dashboard               │
+└────────────────────────────┬─────────────────────────────┘
+                             │
+                     ┌───────▼────────┐
+                     │ internal/runtime│
+                     │ orchestration   │
+                     └───┬─────────┬───┘
+                         │         │
+              ┌──────────▼───┐ ┌───▼──────────┐
+              │ internal/git │ │ internal/db  │
+              │ git CLI      │ │ pgx/raw SQL  │
+              └──────┬───────┘ └──────┬───────┘
+                     │                │
+              ┌──────▼──────┐   ┌────▼────────┐
+              │ analytics + │   │ PostgreSQL  │
+              │ sessions    │   │ event store │
+              └─────────────┘   └─────────────┘
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Product surfaces                      │
-│  ┌──────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │   CLI    │  │  Web (Axum)  │  │ Desktop (Tauri v2) │  │
-│  └────┬─────┘  └──────┬───────┘  └────────┬──────────┘  │
-│       │               │                   │              │
-│       └───────────────┼───────────────────┘              │
-│                       │                                  │
-│              ┌────────┴────────┐                         │
-│              │ gitpulse-runtime │  ← orchestration       │
-│              └───┬─────────┬───┘                         │
-│                  │         │                             │
-│         ┌────────┴──┐  ┌───┴──────────┐                  │
-│         │   core    │  │    infra     │  ← domain + I/O  │
-│         └───────────┘  └──────┬───────┘                  │
-│                               │                          │
-│                        ┌──────┴──────┐                   │
-│                        │   SQLite    │                   │
-│                        └─────────────┘                   │
-└─────────────────────────────────────────────────────────┘
-```
+
+## Package map
+
+### `cmd/gitpulse`
+
+Cobra CLI entrypoint. Owns command wiring only.
+
+### `internal/config`
+
+Platform path discovery and layered config loading via TOML + environment overrides.
+
+### `internal/db`
+
+Database connection, embedded schema, raw SQL queries, and analytics persistence.
+
+### `internal/filter`
+
+Include/exclude glob logic for path filtering.
+
+### `internal/git`
+
+Git subprocess execution, repo discovery, snapshot parsing, and history import parsing.
+
+### `internal/metrics`
+
+Pure-ish score, streak, and achievement logic.
+
+### `internal/models`
+
+Shared data structures passed between runtime, DB, and web layers.
+
+### `internal/runtime`
+
+Application orchestration: add repo, refresh, import history, rebuild analytics, and assemble view models.
+
+### `internal/sessions`
+
+Sessionization logic over activity points.
+
+### `internal/web`
+
+`net/http` handlers, partial endpoints, and template rendering.
 
 ## Data flow
 
-1. A repo root or parent folder is added through the CLI or UI.
-2. The runtime discovers repos and persists them in SQLite.
-3. Initial history import pulls recent commit metadata through the git CLI.
-4. A debounced watcher plus periodic polling enqueue repo refresh work.
-5. Refreshes call the git adapter for canonical snapshots:
-   - branch/head/upstream state
-   - ahead/behind counts
-   - live and staged numstat diffs
-   - untracked text file additions
-   - periodic tokei language snapshots
-6. The runtime writes snapshots, file activity events, commits, and pushes to the event ledger tables.
-7. Rollup rebuilds convert event history into:
-   - focus sessions
-   - daily rollups
-   - streaks
-   - score
-   - achievements
-8. Axum + Askama pages and HTMX partials read the resulting analytics for dashboard and drill-down views.
+1. A repo or folder is added through the CLI or web form.
+2. `internal/git` discovers git roots and probes repo metadata.
+3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, and achievements.
+4. `internal/runtime` rebuilds derived analytics from raw events.
+5. `internal/web` renders dashboard, repository, sessions, achievements, and settings views from runtime view models.
 
-## Analytics rebuild strategy
+## Persistence model
 
-- Sessions, daily rollups, and achievements are still rebuilt from the full local snapshot/event history for v1.
-- The explicit `gitpulse rebuild-rollups` maintenance path reports scanned row counts, derived output counts, and elapsed time so rebuild cost is operator-visible.
-- This keeps the raw-event versus derived-rollup split inspectable while deferring incremental/scoped rebuild complexity until measured operator pain justifies it.
+Current Go rewrite tables:
 
-## Crate boundaries
+- `tracked_targets`
+- `repositories`
+- `repo_status_snapshots`
+- `file_activity_events`
+- `commit_events`
+- `push_events`
+- `focus_sessions`
+- `daily_rollups`
+- `achievements`
+- `settings`
 
-### `gitpulse-core`
+Schema sources:
 
-- Pure logic and shared types
-- No Axum/Tauri/SQLx concerns
-- Holds score, streak, session, and timezone/day-boundary rules
-- Achievement definitions and evaluation logic
-- Settings and configuration types
+- `internal/db/schema.sql` for the embedded startup migration path
+- `migrations/001_init.sql` for explicit repo-visible schema history
 
-### `gitpulse-infra`
+## Migration stance
 
-- All external integration boundaries
-- SQLx/SQLite persistence and migrations
-- Layered config loading (defaults -> TOML -> env vars -> CLI)
-- App directory discovery (platform-aware XDG/macOS/Windows)
-- Git CLI parsing and command execution
-- Repo discovery and path normalization
-- Exclusion pattern matching (global + repo-specific, exclude-wins)
-- notify-based filesystem watching with debouncing
-- Optional GitHub API verification
-
-### `gitpulse-runtime`
-
-- Application orchestration
-- Coordinates adds/imports/refreshes
-- Validates and persists repo-specific pattern overrides
-- Detects pushes from state transitions
-- Rebuilds analytics from ledger data
-- Exposes high-level queries for the UI and CLI
-
-### `gitpulse-web`
-
-- Axum routes and handlers
-- Askama templates with HTMX partials
-- Repository detail forms for repo-specific pattern overrides
-- Server-side SVG chart rendering (trends, heatmaps, language/file breakdowns)
-- Static asset serving with compression
-
-### CLI and desktop apps
-
-- `gitpulse-cli` is the headless entrypoint
-- `gitpulse-desktop` is intentionally thin and reuses the exact same runtime/web stack
-
-## Persistence strategy
-
-SQLite stores append-friendly event data plus rebuildable daily analytics:
-
-| Table | Purpose | Append or derived |
-|-------|---------|-------------------|
-| `tracked_targets` | Repo roots and folders being monitored | Append |
-| `repositories` | Individual git repos with config | Append |
-| `repo_status_snapshots` | Point-in-time branch/diff state | Append |
-| `file_activity_events` | Per-file line change events | Append |
-| `commit_events` | Imported commit metadata | Append (idempotent) |
-| `push_events` | Detected/confirmed pushes | Append |
-| `focus_sessions` | Sessionized work periods | Derived |
-| `daily_rollups` | Aggregated daily metrics | Derived |
-| `achievements` | Unlocked badges | Derived |
-| `settings` | User configuration | Append |
-
-The app keeps raw events separate from rollups and separate again from gamified score so recalculation stays possible.
-
-## Why git CLI instead of libgit2
-
-- Simpler availability on developer machines
-- Easier alignment with what users see in their normal git workflows
-- Safer incremental parsing for a local-first v1
-- Avoids linking complexity and platform-specific build issues
-
-## Desktop and web reuse
-
-There is one product implementation:
-
-- same runtime
-- same database
-- same routes
-- same templates
-- same assets
-
-The Tauri shell only starts the runtime on localhost and adds a native folder picker bridge.
-
-## Future architecture considerations
-
-### REST API layer (Phase 10)
-
-The API will sit alongside the web routes in `gitpulse-web` or in a new `gitpulse-api` crate, consuming the same `gitpulse-runtime` queries. The web dashboard may eventually be refactored to consume the API internally, but for v1 the server-side rendering approach stays.
-
-### Plugin system (Phase 11)
-
-Plugins will communicate with the host via JSON-RPC over stdin/stdout (process isolation). The plugin boundary sits between `gitpulse-runtime` (which provides the query/event interface) and the plugin process. Plugins cannot access `gitpulse-infra` or `gitpulse-core` directly. See [plugin-architecture.md](plugin-architecture.md) for the full design.
-
-### Sync layer (Phase 15)
-
-If multi-device sync is added, it will operate at the event level — syncing raw events between devices and rebuilding derived analytics locally. This preserves the local-first model and avoids syncing derived state that could diverge. The sync layer would sit alongside `gitpulse-infra` as a new boundary crate.
-
-### Scaling considerations
-
-- The current full-history rebuild is O(events). For v1 datasets (months of history, <50 repos), this is fine.
-- If rebuild time becomes a problem, the likely solution is incremental rebuilds scoped to changed date ranges, not a fundamentally different architecture.
-- The event/rollup split was designed to support this transition — rollups can be rebuilt for specific date ranges without replaying all history.
+- New implementation work belongs in Go.
+- PostgreSQL is the only supported database target for the rewrite.
+- No ORM layer should be introduced.
+- Legacy Rust files may be consulted for parity, then removed once the Go path fully replaces them.

@@ -1,88 +1,59 @@
 # GitPulse Agent Notes
 
-This file is concise repo memory for future agents and developers. `BUILD.md` is the primary operational handoff document and should be read first.
+Read `BUILD.md` first. It is the execution manual and current handoff ledger.
 
-## Purpose
+## Repo state
 
-GitPulse is a local-first Rust desktop and web app for tracking repository activity across one or many git repos. It focuses on live working-tree changes, staged work, qualifying commits, local push detection, sessions, streaks, goals, score, achievements, and lightweight historical analytics without uploading source code.
+GitPulse is in an active rewrite from the legacy Rust/Tauri workspace to a Go-first stack.
 
-The long-term vision extends to a plugin-extensible platform with a REST API, multi-device sync, IDE integrations, and optional team analytics — all while preserving local-first principles. See `ROADMAP.md` for the full picture.
+Current active implementation path:
 
-## Architecture
+- `go.mod`
+- `cmd/gitpulse/`
+- `internal/config/`
+- `internal/db/`
+- `internal/filter/`
+- `internal/git/`
+- `internal/metrics/`
+- `internal/models/`
+- `internal/runtime/`
+- `internal/sessions/`
+- `internal/web/`
+- `templates/`
+- `assets/`
+- `migrations/001_init.sql`
 
-- `crates/gitpulse-core/`
-  - Domain models, config types, score formula, streak rules, sessionization, timezone/day-boundary helpers, and achievement evaluation.
-- `crates/gitpulse-infra/`
-  - App directories, config loading, SQLite/SQLx persistence, migrations, git CLI parsing, exclusions, watcher service, and optional GitHub verification.
-- `crates/gitpulse-runtime/`
-  - Repo discovery, target add/import/refresh flows, push detection, rollup rebuilds, session rebuilds, and high-level queries for CLI/web consumers.
-- `crates/gitpulse-web/`
-  - Axum routes, Askama templates, HTMX partials, local assets, and server-side SVG chart rendering.
-- `apps/gitpulse-cli/`
-  - `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor` commands.
-- `apps/gitpulse-desktop/`
-  - Thin Tauri v2 shell that hosts the same localhost UI and exposes a native folder picker bridge.
-- `migrations/0001_init.sql`
-  - Source of truth for the SQLite schema.
+Legacy reference only:
 
-## Design notes
+- `Cargo.toml`, `Cargo.lock`
+- `apps/`, `crates/`
+- Rust-era docs that have not yet been rewritten
 
-- GitPulse keeps live work, committed work, and pushed work separate throughout the product.
-- Canonical accounting comes from git snapshots and persisted events, not raw filesystem watcher events.
-- Daily score is intentionally separate from raw stats.
-- The app is useful with no GitHub token configured.
-- Global include/exclude patterns are user-editable in settings, and per-repo overrides are editable from the repository detail page.
-- Repo-specific pattern changes immediately rescan active repos, but they do not retroactively rewrite previously stored file-activity history.
-- Analytics rebuilds remain full-history and synchronous for v1, and `gitpulse rebuild-rollups` reports scanned row counts plus elapsed time so operators can see rebuild cost.
-- Repo-controlled strings (paths, branch names, labels) are treated as untrusted input in all rendering contexts.
+Do not add new product behavior in Rust. New work goes into Go, with PostgreSQL via `pgx/v5` and raw SQL only.
 
-## Key documents
+## Current product shape
 
-| Document | Purpose |
-|----------|---------|
-| `BUILD.md` | Execution ledger, phase tracking (0-19), verification history, decision log |
-| `ROADMAP.md` | Public-facing product vision (v1/v2/v3) |
-| `CONTRIBUTING.md` | Development setup, architecture rules, contribution workflow |
-| `CHANGELOG.md` | Release history |
-| `docs/architecture.md` | Crate boundaries, data flow, future architecture |
-| `docs/metrics.md` | Metric definitions, semantics, caveats |
-| `docs/desktop-release.md` | Desktop packaging scope and operator workflow |
-| `docs/plugin-architecture.md` | Extension system design (planned for v2) |
+What exists in the Go rewrite today:
 
-## Verified commands
+- Cobra CLI entrypoint with `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
+- PostgreSQL schema + raw SQL query layer
+- Git subprocess integration for repo discovery, snapshots, and history import
+- Rebuildable sessions, rollups, streaks, scoring, and achievements logic
+- net/http server with HTML templates and HTMX-style partial endpoints
+- Reused static assets from the legacy app
 
-```bash
-cargo check --workspace --exclude gitpulse-desktop
-cargo test --workspace --exclude gitpulse-desktop
-cargo clippy --workspace --all-targets --exclude gitpulse-desktop -- -D warnings
-cargo run -p gitpulse-cli -- rebuild-rollups
-cargo run -p gitpulse-cli -- doctor
-cargo check -p gitpulse-desktop
-./scripts/desktop-smoke.sh
-```
+What is not complete yet:
 
-## Current gaps
+- File watcher / background monitoring loop
+- End-to-end integration tests against a live PostgreSQL instance
+- Persistent settings writes from the web UI
+- Zig/C desktop shell replacement for the retired Tauri path
+- Final removal of the legacy Rust tree
 
-- There is no incremental or scoped analytics rebuild strategy yet; longer-lived datasets still rely on the full-history rebuild path.
-- Desktop packaging expectations are now documented around an operator-run macOS `.app` bundle flow, but CI still does not build bundles and signing/notarization remain out of scope.
-- There is no destructive history purge UI flow.
-- Push detection is local-state-based first and optional GitHub confirmation second.
-- No REST API exists yet (planned Phase 10).
-- No plugin system exists yet (planned Phase 11).
+## Working rules
 
-## Working agreement
-
-- Keep `BUILD.md`, `AGENTS.md`, `README.md`, `ROADMAP.md`, `docs/metrics.md`, and `docs/desktop-release.md` aligned when product behavior or release workflow changes.
-- Prefer adding tests when changing git parsing, rollup math, or runtime orchestration.
-- If route or template behavior changes, keep the HTMX partial paths and route smoke tests in sync.
-- New phases or milestones should be reflected in both `BUILD.md` and `ROADMAP.md`.
-- Treat these files as first-update targets after meaningful behavior changes:
-  - `crates/gitpulse-core/src/*`
-  - `crates/gitpulse-infra/src/*`
-  - `crates/gitpulse-runtime/src/lib.rs`
-  - `crates/gitpulse-web/src/lib.rs`
-  - `README.md`
-  - `BUILD.md`
-  - `docs/architecture.md`
-  - `docs/metrics.md`
-  - `docs/desktop-release.md`
+- Keep `README.md`, `BUILD.md`, `REWRITE_TRACKER.md`, and `docs/architecture.md` aligned with code.
+- Treat `REWRITE_TRACKER.md` as the resume point for the rewrite.
+- Prefer the narrowest truthful verification first: `go test ./...`, then a focused CLI smoke command.
+- For database work, keep SQL explicit in `internal/db/`; no ORM.
+- If you rescue work from scratch dirs or old worktrees, document what was rescued before deleting anything.

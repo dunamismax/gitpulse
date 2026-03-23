@@ -1,87 +1,81 @@
 # GitPulse Roadmap
 
-This document outlines the product vision for GitPulse across three major milestones. It complements [BUILD.md](BUILD.md), which tracks execution details and verification history.
+This is the product roadmap, not the execution ledger. For the current repo state and verification history, read [BUILD.md](BUILD.md). For the active migration checklist, read [REWRITE_TRACKER.md](REWRITE_TRACKER.md).
 
 ## Vision
 
-GitPulse aims to be the definitive local-first developer analytics platform — a tool that helps developers understand their work patterns, maintain momentum, and stay honest about their output, all without sacrificing privacy or shipping source code to a cloud service.
+GitPulse should become a trustworthy local-first developer analytics tool that helps an individual understand their own work without shipping source code to somebody else's cloud.
 
-The long-term goal is a plugin-extensible platform that works across devices, integrates with the tools developers already use, and optionally supports team-level insights without becoming surveillance.
+Long term, it can grow into an extensible platform with APIs, plugins, and optional connectivity. That only matters if the local single-machine product stays solid, inspectable, and privacy-respecting.
 
-## v1 — Local-first foundation
+## Current reality
 
-**Status:** In progress. Core product is functional. Hardening and stabilization underway.
+The repository is in an active rewrite from the legacy Rust/Tauri implementation to a Go-first stack with PostgreSQL and raw SQL.
 
-**Goal:** Ship a reliable, trustworthy, local-first analytics tool for individual developers.
+Near-term roadmap decisions:
 
-| Milestone | Status | Description |
-|-----------|--------|-------------|
-| Core analytics engine | Done | Commits, pushes, sessions, streaks, score, achievements |
-| Web dashboard | Done | Axum + Askama + HTMX with SVG charts |
-| Desktop app | In progress | Thin Tauri v2 shell, packaging workflow |
-| Correctness hardening | Done | Idempotent imports, rollup trust, input escaping |
-| Performance strategy | Not started | Incremental rebuilds for large datasets |
-| Data lifecycle | Not started | History purge, stale repo cleanup, pattern retroactivity |
-| v1 release | Not started | Docs alignment, quality gates, release checklist |
+- stabilize the Go CLI + local web dashboard first
+- prove the PostgreSQL-backed happy path end to end
+- only revisit native-shell packaging after the core runtime is solid
+- treat Zig/C as the future native path if one is still needed
 
-**What ships with v1:**
-- CLI with `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, `doctor`
-- Browser-based dashboard on localhost
-- macOS desktop app (unsigned `.app` bundle)
-- SQLite-backed persistence with rebuildable analytics
-- Layered configuration with sane defaults
-- Per-repo include/exclude pattern overrides
+## Milestone 1 — Go rewrite parity
 
-## v2 — Platform and extensibility
+**Status:** In progress
 
-**Status:** Planning. No code yet.
+Goal: make the Go rewrite the clear primary implementation for local use.
 
-**Goal:** Transform GitPulse from a standalone tool into an extensible platform that developers can build on.
+Targets:
 
-| Milestone | Description |
-|-----------|-------------|
-| REST API | Versioned JSON API for all analytics data. API key auth. OpenAPI spec. Webhook support. |
-| Plugin system | Extension architecture for custom metrics, achievements, widgets, and data sources. TOML manifests. Process-level or WASM isolation. |
-| Advanced analytics | Time-of-day heatmaps, velocity trends, cross-repo correlation, weekly digests, developer profiles. |
-| Cross-platform desktop | Windows and Linux builds. CI-produced artifacts. Code signing. Auto-update. |
-| Notifications | Native desktop notifications, streak alerts, goal completion, webhook-based external delivery. |
+- CLI commands: `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, `doctor`
+- PostgreSQL-backed event and rollup model
+- dashboard, repositories, sessions, achievements, and settings pages
+- rebuilt sessions, streaks, score, and achievements logic
+- operator-facing docs and reproducible local setup
 
-**Design principles for v2:**
-- The API is the integration surface. IDE extensions, mobile apps, and external dashboards consume the API — they don't duplicate the runtime.
-- Plugins extend, they don't fork. A well-behaved plugin should survive core upgrades.
-- Advanced analytics stay interpretable. No black-box scoring. Everything derivable from stored events.
-- Cross-platform is CI-driven. No more operator-run packaging as the primary distribution path.
+Still needed:
 
-## v3 — Connectivity and ecosystem
+- live PostgreSQL smoke verification
+- integration tests
+- watcher/background monitoring loop
+- settings persistence
+- GitHub push verification parity where it is still worth keeping
+- removal or quarantine of the legacy Rust tree
 
-**Status:** Vision. Informed by v1 and v2 experience.
+## Milestone 2 — Hardening and product usability
 
-**Goal:** Connect GitPulse across devices, teams, and the broader developer tool ecosystem while preserving local-first principles.
+**Status:** Planned
 
-| Milestone | Description |
-|-----------|-------------|
-| Multi-device sync | Optional, end-to-end encrypted sync across machines. Self-hostable server. CRDTs or operation-based merge. |
-| IDE integrations | VS Code and JetBrains plugins showing status bar stats, mini-dashboards, and focus mode integration. |
-| External integrations | GitLab, Gitea, Bitbucket verification. Jira/Linear ticket correlation. Calendar integration. |
-| Team analytics | Opt-in aggregate dashboards. Privacy-first design. No individual leaderboards by default. Self-hostable. |
-| Mobile companion | Read-only companion app for checking stats on the go. Push notifications for streaks and achievements. |
+Goal: make the rewritten app comfortable to run daily.
 
-**Non-negotiable constraints for v3:**
-- Sync is optional. GitPulse must remain fully functional as a single-machine tool.
-- Sync is encrypted end-to-end. The sync server never sees plaintext data.
-- Team analytics are opt-in at every level. Individuals control what they share.
-- No vendor lock-in. Self-hosting is always an option.
+Possible scope:
 
-## What GitPulse will never be
+- more focused runtime and database tests
+- better error handling and diagnostics
+- explicit migration/version handling beyond the bootstrap schema
+- data lifecycle controls
+- incremental rebuild strategy if full rebuilds become painful
+- native packaging only if it earns its keep
 
-- **A code review tool.** GitPulse tracks activity, not quality.
-- **A surveillance tool.** Team features exist for team awareness, not individual monitoring.
-- **A cloud-first SaaS.** The local-first model is a feature, not a limitation to overcome.
-- **A replacement for git.** GitPulse reads from git. It doesn't modify your repositories.
-- **A gamification trap.** Score exists to reward momentum, not to create anxiety. The UI makes this explicit.
+## Milestone 3 — Platform surface area
 
-## Contributing to the roadmap
+**Status:** Planned
 
-The roadmap is a living document. If you have ideas, open an issue or start a discussion. Priorities shift based on real usage and feedback, not speculation.
+Goal: expand GitPulse without turning it into surveillance software.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved in development.
+Possible scope:
+
+- REST API
+- plugin or extension model
+- optional notifications
+- richer analytics views
+- self-hostable sync or multi-machine workflows
+- IDE integrations
+
+## Non-negotiables
+
+- local-first stays the default
+- no source upload
+- metrics remain inspectable and explainable
+- team features, if they ever exist, must stay opt-in and privacy-respecting
+- the product should still be useful offline and on a single machine

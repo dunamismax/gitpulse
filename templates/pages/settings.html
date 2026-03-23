@@ -1,0 +1,74 @@
+{{define "content"}}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Settings</p>
+    <h2>Identity, goals, and boundaries</h2>
+    <p class="muted">Identity aliases shape commit and push history totals. Live working-tree activity always counts locally.</p>
+  </div>
+</section>
+
+<form class="settings-form" method="post" action="/settings">
+  <section class="panel">
+    <header class="panel-head"><h3>Identity</h3></header>
+    <label>Author Emails (one per line)</label>
+    <textarea name="authors" rows="4">{{range .Config.Authors}}{{.Email}}
+{{end}}</textarea>
+  </section>
+
+  <section class="grid two">
+    <article class="panel">
+      <header class="panel-head"><h3>Goals</h3></header>
+      <label>Changed Lines Per Day</label>
+      <input type="number" name="changed_lines_per_day" value="{{.Config.Goals.ChangedLinesPerDay}}" />
+      <label>Commits Per Day</label>
+      <input type="number" name="commits_per_day" value="{{.Config.Goals.CommitsPerDay}}" />
+      <label>Focus Minutes Per Day</label>
+      <input type="number" name="focus_minutes_per_day" value="{{.Config.Goals.FocusMinutesPerDay}}" />
+    </article>
+    <article class="panel">
+      <header class="panel-head"><h3>Time and Sessions</h3></header>
+      <label>Timezone (IANA format)</label>
+      <input type="text" name="timezone" value="{{.Config.UI.Timezone}}" />
+      <label>Day Boundary Minutes</label>
+      <input type="number" name="day_boundary_minutes" value="{{.Config.UI.DayBoundaryMinutes}}" />
+      <label>Session Gap Minutes</label>
+      <input type="number" name="session_gap_minutes" value="{{.Config.Monitoring.SessionGapMinutes}}" />
+      <label>Import Window Days</label>
+      <input type="number" name="import_days" value="{{.Config.Monitoring.ImportDays}}" />
+    </article>
+  </section>
+
+  <section class="grid two">
+    <article class="panel">
+      <header class="panel-head"><h3>Patterns</h3></header>
+      <label>Global Include Patterns (one per line)</label>
+      <textarea name="include_patterns" rows="5">{{join .Config.Patterns.Include "\n"}}</textarea>
+      <label>Global Exclude Patterns (one per line)</label>
+      <textarea name="exclude_patterns" rows="8">{{join .Config.Patterns.Exclude "\n"}}</textarea>
+    </article>
+    <article class="panel">
+      <header class="panel-head"><h3>GitHub Verification</h3></header>
+      <label class="checkbox">
+        <input type="checkbox" name="github_enabled" {{if .Config.Github.Enabled}}checked{{end}} />
+        Enable GitHub metadata lookups
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="github_verify_remote_pushes" {{if .Config.Github.VerifyRemotePushes}}checked{{end}} />
+        Confirm pushes remotely when possible
+      </label>
+      <label>GitHub Token</label>
+      <input type="password" name="github_token" value="" autocomplete="new-password" placeholder="Leave blank to keep the current token" />
+      {{if .Paths}}
+      <div class="meta-list">
+        <span>Config: {{.Paths.ConfigDir}}</span>
+        <span>Data: {{.Paths.DataDir}}</span>
+      </div>
+      {{end}}
+    </article>
+  </section>
+
+  <div class="button-row">
+    <button type="submit">Save Settings</button>
+  </div>
+</form>
+{{end}}

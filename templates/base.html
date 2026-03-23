@@ -1,0 +1,36 @@
+{{define "base"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GitPulse</title>
+    <link rel="stylesheet" href="/assets/css/app.css" />
+    <script src="/assets/js/htmx.min.js"></script>
+    <script src="/assets/js/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">GP</div>
+          <div>
+            <h1>GitPulse</h1>
+            <p>Local-first git analytics</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="/" {{if eq .ActiveNav "dashboard"}}class="active"{{end}}>Dashboard</a>
+          <a href="/repositories" {{if eq .ActiveNav "repositories"}}class="active"{{end}}>Repositories</a>
+          <a href="/sessions" {{if eq .ActiveNav "sessions"}}class="active"{{end}}>Sessions</a>
+          <a href="/achievements" {{if eq .ActiveNav "achievements"}}class="active"{{end}}>Achievements</a>
+          <a href="/settings" {{if eq .ActiveNav "settings"}}class="active"{{end}}>Settings</a>
+        </nav>
+      </aside>
+      <main class="content">
+        {{block "content" .}}{{end}}
+      </main>
+    </div>
+  </body>
+</html>
+{{end}}

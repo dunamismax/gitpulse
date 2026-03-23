@@ -7,3 +7,6 @@
 /.idea
 /apps/gitpulse-desktop/src-tauri/gen
 gitpulse-data
+/gitpulse
+/.claude
+/.claire
