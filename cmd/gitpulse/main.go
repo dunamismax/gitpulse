@@ -29,7 +29,7 @@ func rootCmd() *cobra.Command {
 		Use:   "gitpulse",
 		Short: "Local-first git activity analytics",
 		Long: `GitPulse tracks commits, sessions, and streaks across repositories
-without uploading source code. All data is stored in PostgreSQL locally.`,
+without uploading source code. All data stays local; the current implementation stores it in PostgreSQL.`,
 		SilenceUsage: true,
 	}
 

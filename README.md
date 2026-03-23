@@ -2,7 +2,9 @@
 
 Local-first git activity analytics for developers who want honest signals without uploading source code.
 
-GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by PostgreSQL, with raw SQL via `pgx/v5`, a Cobra CLI, and a browser dashboard now built with Bun, TypeScript, Astro, and Alpine.js.
+GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application currently backed by PostgreSQL, with plain SQL via `pgx/v5`, a Cobra CLI, and a browser dashboard built with Bun, TypeScript, Astro, and Alpine.js.
+
+Today that PostgreSQL requirement is an implementation fact, not the new default doctrine: GitPulse is still a single-user, local-first product that looks more SQLite-shaped than PostgreSQL-earned. This pass keeps the existing PostgreSQL runtime honest in the docs instead of faking a risky half-migration.
 
 [![CI](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -49,7 +51,7 @@ For the execution ledger, verification history, and next steps, see [BUILD.md](B
 
 - **Local-first**: no source upload, no cloud dependency for core use
 - **Separate ledgers**: live work, committed work, and pushed work are not mashed into one fake metric
-- **Inspectable data**: PostgreSQL + raw SQL keeps storage transparent
+- **Inspectable data**: the current PostgreSQL + plain SQL implementation keeps storage transparent today
 - **Rebuildable analytics**: sessions, rollups, and achievements are derived from stored events
 - **Portable surface area**: CLI and browser dashboard share the same Go runtime
 
@@ -63,6 +65,8 @@ For the execution ledger, verification history, and next steps, see [BUILD.md](B
 - PostgreSQL 14+
 
 ### Configure PostgreSQL
+
+The current implementation still requires PostgreSQL. That is a current-state constraint, not a claim that PostgreSQL is the forever default for this product.
 
 Create a local database:
 
@@ -153,7 +157,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── cmd/gitpulse/              # Cobra CLI entrypoint
 ├── frontend/                  # Bun + Astro + TypeScript + Alpine browser app
 ├── internal/config/           # Config loading and platform paths
-├── internal/db/               # pgx connection + raw SQL queries + schema embed
+├── internal/db/               # current pgx connection + plain SQL queries + schema embed
 ├── internal/filter/           # Include/exclude path matching
 ├── internal/git/              # Git subprocess parsing and discovery
 ├── internal/metrics/          # Score, streak, achievement logic
@@ -163,7 +167,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── internal/web/              # net/http handlers, JSON API routes, and frontend serving
 ├── templates/                 # Legacy Go template fallback during frontend transition
 ├── assets/                    # Legacy static asset fallback during frontend transition
-├── migrations/                # PostgreSQL migration files
+├── migrations/                # current PostgreSQL migration files
 ├── docs/architecture.md       # Current architecture notes
 ├── BUILD.md                   # Execution manual and verification log
 └── ROADMAP.md                 # Product roadmap

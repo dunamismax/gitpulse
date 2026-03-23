@@ -13,14 +13,15 @@ Long term, it can grow into an extensible platform with APIs, plugins, and optio
 The repository currently centers on:
 
 - Go runtime and CLI
-- PostgreSQL persistence
-- raw SQL via `pgx/v5`
+- current PostgreSQL persistence
+- plain SQL via `pgx/v5`
 - a local browser dashboard built with Astro and served by the Go runtime
 
 Near-term roadmap decisions:
 
 - stabilize the Go CLI + local web dashboard first
-- prove the PostgreSQL-backed happy path end to end
+- prove the current PostgreSQL-backed happy path end to end while the code still uses it
+- scope the safe cutover to a SQLite-first storage default instead of pretending PostgreSQL is permanently earned
 - treat packaging as optional follow-on work, not a current product surface
 
 ## Milestone 1 — operator-ready Go runtime
@@ -32,14 +33,15 @@ Goal: make the current Go runtime comfortable to run locally every day.
 Targets:
 
 - CLI commands: `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, `doctor`
-- PostgreSQL-backed event and rollup model
+- current PostgreSQL-backed event and rollup model
 - dashboard, repositories, sessions, achievements, and settings pages
 - rebuilt sessions, streaks, score, and achievements logic
 - operator-facing docs and reproducible local setup
 
 Still needed:
 
-- live PostgreSQL smoke verification
+- live current-PostgreSQL smoke verification
+- a deliberate SQLite migration plan for the Go-owned runtime
 - integration tests
 - watcher/background monitoring loop
 - GitHub push verification parity where it is still worth keeping

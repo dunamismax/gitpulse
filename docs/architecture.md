@@ -1,13 +1,22 @@
 # GitPulse Architecture
 
-GitPulse is a local-first Go application with PostgreSQL persistence and a browser dashboard built with Astro.
+GitPulse is a local-first Go application with a browser dashboard built with Astro. The current implementation persists state in PostgreSQL, but that is a current-state implementation choice rather than the long-term default doctrine for this product.
 
 The active stack is:
 
 - Go for CLI, runtime, JSON API, git integration, analytics, and data access
-- PostgreSQL for all persisted state
-- raw SQL via `pgx/v5`
+- current PostgreSQL persistence via `pgx/v5`
+- plain SQL for the current data layer
 - Bun + TypeScript + Astro + Alpine.js for the browser UI
+
+Storage doctrine for this repo:
+
+- GitPulse is still a single-user, local-first product, so SQLite is the more natural long-term default
+- the current code is deeply PostgreSQL-coupled, so this pass does not fake a half-migration
+- Go owns persistence; the Astro frontend is an operator surface, not the system of record
+- keep data relational and local-first
+- keep plain SQL unless backend complexity later earns `sqlc`
+- do not pivot to MongoDB
 
 ## System overview
 
@@ -24,7 +33,7 @@ The active stack is:
                          │         │
               ┌──────────▼───┐ ┌───▼──────────┐
               │ internal/git │ │ internal/db  │
-              │ git CLI      │ │ pgx/raw SQL  │
+              │ git CLI      │ │ pgx/plain SQL│
               └──────┬───────┘ └──────┬───────┘
                      │                │
               ┌──────▼──────┐   ┌────▼────────┐
@@ -60,7 +69,7 @@ Platform path discovery, layered config loading, and atomic TOML writes for the 
 
 ### `internal/db`
 
-Database connection, embedded schema, raw SQL queries, and analytics persistence.
+Current PostgreSQL connection, embedded schema, plain SQL queries, and analytics persistence.
 
 ### `internal/filter`
 
@@ -117,13 +126,17 @@ Current tables:
 Schema sources:
 
 - `internal/db/schema.sql` for the embedded startup schema path
-- `migrations/0001_init.sql` and `migrations/001_init.sql` for repo-visible SQL migration files
+- `migrations/001_init.sql` for the repo-visible current PostgreSQL migration file
 
 ## Design constraints
 
 - New backend implementation work belongs in Go.
-- PostgreSQL is the only supported database target.
-- No ORM layer should be introduced.
+- PostgreSQL is the only supported database target today because that is what the code implements right now.
+- GitPulse does not presently earn PostgreSQL as a product default; SQLite is the likelier storage landing zone once a real migration happens.
+- Keep persistence in Go; do not move schema ownership into the Astro lane unless the architecture materially changes and Drizzle becomes justified there.
+- Keep data relational and local-first.
+- Keep plain SQL unless backend complexity later earns `sqlc`.
+- Do not introduce MongoDB.
 - Astro owns the page/layout lane for the browser UI.
 - Alpine handles light browser interaction; keep hydration modest.
 - Keep repo-controlled strings treated as untrusted input.

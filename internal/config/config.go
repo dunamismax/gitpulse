@@ -53,7 +53,7 @@ type GithubSettings struct {
 	VerifyRemotePushes bool    `json:"verify_remote_pushes" mapstructure:"verify_remote_pushes" toml:"verify_remote_pushes"`
 }
 
-// DatabaseSettings holds the PostgreSQL connection string.
+// DatabaseSettings holds the current database connection string.
 type DatabaseSettings struct {
 	DSN string `json:"dsn" mapstructure:"dsn" toml:"dsn"`
 }

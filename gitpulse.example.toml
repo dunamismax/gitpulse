@@ -12,7 +12,9 @@
 #   GITPULSE_SERVER__PORT=9000
 
 [database]
-# PostgreSQL only. Raw SQL via pgx/v5. Create the database before first run.
+# Current implementation: PostgreSQL via pgx/v5 with plain SQL.
+# GitPulse itself is likely to move toward a SQLite-first local default later,
+# but that migration has not been implemented yet.
 # Example: createdb gitpulse
 # Add sslmode as needed for remote instances.
 dsn = "postgres://localhost/gitpulse?sslmode=disable"

@@ -1,4 +1,4 @@
-// Package db provides PostgreSQL access via pgx/v5 connection pools.
+// Package db provides the current PostgreSQL access layer via pgx/v5 connection pools.
 package db
 
 import (
