@@ -1,12 +1,13 @@
 # Contributing to GitPulse
 
-GitPulse is an active Go application. Read [BUILD.md](BUILD.md) first, then [docs/architecture.md](docs/architecture.md).
+GitPulse is an active Go application with a Bun/Astro frontend. Read [BUILD.md](BUILD.md) first, then [docs/architecture.md](docs/architecture.md).
 
 ## Development setup
 
 ### Prerequisites
 
 - Go 1.25+
+- Bun 1.1+
 - Git 2.30+
 - PostgreSQL 14+
 
@@ -15,6 +16,8 @@ GitPulse is an active Go application. Read [BUILD.md](BUILD.md) first, then [doc
 ```bash
 git clone https://github.com/dunamismax/gitpulse.git
 cd gitpulse
+cd frontend && bun install && bun run build
+cd ..
 go test ./...
 go build ./cmd/gitpulse
 ```
@@ -38,24 +41,27 @@ See [gitpulse.example.toml](gitpulse.example.toml) for the full config surface.
 
 ## Architecture rules
 
-GitPulse currently uses a Go-first layout.
+GitPulse currently uses a Go-first backend with an Astro browser frontend.
 
 | Path | Owns |
 |------|------|
 | `cmd/gitpulse` | CLI command wiring |
+| `frontend` | Astro pages, layout, styles, and browser-side TypeScript/Alpine |
 | `internal/config` | config loading and platform paths |
 | `internal/db` | pgx pool, schema, raw SQL queries |
 | `internal/filter` | include/exclude matching |
 | `internal/git` | git subprocess integration and parsing |
 | `internal/metrics` | score, streak, achievement logic |
-| `internal/models` | shared data and view structs |
+| `internal/models` | shared data and API/view structs |
 | `internal/runtime` | orchestration and view assembly |
 | `internal/sessions` | sessionization |
-| `internal/web` | HTTP handlers and rendering |
+| `internal/web` | HTTP handlers, JSON API, and frontend serving |
 
 Rules:
 
-- New implementation work goes in Go.
+- New backend implementation work goes in Go.
+- Astro owns the browser page/layout lane.
+- Alpine handles light browser interaction; avoid heavy hydration unless it clearly earns its keep.
 - Database work stays PostgreSQL-only.
 - Use raw SQL via `pgx/v5`; do not add an ORM.
 - Keep repo-controlled strings treated as untrusted input.
@@ -67,6 +73,8 @@ Rules:
 Run the narrowest useful checks first:
 
 ```bash
+cd frontend && bun run build
+cd ..
 go test ./...
 go build ./cmd/gitpulse
 go run ./cmd/gitpulse --help

@@ -1,0 +1,34 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+---
+
+<AppLayout
+  title="Achievements"
+  page="achievements"
+  activeNav="achievements"
+  eyebrow="Achievements"
+  heading="Consistency, not gimmicks"
+  description="Score is separate from raw stats and the badge set stays intentionally grounded."
+>
+  <div class="page-body" x-data="window.gitpulse.achievementsPage()" x-init="init()">
+    <div class="notice" x-cloak x-show="loading">Loading achievements…</div>
+    <div class="notice notice-error" x-cloak x-show="error" x-text="error"></div>
+
+    <section class="grid three">
+      <article class="stat-card"><span>Current Streak</span><strong><span x-text="streaks.current_days"></span> days</strong></article>
+      <article class="stat-card"><span>Best Streak</span><strong><span x-text="streaks.best_days"></span> days</strong></article>
+      <article class="stat-card"><span>Today's Score</span><strong x-text="todayScore"></strong></article>
+    </section>
+
+    <section class="badge-grid" x-show="achievements.length">
+      <template x-for="achievement in achievements" :key="achievement.kind + achievement.unlocked_at">
+        <article class="badge-card">
+          <h3 x-text="achievement.kind"></h3>
+          <p x-text="achievement.reason"></p>
+          <small x-text="achievement.day ? `Unlocked on ${achievement.day}` : 'Unlocked recently'"></small>
+        </article>
+      </template>
+    </section>
+    <p class="muted" x-show="!achievements.length">No achievements unlocked yet. Keep coding.</p>
+  </div>
+</AppLayout>

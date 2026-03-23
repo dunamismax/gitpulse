@@ -1,0 +1,84 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+---
+
+<AppLayout
+  title="Settings"
+  page="settings"
+  activeNav="settings"
+  eyebrow="Settings"
+  heading="Identity, goals, and boundaries"
+  description="Configured author emails shape commit and push history totals. Live working-tree activity always counts locally."
+>
+  <div class="page-body" x-data="window.gitpulse.settingsPage()" x-init="init()">
+    <div class="notice" x-cloak x-show="loading">Loading settings…</div>
+    <div class="notice notice-success" x-cloak x-show="saved">Settings saved to the active config file.</div>
+    <div class="notice notice-error" x-cloak x-show="error" x-text="error"></div>
+
+    <form class="settings-form" @submit.prevent="save()">
+      <section class="panel">
+        <header class="panel-head"><h3>Identity</h3></header>
+        <label>Author Emails (one per line)</label>
+        <textarea name="authors" rows="4" x-model="form.authors"></textarea>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <header class="panel-head"><h3>Goals</h3></header>
+          <label>Changed Lines Per Day</label>
+          <input type="number" name="changed_lines_per_day" x-model.number="form.changed_lines_per_day" />
+          <label>Commits Per Day</label>
+          <input type="number" name="commits_per_day" x-model.number="form.commits_per_day" />
+          <label>Focus Minutes Per Day</label>
+          <input type="number" name="focus_minutes_per_day" x-model.number="form.focus_minutes_per_day" />
+        </article>
+
+        <article class="panel">
+          <header class="panel-head"><h3>Time and Sessions</h3></header>
+          <label>Timezone (IANA format)</label>
+          <input type="text" name="timezone" x-model="form.timezone" />
+          <label>Day Boundary Minutes</label>
+          <input type="number" name="day_boundary_minutes" x-model.number="form.day_boundary_minutes" />
+          <label>Session Gap Minutes</label>
+          <input type="number" name="session_gap_minutes" x-model.number="form.session_gap_minutes" />
+          <label>Import Window Days</label>
+          <input type="number" name="import_days" x-model.number="form.import_days" />
+        </article>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <header class="panel-head"><h3>Patterns</h3></header>
+          <label>Global Include Patterns (one per line)</label>
+          <textarea name="include_patterns" rows="5" x-model="form.include_patterns"></textarea>
+          <label>Global Exclude Patterns (one per line)</label>
+          <textarea name="exclude_patterns" rows="8" x-model="form.exclude_patterns"></textarea>
+        </article>
+
+        <article class="panel">
+          <header class="panel-head"><h3>GitHub Verification</h3></header>
+          <label class="checkbox">
+            <input type="checkbox" name="github_enabled" x-model="form.github_enabled" />
+            Enable GitHub metadata lookups
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="github_verify_remote_pushes" x-model="form.github_verify_remote_pushes" />
+            Confirm pushes remotely when possible
+          </label>
+          <label>GitHub Token</label>
+          <input type="password" name="github_token" value="" autocomplete="new-password" placeholder="Leave blank to keep the current token" x-model="form.github_token" />
+          <div class="meta-list" x-show="paths">
+            <span>Config File: <span x-text="paths?.config_file"></span></span>
+            <span>Config Dir: <span x-text="paths?.config_dir"></span></span>
+            <span>Data: <span x-text="paths?.data_dir"></span></span>
+          </div>
+          <p class="field-note">Environment overrides still win on the next process start.</p>
+        </article>
+      </section>
+
+      <div class="button-row">
+        <button type="submit">Save Settings</button>
+      </div>
+    </form>
+  </div>
+</AppLayout>

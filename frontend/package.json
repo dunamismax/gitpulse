@@ -1,0 +1,16 @@
+{
+  "name": "gitpulse-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host",
+    "build": "astro build"
+  },
+  "dependencies": {
+    "alpinejs": "^3.14.9",
+    "astro": "^5.7.12"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

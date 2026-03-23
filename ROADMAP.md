@@ -15,7 +15,7 @@ The repository currently centers on:
 - Go runtime and CLI
 - PostgreSQL persistence
 - raw SQL via `pgx/v5`
-- local web dashboard rendered from server-side templates
+- a local browser dashboard built with Astro and served by the Go runtime
 
 Near-term roadmap decisions:
 

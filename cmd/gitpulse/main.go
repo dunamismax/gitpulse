@@ -85,10 +85,10 @@ func serveCmd(cfgFile *string) *cobra.Command {
 				host = cfg.Server.Host
 			}
 
-			// Locate templates and assets relative to the binary or cwd.
-			templatesDir, assetsDir := locateStaticDirs()
+			// Locate web assets relative to the binary or cwd.
+			templatesDir, assetsDir, frontendDir := locateWebDirs()
 
-			srv, err := web.New(rt, templatesDir, assetsDir, *cfgFile)
+			srv, err := web.New(rt, templatesDir, assetsDir, *cfgFile, frontendDir)
 			if err != nil {
 				return fmt.Errorf("create server: %w", err)
 			}
@@ -303,19 +303,20 @@ func doctorCmd(cfgFile *string) *cobra.Command {
 	}
 }
 
-// locateStaticDirs finds templates/ and assets/ relative to the binary.
-func locateStaticDirs() (templatesDir, assetsDir string) {
-	// Try relative to current working directory first (development mode).
+// locateWebDirs finds the legacy templates/assets directories and the built
+// Astro frontend output relative to the working directory or binary.
+func locateWebDirs() (templatesDir, assetsDir, frontendDir string) {
 	cwd, _ := os.Getwd()
 	tDir := filepath.Join(cwd, "templates")
 	aDir := filepath.Join(cwd, "assets")
+	fDir := filepath.Join(cwd, "frontend", "dist")
 	if _, err := os.Stat(tDir); err == nil {
-		return tDir, aDir
+		return tDir, aDir, fDir
 	}
-	// Try relative to the binary location.
+
 	exe, _ := os.Executable()
 	base := filepath.Dir(exe)
-	return filepath.Join(base, "templates"), filepath.Join(base, "assets")
+	return filepath.Join(base, "templates"), filepath.Join(base, "assets"), filepath.Join(base, "frontend", "dist")
 }
 
 // maskDSN replaces the password portion of a DSN with asterisks for display.

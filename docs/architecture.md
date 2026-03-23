@@ -1,20 +1,20 @@
 # GitPulse Architecture
 
-GitPulse is a local-first Go application with PostgreSQL persistence and plain HTML templates.
+GitPulse is a local-first Go application with PostgreSQL persistence and a browser dashboard built with Astro.
 
 The active stack is:
 
-- Go for CLI, runtime, web server, git integration, analytics, and data access
+- Go for CLI, runtime, JSON API, git integration, analytics, and data access
 - PostgreSQL for all persisted state
 - raw SQL via `pgx/v5`
-- plain HTML templates plus lightweight browser-side JS where needed
+- Bun + TypeScript + Astro + Alpine.js for the browser UI
 
 ## System overview
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
 │                         surfaces                         │
-│                  CLI + local web dashboard               │
+│                 CLI + browser dashboard                  │
 └────────────────────────────┬─────────────────────────────┘
                              │
                      ┌───────▼────────┐
@@ -31,6 +31,17 @@ The active stack is:
               │ analytics + │   │ PostgreSQL  │
               │ sessions    │   │ event store │
               └─────────────┘   └─────────────┘
+                             │
+                     ┌───────▼────────┐
+                     │ internal/web   │
+                     │ JSON API +     │
+                     │ Astro serving  │
+                     └───────┬────────┘
+                             │
+                     ┌───────▼────────┐
+                     │ frontend/      │
+                     │ Astro + Alpine │
+                     └────────────────┘
 ```
 
 ## Package map
@@ -38,6 +49,10 @@ The active stack is:
 ### `cmd/gitpulse`
 
 Cobra CLI entrypoint. Owns command wiring only.
+
+### `frontend`
+
+Astro pages, shared layout, TypeScript browser code, Alpine components, and CSS. Builds to `frontend/dist`.
 
 ### `internal/config`
 
@@ -61,7 +76,7 @@ Score, streak, and achievement logic.
 
 ### `internal/models`
 
-Shared data structures passed between runtime, DB, and web layers.
+Shared data structures passed between runtime, DB, JSON API, and frontend.
 
 ### `internal/runtime`
 
@@ -73,15 +88,16 @@ Sessionization logic over activity points.
 
 ### `internal/web`
 
-`net/http` handlers, partial endpoints, template rendering, and settings form persistence through `internal/config`.
+`net/http` handlers, JSON endpoints, Astro frontend serving, and temporary legacy template fallback.
 
 ## Data flow
 
-1. A repo or folder is added through the CLI or web form.
+1. A repo or folder is added through the CLI or the browser UI.
 2. `internal/git` discovers git roots and probes repo metadata.
 3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, and achievements.
 4. `internal/runtime` rebuilds derived analytics from raw events.
-5. `internal/web` renders dashboard, repository, sessions, achievements, and settings views from runtime view models.
+5. `internal/web` exposes JSON endpoints and serves the built Astro app.
+6. The Astro frontend fetches those JSON endpoints and renders the operator workflow in the browser.
 
 ## Persistence model
 
@@ -105,8 +121,10 @@ Schema sources:
 
 ## Design constraints
 
-- New implementation work belongs in Go.
+- New backend implementation work belongs in Go.
 - PostgreSQL is the only supported database target.
 - No ORM layer should be introduced.
+- Astro owns the page/layout lane for the browser UI.
+- Alpine handles light browser interaction; keep hydration modest.
 - Keep repo-controlled strings treated as untrusted input.
 - Document new runtime or release surfaces only when code for them exists.

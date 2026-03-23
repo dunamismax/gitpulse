@@ -2,6 +2,9 @@
 /.sqlx
 /.DS_Store
 /dist
+/frontend/.astro
+/frontend/dist
+/frontend/node_modules
 /tmp
 /.idea
 /.vscode

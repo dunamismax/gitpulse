@@ -12,75 +12,75 @@ import (
 
 // AuthorIdentity identifies commits belonging to the user.
 type AuthorIdentity struct {
-	Email   string   `mapstructure:"email" toml:"email"`
-	Name    string   `mapstructure:"name" toml:"name,omitempty"`
-	Aliases []string `mapstructure:"aliases" toml:"aliases,omitempty"`
+	Email   string   `json:"email" mapstructure:"email" toml:"email"`
+	Name    string   `json:"name" mapstructure:"name" toml:"name,omitempty"`
+	Aliases []string `json:"aliases" mapstructure:"aliases" toml:"aliases,omitempty"`
 }
 
 // GoalSettings holds daily productivity targets.
 type GoalSettings struct {
-	ChangedLinesPerDay int `mapstructure:"changed_lines_per_day" toml:"changed_lines_per_day"`
-	CommitsPerDay      int `mapstructure:"commits_per_day" toml:"commits_per_day"`
-	FocusMinutesPerDay int `mapstructure:"focus_minutes_per_day" toml:"focus_minutes_per_day"`
+	ChangedLinesPerDay int `json:"changed_lines_per_day" mapstructure:"changed_lines_per_day" toml:"changed_lines_per_day"`
+	CommitsPerDay      int `json:"commits_per_day" mapstructure:"commits_per_day" toml:"commits_per_day"`
+	FocusMinutesPerDay int `json:"focus_minutes_per_day" mapstructure:"focus_minutes_per_day" toml:"focus_minutes_per_day"`
 }
 
 // MonitoringSettings controls polling and import behavior.
 type MonitoringSettings struct {
-	ImportDays         int   `mapstructure:"import_days" toml:"import_days"`
-	SessionGapMinutes  int64 `mapstructure:"session_gap_minutes" toml:"session_gap_minutes"`
-	RepoDiscoveryDepth int   `mapstructure:"repo_discovery_depth" toml:"repo_discovery_depth"`
-	WatcherDebounceMs  int   `mapstructure:"watcher_debounce_ms" toml:"watcher_debounce_ms"`
-	IdlePollSeconds    int   `mapstructure:"idle_poll_seconds" toml:"idle_poll_seconds"`
-	LivePollSeconds    int   `mapstructure:"live_poll_seconds" toml:"live_poll_seconds"`
+	ImportDays         int   `json:"import_days" mapstructure:"import_days" toml:"import_days"`
+	SessionGapMinutes  int64 `json:"session_gap_minutes" mapstructure:"session_gap_minutes" toml:"session_gap_minutes"`
+	RepoDiscoveryDepth int   `json:"repo_discovery_depth" mapstructure:"repo_discovery_depth" toml:"repo_discovery_depth"`
+	WatcherDebounceMs  int   `json:"watcher_debounce_ms" mapstructure:"watcher_debounce_ms" toml:"watcher_debounce_ms"`
+	IdlePollSeconds    int   `json:"idle_poll_seconds" mapstructure:"idle_poll_seconds" toml:"idle_poll_seconds"`
+	LivePollSeconds    int   `json:"live_poll_seconds" mapstructure:"live_poll_seconds" toml:"live_poll_seconds"`
 }
 
 // UISettings controls display preferences.
 type UISettings struct {
-	Timezone           string `mapstructure:"timezone" toml:"timezone"`
-	DayBoundaryMinutes int    `mapstructure:"day_boundary_minutes" toml:"day_boundary_minutes"`
+	Timezone           string `json:"timezone" mapstructure:"timezone" toml:"timezone"`
+	DayBoundaryMinutes int    `json:"day_boundary_minutes" mapstructure:"day_boundary_minutes" toml:"day_boundary_minutes"`
 }
 
 // PatternSettings controls which file paths are included in analytics.
 type PatternSettings struct {
-	Include []string `mapstructure:"include" toml:"include"`
-	Exclude []string `mapstructure:"exclude" toml:"exclude"`
+	Include []string `json:"include" mapstructure:"include" toml:"include"`
+	Exclude []string `json:"exclude" mapstructure:"exclude" toml:"exclude"`
 }
 
 // GithubSettings controls optional GitHub API integration.
 type GithubSettings struct {
-	Enabled            bool    `mapstructure:"enabled" toml:"enabled"`
-	Token              *string `mapstructure:"token" toml:"token,omitempty"`
-	VerifyRemotePushes bool    `mapstructure:"verify_remote_pushes" toml:"verify_remote_pushes"`
+	Enabled            bool    `json:"enabled" mapstructure:"enabled" toml:"enabled"`
+	Token              *string `json:"token" mapstructure:"token" toml:"token,omitempty"`
+	VerifyRemotePushes bool    `json:"verify_remote_pushes" mapstructure:"verify_remote_pushes" toml:"verify_remote_pushes"`
 }
 
 // DatabaseSettings holds the PostgreSQL connection string.
 type DatabaseSettings struct {
-	DSN string `mapstructure:"dsn" toml:"dsn"`
+	DSN string `json:"dsn" mapstructure:"dsn" toml:"dsn"`
 }
 
 // ServerSettings holds the web server listen address.
 type ServerSettings struct {
-	Host string `mapstructure:"host" toml:"host"`
-	Port int    `mapstructure:"port" toml:"port"`
+	Host string `json:"host" mapstructure:"host" toml:"host"`
+	Port int    `json:"port" mapstructure:"port" toml:"port"`
 }
 
 // AppConfig is the root configuration structure.
 type AppConfig struct {
-	Authors    []AuthorIdentity   `mapstructure:"authors" toml:"authors"`
-	Goals      GoalSettings       `mapstructure:"goals" toml:"goals"`
-	Patterns   PatternSettings    `mapstructure:"patterns" toml:"patterns"`
-	Github     GithubSettings     `mapstructure:"github" toml:"github"`
-	Monitoring MonitoringSettings `mapstructure:"monitoring" toml:"monitoring"`
-	UI         UISettings         `mapstructure:"ui" toml:"ui"`
-	Database   DatabaseSettings   `mapstructure:"database" toml:"database"`
-	Server     ServerSettings     `mapstructure:"server" toml:"server"`
+	Authors    []AuthorIdentity   `json:"authors" mapstructure:"authors" toml:"authors"`
+	Goals      GoalSettings       `json:"goals" mapstructure:"goals" toml:"goals"`
+	Patterns   PatternSettings    `json:"patterns" mapstructure:"patterns" toml:"patterns"`
+	Github     GithubSettings     `json:"github" mapstructure:"github" toml:"github"`
+	Monitoring MonitoringSettings `json:"monitoring" mapstructure:"monitoring" toml:"monitoring"`
+	UI         UISettings         `json:"ui" mapstructure:"ui" toml:"ui"`
+	Database   DatabaseSettings   `json:"database" mapstructure:"database" toml:"database"`
+	Server     ServerSettings     `json:"server" mapstructure:"server" toml:"server"`
 }
 
 // AppPaths holds platform-specific filesystem paths.
 type AppPaths struct {
-	ConfigDir  string
-	DataDir    string
-	ConfigFile string
+	ConfigDir  string `json:"config_dir"`
+	DataDir    string `json:"data_dir"`
+	ConfigFile string `json:"config_file"`
 }
 
 // defaultExcludePatterns covers common noisy/generated paths.

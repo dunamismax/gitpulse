@@ -6,36 +6,51 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/dunamismax/gitpulse/internal/runtime"
 )
 
-// Server holds the router, per-page template sets, and runtime dependency.
+// Server holds the router, optional legacy templates, and runtime dependency.
 type Server struct {
-	mux        *http.ServeMux
-	pages      map[string]*template.Template // page name -> template set
-	partials   map[string]*template.Template // partial name -> standalone template
-	rt         *runtime.Runtime
-	configFile string
+	mux         *http.ServeMux
+	pages       map[string]*template.Template // legacy page name -> template set
+	partials    map[string]*template.Template // legacy partial name -> standalone template
+	rt          *runtime.Runtime
+	configFile  string
+	frontendDir string // path to Astro build output (frontend/dist)
 }
 
-// New creates a Server, parses all templates, and registers routes.
-func New(rt *runtime.Runtime, templatesDir, assetsDir, configFile string) (*Server, error) {
+// New creates a Server and loads the legacy templates only when the Astro
+// frontend build output is not present.
+func New(rt *runtime.Runtime, templatesDir, assetsDir, configFile, frontendDir string) (*Server, error) {
 	s := &Server{
-		mux:        http.NewServeMux(),
-		pages:      make(map[string]*template.Template),
-		partials:   make(map[string]*template.Template),
-		rt:         rt,
-		configFile: configFile,
+		mux:         http.NewServeMux(),
+		pages:       make(map[string]*template.Template),
+		partials:    make(map[string]*template.Template),
+		rt:          rt,
+		configFile:  configFile,
+		frontendDir: frontendDir,
 	}
 
-	if err := s.loadTemplates(templatesDir); err != nil {
-		return nil, fmt.Errorf("load templates: %w", err)
+	if !s.hasFrontend() {
+		if err := s.loadTemplates(templatesDir); err != nil {
+			return nil, fmt.Errorf("load templates: %w", err)
+		}
 	}
 
 	s.registerRoutes(assetsDir)
 	return s, nil
+}
+
+// hasFrontend reports whether the built Astro frontend exists.
+func (s *Server) hasFrontend() bool {
+	if s.frontendDir == "" {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(s.frontendDir, "index.html"))
+	return err == nil && !info.IsDir()
 }
 
 // loadTemplates parses all templates from the templates directory.
@@ -55,7 +70,6 @@ func (s *Server) loadTemplates(dir string) error {
 
 	funcs := templateFuncs()
 
-	// Build a template set per page: base + partials + the specific page.
 	for _, pageFile := range pageFiles {
 		name := filepath.Base(pageFile)
 		files := []string{baseFile, pageFile}
@@ -68,7 +82,6 @@ func (s *Server) loadTemplates(dir string) error {
 		s.pages[name] = t
 	}
 
-	// Build standalone templates for partials.
 	for _, partialFile := range partialFiles {
 		name := filepath.Base(partialFile)
 		t, err := template.New(name).Funcs(funcs).ParseFiles(partialFile)
@@ -97,11 +110,67 @@ func (s *Server) ListenAndServe(addr string) error {
 func (s *Server) registerRoutes(assetsDir string) {
 	mux := s.mux
 
-	// Static assets.
+	// JSON API routes are always available so the Astro frontend and any local
+	// tooling share the same narrow backend boundary.
+	mux.HandleFunc("GET /api/dashboard", s.handleAPIDashboard)
+	mux.HandleFunc("GET /api/repositories", s.handleAPIRepositories)
+	mux.HandleFunc("GET /api/repositories/{id}", s.handleAPIRepoDetail)
+	mux.HandleFunc("GET /api/sessions", s.handleAPISessions)
+	mux.HandleFunc("GET /api/achievements", s.handleAPIAchievements)
+	mux.HandleFunc("GET /api/settings", s.handleAPISettings)
+
+	mux.HandleFunc("POST /api/repositories/add", s.handleAPIRepoAdd)
+	mux.HandleFunc("POST /api/repositories/{id}/refresh", s.handleAPIRepoRefresh)
+	mux.HandleFunc("POST /api/repositories/{id}/toggle", s.handleAPIRepoToggle)
+	mux.HandleFunc("POST /api/repositories/{id}/remove", s.handleAPIRepoRemove)
+	mux.HandleFunc("POST /api/repositories/{id}/patterns", s.handleAPIRepoPatterns)
+	mux.HandleFunc("POST /api/settings", s.handleAPISettingsSave)
+
+	if s.hasFrontend() {
+		slog.Info("serving Astro frontend", "dir", s.frontendDir)
+		s.registerFrontendRoutes()
+		return
+	}
+
+	slog.Info("serving legacy Go template frontend", "assets", assetsDir)
+	s.registerLegacyRoutes(assetsDir)
+}
+
+func (s *Server) registerFrontendRoutes() {
+	mux := s.mux
+	fs := http.FileServer(http.Dir(s.frontendDir))
+
+	mux.Handle("GET /_astro/", fs)
+
+	servePage := func(filePath string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			http.ServeFile(w, r, filepath.Join(s.frontendDir, filePath))
+		}
+	}
+
+	mux.HandleFunc("GET /{$}", servePage("index.html"))
+	mux.HandleFunc("GET /repositories", servePage(filepath.Join("repositories", "index.html")))
+	mux.HandleFunc("GET /repositories/{id}", servePage(filepath.Join("repositories", "detail", "index.html")))
+	mux.HandleFunc("GET /sessions", servePage(filepath.Join("sessions", "index.html")))
+	mux.HandleFunc("GET /achievements", servePage(filepath.Join("achievements", "index.html")))
+	mux.HandleFunc("GET /settings", servePage(filepath.Join("settings", "index.html")))
+
+	// Keep legacy form posts working as a thin compatibility layer.
+	mux.HandleFunc("POST /repositories/add", s.handleRepoAdd)
+	mux.HandleFunc("POST /repositories/{id}/refresh", s.handleRepoRefresh)
+	mux.HandleFunc("POST /repositories/{id}/toggle", s.handleRepoToggle)
+	mux.HandleFunc("POST /repositories/{id}/remove", s.handleRepoRemove)
+	mux.HandleFunc("POST /repositories/{id}/patterns", s.handleRepoPatterns)
+	mux.HandleFunc("POST /settings", s.handleSettingsSave)
+}
+
+func (s *Server) registerLegacyRoutes(assetsDir string) {
+	mux := s.mux
+
 	fs := http.FileServer(http.Dir(assetsDir))
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", fs))
 
-	// Pages.
 	mux.HandleFunc("GET /{$}", s.handleDashboard)
 	mux.HandleFunc("GET /repositories", s.handleRepositoriesList)
 	mux.HandleFunc("GET /repositories/{id}", s.handleRepoDetail)
@@ -109,12 +178,10 @@ func (s *Server) registerRoutes(assetsDir string) {
 	mux.HandleFunc("GET /achievements", s.handleAchievements)
 	mux.HandleFunc("GET /settings", s.handleSettings)
 
-	// Partials (HTMX targets).
 	mux.HandleFunc("GET /partials/dashboard-summary", s.handlePartialDashboardSummary)
 	mux.HandleFunc("GET /partials/activity-feed", s.handlePartialActivityFeed)
 	mux.HandleFunc("GET /partials/repo-cards", s.handlePartialRepoCards)
 
-	// Actions.
 	mux.HandleFunc("POST /repositories/add", s.handleRepoAdd)
 	mux.HandleFunc("POST /repositories/{id}/refresh", s.handleRepoRefresh)
 	mux.HandleFunc("POST /repositories/{id}/toggle", s.handleRepoToggle)
