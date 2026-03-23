@@ -3,6 +3,7 @@ package web
 import (
 	"log/slog"
 	"net/http"
+	"path/filepath"
 
 	"github.com/dunamismax/gitpulse/internal/config"
 )
@@ -77,9 +78,18 @@ func (s *Server) handleAchievements(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	paths, _ := config.DiscoverPaths()
+	if paths == nil {
+		paths = &config.AppPaths{}
+	}
+	if resolved, err := config.ResolveConfigFile(s.configFile); err == nil {
+		paths.ConfigFile = resolved
+		paths.ConfigDir = filepath.Dir(resolved)
+	}
+
 	s.renderPage(w, "settings.html", map[string]any{
 		"ActiveNav": "settings",
 		"Config":    s.rt.Config(),
 		"Paths":     paths,
+		"Saved":     r.URL.Query().Get("saved") == "1",
 	})
 }

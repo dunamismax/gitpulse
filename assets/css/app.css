@@ -334,6 +334,18 @@ button.danger {
   gap: 18px;
 }
 
+.notice {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+}
+
+.notice-success {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #bbf7d0;
+}
+
 .checkbox {
   display: flex;
   align-items: center;

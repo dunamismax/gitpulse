@@ -12,68 +12,68 @@ import (
 
 // AuthorIdentity identifies commits belonging to the user.
 type AuthorIdentity struct {
-	Email   string   `mapstructure:"email"`
-	Name    string   `mapstructure:"name"`
-	Aliases []string `mapstructure:"aliases"`
+	Email   string   `mapstructure:"email" toml:"email"`
+	Name    string   `mapstructure:"name" toml:"name,omitempty"`
+	Aliases []string `mapstructure:"aliases" toml:"aliases,omitempty"`
 }
 
 // GoalSettings holds daily productivity targets.
 type GoalSettings struct {
-	ChangedLinesPerDay int `mapstructure:"changed_lines_per_day"`
-	CommitsPerDay      int `mapstructure:"commits_per_day"`
-	FocusMinutesPerDay int `mapstructure:"focus_minutes_per_day"`
+	ChangedLinesPerDay int `mapstructure:"changed_lines_per_day" toml:"changed_lines_per_day"`
+	CommitsPerDay      int `mapstructure:"commits_per_day" toml:"commits_per_day"`
+	FocusMinutesPerDay int `mapstructure:"focus_minutes_per_day" toml:"focus_minutes_per_day"`
 }
 
 // MonitoringSettings controls polling and import behavior.
 type MonitoringSettings struct {
-	ImportDays         int   `mapstructure:"import_days"`
-	SessionGapMinutes  int64 `mapstructure:"session_gap_minutes"`
-	RepoDiscoveryDepth int   `mapstructure:"repo_discovery_depth"`
-	WatcherDebounceMs  int   `mapstructure:"watcher_debounce_ms"`
-	IdlePollSeconds    int   `mapstructure:"idle_poll_seconds"`
-	LivePollSeconds    int   `mapstructure:"live_poll_seconds"`
+	ImportDays         int   `mapstructure:"import_days" toml:"import_days"`
+	SessionGapMinutes  int64 `mapstructure:"session_gap_minutes" toml:"session_gap_minutes"`
+	RepoDiscoveryDepth int   `mapstructure:"repo_discovery_depth" toml:"repo_discovery_depth"`
+	WatcherDebounceMs  int   `mapstructure:"watcher_debounce_ms" toml:"watcher_debounce_ms"`
+	IdlePollSeconds    int   `mapstructure:"idle_poll_seconds" toml:"idle_poll_seconds"`
+	LivePollSeconds    int   `mapstructure:"live_poll_seconds" toml:"live_poll_seconds"`
 }
 
 // UISettings controls display preferences.
 type UISettings struct {
-	Timezone           string `mapstructure:"timezone"`
-	DayBoundaryMinutes int    `mapstructure:"day_boundary_minutes"`
+	Timezone           string `mapstructure:"timezone" toml:"timezone"`
+	DayBoundaryMinutes int    `mapstructure:"day_boundary_minutes" toml:"day_boundary_minutes"`
 }
 
 // PatternSettings controls which file paths are included in analytics.
 type PatternSettings struct {
-	Include []string `mapstructure:"include"`
-	Exclude []string `mapstructure:"exclude"`
+	Include []string `mapstructure:"include" toml:"include"`
+	Exclude []string `mapstructure:"exclude" toml:"exclude"`
 }
 
 // GithubSettings controls optional GitHub API integration.
 type GithubSettings struct {
-	Enabled            bool    `mapstructure:"enabled"`
-	Token              *string `mapstructure:"token"`
-	VerifyRemotePushes bool    `mapstructure:"verify_remote_pushes"`
+	Enabled            bool    `mapstructure:"enabled" toml:"enabled"`
+	Token              *string `mapstructure:"token" toml:"token,omitempty"`
+	VerifyRemotePushes bool    `mapstructure:"verify_remote_pushes" toml:"verify_remote_pushes"`
 }
 
 // DatabaseSettings holds the PostgreSQL connection string.
 type DatabaseSettings struct {
-	DSN string `mapstructure:"dsn"`
+	DSN string `mapstructure:"dsn" toml:"dsn"`
 }
 
 // ServerSettings holds the web server listen address.
 type ServerSettings struct {
-	Host string `mapstructure:"host"`
-	Port int    `mapstructure:"port"`
+	Host string `mapstructure:"host" toml:"host"`
+	Port int    `mapstructure:"port" toml:"port"`
 }
 
 // AppConfig is the root configuration structure.
 type AppConfig struct {
-	Authors    []AuthorIdentity   `mapstructure:"authors"`
-	Goals      GoalSettings       `mapstructure:"goals"`
-	Patterns   PatternSettings    `mapstructure:"patterns"`
-	Github     GithubSettings     `mapstructure:"github"`
-	Monitoring MonitoringSettings `mapstructure:"monitoring"`
-	UI         UISettings         `mapstructure:"ui"`
-	Database   DatabaseSettings   `mapstructure:"database"`
-	Server     ServerSettings     `mapstructure:"server"`
+	Authors    []AuthorIdentity   `mapstructure:"authors" toml:"authors"`
+	Goals      GoalSettings       `mapstructure:"goals" toml:"goals"`
+	Patterns   PatternSettings    `mapstructure:"patterns" toml:"patterns"`
+	Github     GithubSettings     `mapstructure:"github" toml:"github"`
+	Monitoring MonitoringSettings `mapstructure:"monitoring" toml:"monitoring"`
+	UI         UISettings         `mapstructure:"ui" toml:"ui"`
+	Database   DatabaseSettings   `mapstructure:"database" toml:"database"`
+	Server     ServerSettings     `mapstructure:"server" toml:"server"`
 }
 
 // AppPaths holds platform-specific filesystem paths.
@@ -182,15 +182,11 @@ func Load(cfgFile string) (*AppConfig, error) {
 	v.SetDefault("server.port", 7467)
 	v.SetDefault("patterns.exclude", defaultExcludePatterns)
 
-	if cfgFile != "" {
-		v.SetConfigFile(cfgFile)
-	} else {
-		paths, err := DiscoverPaths()
-		if err != nil {
-			return nil, err
-		}
-		v.SetConfigFile(paths.ConfigFile)
+	resolvedCfgFile, err := ResolveConfigFile(cfgFile)
+	if err != nil {
+		return nil, err
 	}
+	v.SetConfigFile(resolvedCfgFile)
 
 	// Environment variable overrides: GITPULSE_SERVER__PORT, GITPULSE_DATABASE__DSN, etc.
 	v.SetEnvPrefix("GITPULSE")

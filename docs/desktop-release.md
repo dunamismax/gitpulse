@@ -24,6 +24,5 @@ Treat them as new work and update these files together:
 
 - `README.md`
 - `BUILD.md`
-- `REWRITE_TRACKER.md`
 - `docs/architecture.md`
 - `.github/workflows/ci.yml`

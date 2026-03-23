@@ -13,19 +13,21 @@ import (
 
 // Server holds the router, per-page template sets, and runtime dependency.
 type Server struct {
-	mux      *http.ServeMux
-	pages    map[string]*template.Template // page name -> template set
-	partials map[string]*template.Template // partial name -> standalone template
-	rt       *runtime.Runtime
+	mux        *http.ServeMux
+	pages      map[string]*template.Template // page name -> template set
+	partials   map[string]*template.Template // partial name -> standalone template
+	rt         *runtime.Runtime
+	configFile string
 }
 
 // New creates a Server, parses all templates, and registers routes.
-func New(rt *runtime.Runtime, templatesDir, assetsDir string) (*Server, error) {
+func New(rt *runtime.Runtime, templatesDir, assetsDir, configFile string) (*Server, error) {
 	s := &Server{
-		mux:      http.NewServeMux(),
-		pages:    make(map[string]*template.Template),
-		partials: make(map[string]*template.Template),
-		rt:       rt,
+		mux:        http.NewServeMux(),
+		pages:      make(map[string]*template.Template),
+		partials:   make(map[string]*template.Template),
+		rt:         rt,
+		configFile: configFile,
 	}
 
 	if err := s.loadTemplates(templatesDir); err != nil {

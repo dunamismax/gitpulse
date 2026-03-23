@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,8 +24,9 @@ import (
 
 // Runtime wires together all subsystems.
 type Runtime struct {
-	cfg  *config.AppConfig
-	pool *pgxpool.Pool
+	cfgMu sync.RWMutex
+	cfg   *config.AppConfig
+	pool  *pgxpool.Pool
 }
 
 // New connects to the database, runs migrations, and returns a Runtime.
@@ -43,7 +45,7 @@ func New(ctx context.Context, cfg *config.AppConfig) (*Runtime, error) {
 		return nil, fmt.Errorf("migrations: %w", err)
 	}
 
-	return &Runtime{cfg: cfg, pool: pool}, nil
+	return &Runtime{cfg: cfg.Clone(), pool: pool}, nil
 }
 
 // Close shuts down the database pool.
@@ -58,7 +60,21 @@ func (rt *Runtime) Pool() *pgxpool.Pool {
 
 // Config returns the loaded configuration.
 func (rt *Runtime) Config() *config.AppConfig {
-	return rt.cfg
+	rt.cfgMu.RLock()
+	defer rt.cfgMu.RUnlock()
+
+	if rt.cfg == nil {
+		return &config.AppConfig{}
+	}
+	return rt.cfg.Clone()
+}
+
+// SetConfig replaces the in-memory configuration snapshot.
+func (rt *Runtime) SetConfig(cfg *config.AppConfig) {
+	rt.cfgMu.Lock()
+	defer rt.cfgMu.Unlock()
+
+	rt.cfg = cfg.Clone()
 }
 
 // ---------------------------------------------------------------------------
@@ -78,12 +94,14 @@ func (rt *Runtime) FindRepo(ctx context.Context, selector string) (*models.Repos
 // AddTarget discovers repositories at path, registers them, imports initial
 // history, and rebuilds analytics.
 func (rt *Runtime) AddTarget(ctx context.Context, path string) ([]models.Repository, error) {
+	cfg := rt.Config()
+
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("resolve path: %w", err)
 	}
 
-	roots, err := gitpkg.DiscoverRepositories(ctx, abs, rt.cfg.Monitoring.RepoDiscoveryDepth)
+	roots, err := gitpkg.DiscoverRepositories(ctx, abs, cfg.Monitoring.RepoDiscoveryDepth)
 	if err != nil {
 		return nil, fmt.Errorf("discover repos: %w", err)
 	}
@@ -121,8 +139,8 @@ func (rt *Runtime) AddTarget(ctx context.Context, path string) ([]models.Reposit
 			State:           models.StateActive,
 			CreatedAt:       now,
 			UpdatedAt:       now,
-			IncludePatterns: rt.cfg.Patterns.Include,
-			ExcludePatterns: rt.cfg.Patterns.Exclude,
+			IncludePatterns: cfg.Patterns.Include,
+			ExcludePatterns: cfg.Patterns.Exclude,
 		}
 		if remoteURL != "" {
 			repo.RemoteURL = &remoteURL
@@ -141,7 +159,7 @@ func (rt *Runtime) AddTarget(ctx context.Context, path string) ([]models.Reposit
 			continue
 		}
 
-		if _, err := rt.ImportRepoHistory(ctx, saved.ID, rt.cfg.Monitoring.ImportDays); err != nil {
+		if _, err := rt.ImportRepoHistory(ctx, saved.ID, cfg.Monitoring.ImportDays); err != nil {
 			// Non-fatal: continue even if import fails.
 			_ = err
 		}
@@ -259,6 +277,8 @@ func (rt *Runtime) RescanAll(ctx context.Context) error {
 // ImportRepoHistory imports commit history for a repository.
 // Returns the number of commits inserted.
 func (rt *Runtime) ImportRepoHistory(ctx context.Context, repoID uuid.UUID, days int) (int, error) {
+	cfg := rt.Config()
+
 	repo, err := db.GetRepository(ctx, rt.pool, repoID)
 	if err != nil || repo == nil {
 		return 0, fmt.Errorf("repo not found: %v", repoID)
@@ -269,7 +289,7 @@ func (rt *Runtime) ImportRepoHistory(ctx context.Context, repoID uuid.UUID, days
 		return 0, err
 	}
 
-	imported, err := gitpkg.ImportHistory(ctx, repoID, repo.RootPath, rt.cfg.AuthorEmails(), days, f)
+	imported, err := gitpkg.ImportHistory(ctx, repoID, repo.RootPath, cfg.AuthorEmails(), days, f)
 	if err != nil {
 		return 0, fmt.Errorf("import history %s: %w", repo.Name, err)
 	}
@@ -356,6 +376,8 @@ func (rt *Runtime) RebuildAnalytics(ctx context.Context) (*models.RebuildReport,
 
 // rebuildAnalyticsInternal does the actual work without returning a report.
 func (rt *Runtime) rebuildAnalyticsInternal(ctx context.Context) error {
+	cfg := rt.Config()
+
 	repos, err := db.ListRepositories(ctx, rt.pool)
 	if err != nil {
 		return err
@@ -384,8 +406,8 @@ func (rt *Runtime) rebuildAnalyticsInternal(ctx context.Context) error {
 		return err
 	}
 
-	tz := loadTimezone(rt.cfg.UI.Timezone)
-	boundary := time.Duration(rt.cfg.UI.DayBoundaryMinutes) * time.Minute
+	tz := loadTimezone(cfg.UI.Timezone)
+	boundary := time.Duration(cfg.UI.DayBoundaryMinutes) * time.Minute
 
 	// dayKey returns the calendar day string for a UTC timestamp respecting the
 	// configured timezone and day boundary offset.
@@ -523,7 +545,7 @@ func (rt *Runtime) rebuildAnalyticsInternal(ctx context.Context) error {
 		})
 	}
 
-	focusSessions := sessions.Sessionize(points, rt.cfg.Monitoring.SessionGapMinutes)
+	focusSessions := sessions.Sessionize(points, cfg.Monitoring.SessionGapMinutes)
 
 	// Distribute focus minutes back to daily accumulators.
 	for _, s := range focusSessions {
@@ -605,6 +627,7 @@ func (rt *Runtime) rebuildAnalyticsInternal(ctx context.Context) error {
 
 // DashboardView builds all data for the dashboard page.
 func (rt *Runtime) DashboardView(ctx context.Context) (*models.DashboardView, error) {
+	cfg := rt.Config()
 	today := time.Now().UTC().Format("2006-01-02")
 
 	// Today's "all" rollup.
@@ -615,7 +638,7 @@ func (rt *Runtime) DashboardView(ctx context.Context) (*models.DashboardView, er
 	todayRollup := findRollup(allRollups, today)
 	streaks := metrics.ComputeStreaks(allRollups)
 
-	goals := rt.cfg.Goals
+	goals := cfg.Goals
 	defaultGoals := config.GoalSettings{
 		ChangedLinesPerDay: 250,
 		CommitsPerDay:      3,
@@ -851,13 +874,15 @@ func (rt *Runtime) AchievementsView(ctx context.Context) ([]models.Achievement, 
 // ---------------------------------------------------------------------------
 
 func (rt *Runtime) filterForRepo(repo *models.Repository) (*filter.PathFilter, error) {
+	cfg := rt.Config()
+
 	include := repo.IncludePatterns
 	exclude := repo.ExcludePatterns
 	if len(include) == 0 {
-		include = rt.cfg.Patterns.Include
+		include = cfg.Patterns.Include
 	}
 	if len(exclude) == 0 {
-		exclude = rt.cfg.Patterns.Exclude
+		exclude = cfg.Patterns.Exclude
 	}
 	if len(exclude) == 0 {
 		exclude = filter.DefaultExcludePatterns()

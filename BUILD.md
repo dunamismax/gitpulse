@@ -59,7 +59,7 @@ The active implementation lives in:
 What is done in the current Go path:
 
 - Cobra CLI with `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
-- layered config loading and platform path discovery
+- layered config loading, platform path discovery, and atomic TOML writes for web settings
 - PostgreSQL connection, embedded schema, and raw SQL query files
 - git subprocess helpers for repo discovery, snapshot parsing, and history import
 - analytics rebuild flow for sessions, rollups, streaks, score, and achievements
@@ -70,7 +70,6 @@ What is not done yet:
 
 - broader live PostgreSQL smoke coverage beyond compile/test/help checks
 - continuous watcher / background monitoring loop
-- settings persistence writes from the web UI
 - packaged desktop release workflow
 
 ---
@@ -80,7 +79,6 @@ What is not done yet:
 | File | Owns |
 |------|------|
 | `BUILD.md` | execution truth, verification log, next steps |
-| `REWRITE_TRACKER.md` | current implementation checklist and resumable handoff state |
 | `README.md` | public-facing project status and local run instructions |
 | `AGENTS.md` | concise repo memory for future agents |
 | `docs/architecture.md` | active Go architecture |
@@ -142,10 +140,9 @@ Only record commands that actually passed.
 
 ### Verified on 2026-03-23
 
-- `go test ./...`
-- `go build ./cmd/gitpulse`
-- `go run ./cmd/gitpulse --help`
-- tracked-files scan for stale toolchain and desktop-packaging references
+- `GOCACHE=/tmp/gitpulse-gocache go test ./internal/config ./internal/runtime ./internal/web ./cmd/gitpulse`
+- `GOCACHE=/tmp/gitpulse-gocache go build ./cmd/gitpulse`
+- tracked-files scan for stale tracker references
 
 ### Not yet re-verified in this pass
 
@@ -171,10 +168,9 @@ Only record commands that actually passed.
 
 ### Phase 3 — product hardening
 
-- **in progress** dashboard, repository detail, sessions, achievements, and settings routes exist in the Go tree
+- **in progress** dashboard, repository detail, sessions, achievements, and settings routes exist in the Go tree, and settings save back to the TOML config file
 - **not started** continuous watcher / polling loop
 - **not started** GitHub remote verification parity where it is still worth keeping
-- **not started** full settings persistence from the web layer
 
 ### Phase 4 — optional distribution work
 
@@ -195,7 +191,6 @@ Only record commands that actually passed.
 
 - The Go path compiles and tests, but the end-to-end DB workflow still needs broader live verification.
 - `internal/db/schema.sql`, `migrations/0001_init.sql`, and `migrations/001_init.sql` must remain aligned until migration history is consolidated.
-- The web settings form currently displays configuration only; save is a stub redirect.
 - Packaged desktop release work is intentionally out of scope until the core runtime is solid.
 
 ---

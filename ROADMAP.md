@@ -1,6 +1,6 @@
 # GitPulse Roadmap
 
-This is the product roadmap, not the execution ledger. For the current repo state and verification history, read [BUILD.md](BUILD.md). For the current implementation checklist, read [REWRITE_TRACKER.md](REWRITE_TRACKER.md).
+This is the product roadmap, not the execution ledger. For the current repo state and verification history, read [BUILD.md](BUILD.md).
 
 ## Vision
 
@@ -42,7 +42,6 @@ Still needed:
 - live PostgreSQL smoke verification
 - integration tests
 - watcher/background monitoring loop
-- settings persistence
 - GitHub push verification parity where it is still worth keeping
 
 ## Milestone 2 — hardening and product usability

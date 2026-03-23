@@ -3,11 +3,14 @@
   <div>
     <p class="eyebrow">Settings</p>
     <h2>Identity, goals, and boundaries</h2>
-    <p class="muted">Identity aliases shape commit and push history totals. Live working-tree activity always counts locally.</p>
+    <p class="muted">Configured author emails shape commit and push history totals. Live working-tree activity always counts locally.</p>
   </div>
 </section>
 
 <form class="settings-form" method="post" action="/settings">
+  {{if .Saved}}
+  <div class="notice notice-success">Settings saved to the active config file.</div>
+  {{end}}
   <section class="panel">
     <header class="panel-head"><h3>Identity</h3></header>
     <label>Author Emails (one per line)</label>
@@ -60,9 +63,11 @@
       <input type="password" name="github_token" value="" autocomplete="new-password" placeholder="Leave blank to keep the current token" />
       {{if .Paths}}
       <div class="meta-list">
-        <span>Config: {{.Paths.ConfigDir}}</span>
+        <span>Config File: {{.Paths.ConfigFile}}</span>
+        <span>Config Dir: {{.Paths.ConfigDir}}</span>
         <span>Data: {{.Paths.DataDir}}</span>
       </div>
+      <p class="field-note">Environment overrides still win on the next process start.</p>
       {{end}}
     </article>
   </section>

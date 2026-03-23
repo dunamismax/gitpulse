@@ -41,7 +41,7 @@ Cobra CLI entrypoint. Owns command wiring only.
 
 ### `internal/config`
 
-Platform path discovery and layered config loading via TOML + environment overrides.
+Platform path discovery, layered config loading, and atomic TOML writes for the settings page. Environment variables still override file values.
 
 ### `internal/db`
 
@@ -73,7 +73,7 @@ Sessionization logic over activity points.
 
 ### `internal/web`
 
-`net/http` handlers, partial endpoints, and template rendering.
+`net/http` handlers, partial endpoints, template rendering, and settings form persistence through `internal/config`.
 
 ## Data flow
 

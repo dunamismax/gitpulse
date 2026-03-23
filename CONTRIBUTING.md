@@ -1,6 +1,6 @@
 # Contributing to GitPulse
 
-GitPulse is an active Go application. Read [BUILD.md](BUILD.md) first, then [REWRITE_TRACKER.md](REWRITE_TRACKER.md), then [docs/architecture.md](docs/architecture.md).
+GitPulse is an active Go application. Read [BUILD.md](BUILD.md) first, then [docs/architecture.md](docs/architecture.md).
 
 ## Development setup
 
@@ -80,7 +80,6 @@ Update docs in the same change when behavior shifts:
 
 - `README.md` for user-facing behavior
 - `BUILD.md` for execution truth and verification
-- `REWRITE_TRACKER.md` for resumable implementation state
 - `docs/architecture.md` for active structure
 - `gitpulse.example.toml` for config surface changes
 

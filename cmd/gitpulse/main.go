@@ -88,7 +88,7 @@ func serveCmd(cfgFile *string) *cobra.Command {
 			// Locate templates and assets relative to the binary or cwd.
 			templatesDir, assetsDir := locateStaticDirs()
 
-			srv, err := web.New(rt, templatesDir, assetsDir)
+			srv, err := web.New(rt, templatesDir, assetsDir, *cfgFile)
 			if err != nil {
 				return fmt.Errorf("create server: %w", err)
 			}

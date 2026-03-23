@@ -28,6 +28,7 @@ What exists today:
 - `gitpulse import` to import commit history
 - `gitpulse rebuild-rollups` to recompute sessions, rollups, and achievements
 - `gitpulse doctor` for environment and configuration diagnostics
+- settings page writes the current configurable UI surface back to the active TOML config file
 - PostgreSQL schema/query code for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings
 - dashboard, repositories, repository detail, sessions, achievements, and settings routes
 - sessionization, streak, score, and achievement logic in Go
@@ -36,10 +37,9 @@ What is not finished yet:
 
 - broader repeatable live PostgreSQL smoke coverage captured in-repo
 - background watcher / continuous monitoring loop
-- settings persistence from the web form
 - packaged desktop release workflow
 
-For the execution ledger and next steps, see [BUILD.md](BUILD.md). For the current implementation tracker, see [REWRITE_TRACKER.md](REWRITE_TRACKER.md).
+For the execution ledger, verification history, and next steps, see [BUILD.md](BUILD.md).
 
 ## Why GitPulse?
 
@@ -141,7 +141,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── migrations/                # PostgreSQL migration files
 ├── docs/architecture.md       # Current architecture notes
 ├── BUILD.md                   # Execution manual and verification log
-└── REWRITE_TRACKER.md         # Current implementation tracker
+└── ROADMAP.md                 # Product roadmap
 ```
 
 ## Verification

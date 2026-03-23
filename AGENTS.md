@@ -40,13 +40,11 @@ What is not complete yet:
 
 - file watcher / background monitoring loop
 - broader end-to-end integration coverage against a live PostgreSQL instance
-- persistent settings writes from the web UI
 - packaged desktop release workflow
 
 ## Working rules
 
-- Keep `README.md`, `BUILD.md`, `REWRITE_TRACKER.md`, and `docs/architecture.md` aligned with code.
-- Treat `REWRITE_TRACKER.md` as the resume point for the current implementation work.
+- Keep `README.md`, `BUILD.md`, and `docs/architecture.md` aligned with code.
 - Prefer the narrowest truthful verification first: `go test ./...`, then `go build ./cmd/gitpulse`, then a focused CLI smoke command.
 - For database work, keep SQL explicit in `internal/db/`; no ORM.
 - Do not document packaging or release behavior that the repo does not implement.
