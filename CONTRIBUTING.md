@@ -15,7 +15,6 @@ GitPulse is mid-rewrite. Read [BUILD.md](BUILD.md) first, then [REWRITE_TRACKER.
 ```bash
 git clone https://github.com/dunamismax/gitpulse.git
 cd gitpulse
-go mod tidy
 go test ./...
 go build ./cmd/gitpulse
 ```
@@ -56,11 +55,12 @@ GitPulse currently uses a Go-first layout.
 
 Rules:
 
-- New implementation work goes in Go, not Rust.
+- New implementation work goes in Go.
 - Database work stays PostgreSQL-only.
 - Use raw SQL via `pgx/v5`; do not add an ORM.
 - Keep repo-controlled strings treated as untrusted input.
 - Keep docs aligned when product behavior changes.
+- Do not imply a desktop shell or release flow that is not present in-tree.
 
 ## Quality gates
 
@@ -83,10 +83,6 @@ Update docs in the same change when behavior shifts:
 - `REWRITE_TRACKER.md` for resumable rewrite state
 - `docs/architecture.md` for active structure
 - `gitpulse.example.toml` for config surface changes
-
-## Legacy code note
-
-The old Rust workspace is still in the repository as migration reference. Do not add new product behavior there unless the change is explicitly about extracting parity information for the Go rewrite.
 
 ## Commit messages
 

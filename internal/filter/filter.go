@@ -86,7 +86,6 @@ func DefaultExcludePatterns() []string {
 		"package-lock.json",
 		"yarn.lock",
 		"pnpm-lock.yaml",
-		"Cargo.lock",
 		"go.sum",
 		"*.png",
 		"*.jpg",

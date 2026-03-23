@@ -2,34 +2,21 @@
 
 Local-first git activity analytics for developers who want honest signals without uploading source code.
 
-GitPulse keeps live work, commit history, and push activity as separate ledgers. The current rewrite is centered on a Go runtime, PostgreSQL, and plain server-rendered HTML.
+GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is the Go rewrite: Go runtime, PostgreSQL, raw SQL via `pgx/v5`, and a local web dashboard rendered with plain HTML templates.
 
 [![CI](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Status
 
-GitPulse is in an active rewrite and recovery pass.
+GitPulse is still mid-rewrite, but the repository truth is now clean:
 
-Current active stack:
+- active stack: Go 1.25+, PostgreSQL 14+, `pgx/v5`, Cobra, `net/http`, plain HTML templates
+- no legacy Rust/Tauri source or Rust toolchain files remain in-tree
+- no native desktop shell is implemented in this repo right now
+- future native packaging, if it still matters, should be a thin Zig/C wrapper over the Go runtime
 
-- Go 1.25+
-- PostgreSQL 14+
-- `pgx/v5` with raw SQL only
-- Cobra CLI
-- `net/http` web server
-- Plain HTML templates + existing CSS/JS assets
-
-Current repo reality:
-
-- The Go rewrite now builds successfully.
-- The rescued implementation includes CLI commands, PostgreSQL schema/query code, git parsing, analytics rebuild logic, and web routes/templates.
-- The legacy Rust/Tauri tree is still present in the repo as migration reference only.
-- The rewrite is not feature-complete yet and this pass did not claim full end-to-end runtime validation against a live PostgreSQL dataset.
-
-For the detailed rewrite ledger and next steps, see [REWRITE_TRACKER.md](REWRITE_TRACKER.md). For the operator handoff manual, see [BUILD.md](BUILD.md).
-
-## What exists in the Go rewrite today
+What exists today:
 
 - `gitpulse serve` to start the local dashboard server
 - `gitpulse add <path>` to register a repo or discover repos under a folder
@@ -37,17 +24,18 @@ For the detailed rewrite ledger and next steps, see [REWRITE_TRACKER.md](REWRITE
 - `gitpulse import` to import commit history
 - `gitpulse rebuild-rollups` to recompute sessions, rollups, and achievements
 - `gitpulse doctor` for environment and configuration diagnostics
-- PostgreSQL schema for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings
-- Dashboard, repositories, repository detail, sessions, achievements, and settings routes
-- Sessionization, streak, score, and achievement logic in Go
+- PostgreSQL schema/query code for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings
+- dashboard, repositories, repository detail, sessions, achievements, and settings routes
+- sessionization, streak, score, and achievement logic in Go
 
-## Not finished yet
+What is not finished yet:
 
-- Background watcher / continuous monitoring loop
-- Settings persistence from the web form
-- Dedicated end-to-end integration tests against a real PostgreSQL instance
-- Thin Zig/C native shell replacement for the retired Tauri desktop path
-- Final removal of the legacy Rust codebase
+- live PostgreSQL smoke validation captured in-repo as repeatable integration coverage
+- background watcher / continuous monitoring loop
+- settings persistence from the web form
+- any future Zig/C native shell or packaging workflow
+
+For the execution ledger and next steps, see [BUILD.md](BUILD.md). For the rewrite checklist, see [REWRITE_TRACKER.md](REWRITE_TRACKER.md).
 
 ## Why GitPulse?
 
@@ -73,24 +61,26 @@ Create a local database:
 createdb gitpulse
 ```
 
-Create a config file from the example:
+Find your config path with:
 
 ```bash
-cp gitpulse.example.toml ~/Library/Application\ Support/gitpulse/gitpulse.toml
+go run ./cmd/gitpulse doctor
 ```
 
-Minimal database config:
+Minimal config:
 
 ```toml
 [database]
 dsn = "postgres://localhost/gitpulse?sslmode=disable"
 ```
 
-You can also use environment overrides:
+Environment override example:
 
 ```bash
 export GITPULSE_DATABASE__DSN='postgres://localhost/gitpulse?sslmode=disable'
 ```
+
+See [gitpulse.example.toml](gitpulse.example.toml) for the full config surface.
 
 ### Build and run
 
@@ -143,21 +133,19 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── internal/sessions/         # Sessionization logic
 ├── internal/web/              # net/http handlers and render helpers
 ├── templates/                 # HTML pages and partials
-├── assets/                    # Reused static assets
-├── migrations/001_init.sql    # PostgreSQL schema baseline for the rewrite
-├── docs/architecture.md       # Current Go rewrite architecture
+├── assets/                    # Static assets used by the local web UI
+├── migrations/001_init.sql    # PostgreSQL schema baseline
+├── docs/architecture.md       # Current architecture notes
 ├── BUILD.md                   # Execution manual and verification log
 └── REWRITE_TRACKER.md         # Rewrite progress and next-step ledger
 ```
 
-## Legacy code note
+## Verification in this cleanup pass
 
-The old Rust workspace is still present during the migration for parity checks and rescue work. It is not the target architecture. New implementation work should go into the Go path, and any future native wrapper work should be Zig/C based.
-
-## Verification run for this recovery pass
-
-- `go mod tidy`
 - `go test ./...`
+- `go build ./cmd/gitpulse`
+- `go run ./cmd/gitpulse --help`
+- stale-reference scan for Rust/Cargo/Tauri terms across tracked docs/config
 
 ## License
 

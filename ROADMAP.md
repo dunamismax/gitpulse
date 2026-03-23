@@ -10,20 +10,26 @@ Long term, it can grow into an extensible platform with APIs, plugins, and optio
 
 ## Current reality
 
-The repository is in an active rewrite from the legacy Rust/Tauri implementation to a Go-first stack with PostgreSQL and raw SQL.
+The repository now reflects the Go rewrite directly:
+
+- Go runtime and CLI
+- PostgreSQL persistence
+- raw SQL via `pgx/v5`
+- local web dashboard rendered from server-side templates
+- no native desktop shell currently in-tree
 
 Near-term roadmap decisions:
 
 - stabilize the Go CLI + local web dashboard first
 - prove the PostgreSQL-backed happy path end to end
 - only revisit native-shell packaging after the core runtime is solid
-- treat Zig/C as the future native path if one is still needed
+- treat Zig/C as the only future native path if one is still needed
 
-## Milestone 1 — Go rewrite parity
+## Milestone 1 — operator-ready Go runtime
 
 **Status:** In progress
 
-Goal: make the Go rewrite the clear primary implementation for local use.
+Goal: make the current Go runtime comfortable to run locally every day.
 
 Targets:
 
@@ -40,13 +46,12 @@ Still needed:
 - watcher/background monitoring loop
 - settings persistence
 - GitHub push verification parity where it is still worth keeping
-- removal or quarantine of the legacy Rust tree
 
-## Milestone 2 — Hardening and product usability
+## Milestone 2 — hardening and product usability
 
 **Status:** Planned
 
-Goal: make the rewritten app comfortable to run daily.
+Goal: make the rewritten app resilient and pleasant to operate.
 
 Possible scope:
 
@@ -55,9 +60,9 @@ Possible scope:
 - explicit migration/version handling beyond the bootstrap schema
 - data lifecycle controls
 - incremental rebuild strategy if full rebuilds become painful
-- native packaging only if it earns its keep
+- packaging only if it earns its keep
 
-## Milestone 3 — Platform surface area
+## Milestone 3 — platform surface area
 
 **Status:** Planned
 

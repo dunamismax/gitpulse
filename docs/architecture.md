@@ -1,17 +1,16 @@
 # GitPulse Architecture
 
-GitPulse is being rebuilt as a local-first Go application with PostgreSQL persistence and plain HTML templates.
+GitPulse is a local-first Go application with PostgreSQL persistence and plain HTML templates.
 
 The active stack is:
 
 - Go for CLI, runtime, web server, git integration, analytics, and data access
 - PostgreSQL for all persisted state
-- Raw SQL via `pgx/v5`
-- Plain HTML templates plus HTMX-style partial responses
-- Existing CSS/JS assets reused where they still fit
-- Zig/C reserved for future thin native shell work, not yet implemented in this repo
+- raw SQL via `pgx/v5`
+- plain HTML templates plus lightweight browser-side JS where needed
+- Zig/C reserved only for a future thin native shell, not implemented in this repo today
 
-Legacy Rust/Tauri code remains in the repository only as a migration reference.
+Rust/Tauri code is no longer part of the tree.
 
 ## System overview
 
@@ -61,7 +60,7 @@ Git subprocess execution, repo discovery, snapshot parsing, and history import p
 
 ### `internal/metrics`
 
-Pure-ish score, streak, and achievement logic.
+Score, streak, and achievement logic.
 
 ### `internal/models`
 
@@ -107,9 +106,10 @@ Schema sources:
 - `internal/db/schema.sql` for the embedded startup migration path
 - `migrations/001_init.sql` for explicit repo-visible schema history
 
-## Migration stance
+## Design constraints
 
 - New implementation work belongs in Go.
-- PostgreSQL is the only supported database target for the rewrite.
+- PostgreSQL is the only supported database target.
 - No ORM layer should be introduced.
-- Legacy Rust files may be consulted for parity, then removed once the Go path fully replaces them.
+- Keep repo-controlled strings treated as untrusted input.
+- Do not imply a desktop shell or packaging workflow until code for it actually exists.

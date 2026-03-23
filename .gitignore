@@ -1,11 +1,10 @@
 /target
-/target-desktop
 /.sqlx
 /.DS_Store
 /dist
 /tmp
 /.idea
-/apps/gitpulse-desktop/src-tauri/gen
+/.vscode
 gitpulse-data
 /gitpulse
 /.claude

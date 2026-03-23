@@ -1,6 +1,0 @@
-[build]
-target-dir = "target"
-
-[alias]
-xtest = "nextest run --workspace"
-xlint = "clippy --workspace --all-targets -- -D warnings"

@@ -83,7 +83,7 @@ type AppPaths struct {
 	ConfigFile string
 }
 
-// defaultExcludePatterns mirrors the Rust codebase defaults.
+// defaultExcludePatterns covers common noisy/generated paths.
 var defaultExcludePatterns = []string{
 	".git/**",
 	"target/**",
@@ -95,7 +95,6 @@ var defaultExcludePatterns = []string{
 	"package-lock.json",
 	"yarn.lock",
 	"pnpm-lock.yaml",
-	"Cargo.lock",
 	"go.sum",
 	"*.png",
 	"*.jpg",
@@ -193,7 +192,7 @@ func Load(cfgFile string) (*AppConfig, error) {
 		v.SetConfigFile(paths.ConfigFile)
 	}
 
-	// Environment variable overrides: GITPULSE_SERVER__PORT, GITPULSE_DB__DSN, etc.
+	// Environment variable overrides: GITPULSE_SERVER__PORT, GITPULSE_DATABASE__DSN, etc.
 	v.SetEnvPrefix("GITPULSE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
 	v.AutomaticEnv()
