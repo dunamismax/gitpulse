@@ -200,6 +200,31 @@ Checklist:
 - [ ] define a release workflow only if it earns its keep
 - [ ] keep desktop packaging clearly optional until the core runtime is operator-solid
 
+### Phase 5 — tech stack alignment
+
+**Status:** planned
+
+Checklist:
+
+- [ ] update `go.mod` toolchain directive to Go 1.26.1 to match the canonical stack version
+- [ ] replace `viper` with `koanf` or plain env vars and flags; `viper` is not in the stack and `koanf` is the prescribed multi-source config tool when needed
+- [ ] introduce `sqlc` for typed query generation from the raw SQL across `internal/db/`; the stack mandates `sqlc` over handwritten pgx boilerplate
+- [ ] add `goose` to `go.mod` and wire existing `migrations/` files through `goose` rather than the embedded ad-hoc schema path
+- [ ] add a `golangci-lint` step to `ci.yml` alongside the existing `go vet` baseline
+- [ ] add a `govulncheck` step to `ci.yml` for dependency vulnerability scanning on every push
+- [ ] add a `/metrics` Prometheus endpoint, gated by a server-side flag or admin listener
+- [ ] expose `pprof` on an admin-only path, separate from the public web listener port
+- [ ] extend test coverage with table-driven tests for git parsing functions in `internal/git/`
+- [ ] add fuzz tests for git subprocess output parsers in `snapshot.go` and `git.go`
+
+Exit criteria:
+
+- `go.mod` toolchain matches Go 1.26.1
+- config loading no longer depends on `viper`
+- at least one `internal/db/` query area is replaced with `sqlc`-generated code and the pattern is documented
+- CI runs `golangci-lint` and `govulncheck` on every push
+- a `/metrics` endpoint exists and returns valid Prometheus exposition format
+
 ---
 
 ## Decisions
