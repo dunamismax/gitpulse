@@ -155,27 +155,50 @@ Only record commands that actually passed.
 
 ### Phase 1 — core local workflow
 
-- **done** CLI commands for serve, add, rescan, import, rebuild-rollups, and doctor
-- **done** PostgreSQL-backed storage and analytics rebuild path
-- **done** local web dashboard routes and templates
-- **done** top-level docs aligned with the active Go runtime
+**Status:** done / checked
+
+Checklist:
+
+- [x] CLI commands for `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
+- [x] PostgreSQL-backed storage and analytics rebuild path
+- [x] local web dashboard routes and templates
+- [x] top-level docs aligned with the active Go runtime
 
 ### Phase 2 — operator-ready verification
 
-- **in progress** validate real PostgreSQL startup, add, import, rescan, and rebuild flows
-- **not started** add focused integration tests around DB-backed runtime behavior
-- **not started** improve config validation and operator-facing error messages
+**Status:** in progress
+
+Checklist:
+
+- [ ] validate real PostgreSQL startup, add, import, rescan, and rebuild flows
+- [ ] add focused integration tests around DB-backed runtime behavior
+- [ ] improve config validation and operator-facing error messages
+
+Exit criteria:
+
+- one live PostgreSQL-backed operator flow is verified end to end
+- integration coverage exists for the runtime paths that mutate persisted state
 
 ### Phase 3 — product hardening
 
-- **in progress** dashboard, repository detail, sessions, achievements, and settings routes exist in the Go tree, and settings save back to the TOML config file
-- **not started** continuous watcher / polling loop
-- **not started** GitHub remote verification parity where it is still worth keeping
+**Status:** in progress
+
+Checklist:
+
+- [x] dashboard, repository detail, sessions, achievements, and settings routes exist in the Go tree
+- [ ] harden those routes into a coherent operator surface
+- [ ] implement or intentionally defer the continuous watcher / polling loop
+- [ ] decide whether GitHub remote verification parity is still worth keeping and document the answer
 
 ### Phase 4 — optional distribution work
 
-- **not started** decide whether packaged desktop releases are worth carrying at all
-- **not started** define a release workflow only if it earns its keep
+**Status:** planned
+
+Checklist:
+
+- [ ] decide whether packaged desktop releases are worth carrying at all
+- [ ] define a release workflow only if it earns its keep
+- [ ] keep desktop packaging clearly optional until the core runtime is operator-solid
 
 ---
 
