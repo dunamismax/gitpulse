@@ -9,6 +9,12 @@
 # All settings have sensible defaults. Only override what you need.
 # Environment variables: prefix any key with GITPULSE_ (e.g., GITPULSE_SERVER_PORT=8080)
 
+# --- Database ---
+# PostgreSQL connection string. The database must exist before starting GitPulse.
+# Create it with: createdb gitpulse
+# Override via environment variable: GITPULSE__DATABASE_URL=postgres://user:pass@host/dbname
+database_url = "postgres://localhost/gitpulse"
+
 # --- Server ---
 # Host and port for the web dashboard.
 server_host = "127.0.0.1"

@@ -16,10 +16,16 @@ pub struct AppConfig {
     pub server_host: String,
     #[serde(default = "default_port")]
     pub server_port: u16,
+    #[serde(default = "default_database_url")]
+    pub database_url: String,
 }
 
 fn default_port() -> u16 {
     7467
+}
+
+fn default_database_url() -> String {
+    "postgres://localhost/gitpulse".into()
 }
 
 impl Default for AppConfig {
@@ -36,6 +42,7 @@ impl Default for AppConfig {
             },
             server_host: "127.0.0.1".into(),
             server_port: default_port(),
+            database_url: default_database_url(),
         }
     }
 }
@@ -54,6 +61,7 @@ impl ConfigLoader {
         let config = Config::builder()
             .set_default("server_host", defaults.server_host)?
             .set_default("server_port", defaults.server_port)?
+            .set_default("database_url", defaults.database_url)?
             .set_default(
                 "settings.goals.changed_lines_per_day",
                 defaults.settings.goals.changed_lines_per_day,

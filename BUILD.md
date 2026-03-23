@@ -38,7 +38,7 @@ Deliver trustworthy personal repository analytics without uploading source code 
 Last reviewed: 2026-03-22
 Host: macOS, `/Users/sawyer/github/gitpulse`
 Branch: `main`
-Toolchain: `cargo 1.94.0`, `rustc 1.94.0`, `git 2.50.1`, `sqlite3 3.51.0`
+Toolchain: `cargo 1.94.0`, `rustc 1.94.0`, `git 2.50.1`, `psql (PostgreSQL) 14+`
 
 What exists:
 
@@ -182,7 +182,7 @@ GitPulse uses the Rust ecosystem with deliberate dependency choices:
 
 | Dependency | Purpose | Justification |
 |------------|---------|---------------|
-| `sqlx` + `sqlite` | Persistence | Compile-time query checking, async-ready, bundles SQLite |
+| `sqlx` + `postgres` | Persistence | Compile-time query checking, async-ready, PostgreSQL driver |
 | `axum` | Web server | Tokio-native, composable, tower middleware ecosystem |
 | `askama` | Templates | Compile-time template checking, zero runtime overhead |
 | `tauri` | Desktop shell | Native window with web content, folder picker, small binary |
@@ -247,7 +247,7 @@ Verified on `2026-03-22`:
 ### Crate boundaries
 
 - **`gitpulse-core`** — Pure-ish domain rules and shared types. Score, streak, session, and timezone/day-boundary logic. Settings and analytics model types.
-- **`gitpulse-infra`** — External boundaries. SQLite/SQLx, migrations, config, app directories, git parsing, repo discovery, exclusions, watchers, and optional GitHub verification.
+- **`gitpulse-infra`** — External boundaries. PostgreSQL/SQLx, migrations, config, app directories, git parsing, repo discovery, exclusions, watchers, and optional GitHub verification.
 - **`gitpulse-runtime`** — Application orchestration. Add target, discover repos, import history, refresh snapshots, detect pushes, rebuild analytics, and serve data to UI/CLI consumers.
 - **`gitpulse-web`** — Axum routes, Askama templates, HTMX partials, and SVG chart rendering. Should stay presentation-oriented and avoid owning product rules.
 - **`gitpulse-cli`** — Headless operator and diagnostics entrypoint.
@@ -260,7 +260,7 @@ Verified on `2026-03-22`:
 3. Initial history import reads qualifying commit metadata through the git CLI.
 4. A debounced watcher plus periodic polling enqueues refresh work.
 5. Refreshes collect canonical repo state: branch/head/upstream metadata, ahead/behind counts, working-tree and staged numstat diffs, untracked text additions, periodic language/size snapshots.
-6. The runtime writes snapshots and event records into SQLite.
+6. The runtime writes snapshots and event records into PostgreSQL.
 7. Analytics rebuilds derive sessions, daily rollups, streaks, score, goals, and achievements.
 8. Axum + Askama + HTMX pages read those derived views for dashboard and drill-down pages.
 9. The desktop shell reuses the same runtime and routes instead of introducing a separate implementation.
@@ -363,7 +363,7 @@ Exit criteria:
 
 Goals:
 - [x] Land the Rust workspace with the current app and crate split
-- [x] Add the SQLite schema baseline under `migrations/0001_init.sql`
+- [x] Add the PostgreSQL schema baseline under `migrations/0001_init.sql`
 - [x] Wire config loading, app directories, and persistence bootstrapping
 - [x] Implement git CLI integration for discovery, status snapshots, and history import
 - [x] Implement watcher support and repo refresh enqueueing
@@ -716,7 +716,7 @@ This section names the concrete boundary for the first public release. Anything 
 - **Per-repo pattern overrides** — include/exclude editing from repo detail page, forward-only behavior
 - **SVG charts** — server-rendered activity, heatmap, and language charts with escaped labels
 - **Layered config** — defaults → `gitpulse.toml` → env vars → CLI overrides
-- **SQLite persistence** — all data local, inspectable, deletable
+- **PostgreSQL persistence** — all data local, inspectable, deletable
 - **CI** — fmt, clippy, nextest, cargo-deny, desktop compile check (macOS)
 - **Desktop packaging** — operator-run unsigned macOS `.app` via `./scripts/desktop-package.sh` (documented, not CI-built)
 
@@ -724,7 +724,7 @@ This section names the concrete boundary for the first public release. Anything 
 
 - **Incremental/scoped analytics rebuilds** (Phase 6) — full-history synchronous rebuild is acceptable for individual-developer datasets at v0.1 scale. Document the limitation. Revisit if users report noticeable lag.
 - **Retroactive pattern cleanup** — pattern override changes apply forward-only. Documented clearly. No reimport flow.
-- **History purge UI** — users can delete the SQLite file or use standard SQL tools. No in-app purge surface.
+- **History purge UI** — users can drop and recreate the PostgreSQL database or use standard SQL tools. No in-app purge surface.
 - **CI-built desktop bundles** — desktop packaging stays operator-local. No signing, notarization, or auto-update.
 - **Cross-platform desktop** — macOS only for v0.1. Windows and Linux are v2.
 - **REST API** (Phase 10) — not started, deferred to v2.
@@ -757,7 +757,7 @@ This section names the concrete boundary for the first public release. Anything 
 
 - **Decided:** `rebuild_analytics()` stays full-history synchronous for v0.1. Individual-developer datasets are small enough. Document the limitation and revisit in Phase 6 if users report lag.
 - **Decided:** Repo-specific pattern overrides are forward-only for v0.1. Documented clearly. Retroactive cleanup deferred to Phase 8.
-- **Decided:** Explicit history purge is out of scope for v0.1. Users can delete the SQLite file directly.
+- **Decided:** Explicit history purge is out of scope for v0.1. Users can drop the PostgreSQL database directly.
 - **Decided:** Bundle builds remain operator-local for v0.1. CI-produced artifacts, signing, and notarization are v2 scope (Phase 13).
 
 ### v2 scope

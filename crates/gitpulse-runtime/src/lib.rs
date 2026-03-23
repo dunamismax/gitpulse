@@ -107,7 +107,7 @@ impl GitPulseRuntime {
         options: BootstrapOptions,
     ) -> Result<Self> {
         paths.ensure()?;
-        let db = Database::connect(&DatabasePaths { file: paths.database_file.clone() }).await?;
+        let db = Database::connect(&DatabasePaths { url: file_config.database_url.clone() }).await?;
         let mut effective_config = file_config.clone();
         if let Some(db_settings) = db.load_json_setting::<AppSettings>("app_settings").await? {
             effective_config.settings = db_settings;
@@ -623,7 +623,7 @@ impl GitPulseRuntime {
             settings: config.settings,
             config_path: self.inner.paths.config_file.display().to_string(),
             data_path: self.inner.paths.data_dir.display().to_string(),
-            database_path: self.inner.paths.database_file.display().to_string(),
+            database_path: config.database_url.clone(),
         })
     }
 
@@ -662,7 +662,7 @@ impl GitPulseRuntime {
         let repos = self.inner.db.list_repositories().await?;
         Ok(DoctorReport {
             git_available: self.git_available().await,
-            db_path: self.inner.paths.database_file.display().to_string(),
+            db_path: self.inner.config.read().await.database_url.clone(),
             config_path: self.inner.paths.config_file.display().to_string(),
             watched_repositories: repos.iter().map(|repo| repo.root_path.clone()).collect(),
             repository_count: repos.len() as i64,

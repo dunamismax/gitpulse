@@ -45,13 +45,14 @@ Most developer analytics tools want your code in their cloud. GitPulse doesn't.
 
 - [Rust](https://rustup.rs/) (stable, 1.85+; tested with 1.94)
 - Git (2.30+)
-- SQLite (bundled via SQLx — no system install needed)
+- PostgreSQL (14+; must be running and accessible)
 
 ### Run the dashboard
 
 ```bash
 git clone https://github.com/dunamismax/gitpulse.git
 cd gitpulse
+createdb gitpulse
 cargo run -p gitpulse-cli -- serve
 ```
 
@@ -113,7 +114,7 @@ The desktop shell launches the same runtime on a random localhost port, loads th
       ┌───────────▼───┐   ┌────▼──────────┐
       │ gitpulse-core │   │ gitpulse-infra │
       │               │   │                │
-      │ domain models │   │ SQLite/SQLx    │
+      │ domain models │   │ PostgreSQL/SQLx│
       │ score formula │   │ config loading │
       │ streak logic  │   │ git CLI        │
       │ sessions      │   │ file watcher   │
@@ -125,7 +126,7 @@ The desktop shell launches the same runtime on a random localhost port, loads th
 | Crate | Responsibility |
 |-------|---------------|
 | `gitpulse-core` | Domain models, score formula, streak logic, sessions, timezone handling, achievements |
-| `gitpulse-infra` | SQLite persistence, config loading, git CLI integration, file watching, GitHub API, exclusion patterns |
+| `gitpulse-infra` | PostgreSQL persistence, config loading, git CLI integration, file watching, GitHub API, exclusion patterns |
 | `gitpulse-runtime` | Repo discovery, import/refresh orchestration, push detection, analytics rebuilds, query API |
 | `gitpulse-web` | Axum routes, Askama templates, HTMX partials, SVG chart rendering |
 | `gitpulse-cli` | Headless CLI entrypoint |
@@ -158,11 +159,15 @@ See [gitpulse.example.toml](gitpulse.example.toml) for all options.
 
 **Platform paths:**
 
-| Platform | Config | Data |
-|----------|--------|------|
-| macOS | `~/Library/Application Support/dev.GitPulse.GitPulse/gitpulse.toml` | `~/Library/Application Support/dev.GitPulse.GitPulse/gitpulse.sqlite3` |
-| Linux | `~/.config/dev/GitPulse/GitPulse/gitpulse.toml` | `~/.local/share/dev/GitPulse/GitPulse/gitpulse.sqlite3` |
-| Windows | `%APPDATA%\dev\GitPulse\GitPulse\config\gitpulse.toml` | `%APPDATA%\dev\GitPulse\GitPulse\data\gitpulse.sqlite3` |
+| Platform | Config |
+|----------|--------|
+| macOS | `~/Library/Application Support/dev.GitPulse.GitPulse/gitpulse.toml` |
+| Linux | `~/.config/dev/GitPulse/GitPulse/gitpulse.toml` |
+| Windows | `%APPDATA%\dev\GitPulse\GitPulse\config\gitpulse.toml` |
+
+The database is a PostgreSQL instance configured via `database_url` in `gitpulse.toml`
+or the `GITPULSE__DATABASE_URL` environment variable (default: `postgres://localhost/gitpulse`).
+Create the database before first run: `createdb gitpulse`
 
 ## Privacy and data model
 
@@ -170,7 +175,7 @@ See [gitpulse.example.toml](gitpulse.example.toml) for all options.
 - **No source code upload.** Only metadata: repo identity, file paths, timestamps, line counts, commit hashes, branch info.
 - **No diff content persistence.** Diffs are read, counted, and discarded.
 - **GitHub verification is opt-in.** Only sends commit metadata needed to check remote reachability.
-- **All data is local SQLite.** Inspect it, back it up, delete it — it's your file.
+- **All data is local PostgreSQL.** The database runs on your machine. Back it up with `pg_dump`, inspect it with any PostgreSQL client, or drop it entirely.
 
 ## Metrics and scoring
 
@@ -212,7 +217,7 @@ cargo run -p gitpulse-cli -- doctor
 ├── Cargo.toml                        # workspace root
 ├── gitpulse.example.toml             # config surface
 ├── migrations/
-│   └── 0001_init.sql                 # SQLite schema baseline
+│   └── 0001_init.sql                 # PostgreSQL schema baseline
 ├── apps/
 │   ├── gitpulse-cli/                 # headless CLI entrypoint
 │   └── gitpulse-desktop/             # Tauri v2 desktop shell

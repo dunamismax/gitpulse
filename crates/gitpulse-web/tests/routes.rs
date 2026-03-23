@@ -4,8 +4,10 @@ use axum::{
 };
 use gitpulse_infra::{AppConfig, AppPaths};
 use gitpulse_runtime::{BootstrapOptions, GitPulseRuntime};
+use sqlx::PgPool;
 use tempfile::tempdir;
 use tower::ServiceExt;
+use uuid::Uuid;
 
 use std::{path::Path, process::Command};
 
@@ -15,8 +17,28 @@ fn test_paths(base: &std::path::Path) -> AppPaths {
         data_dir: base.join("data"),
         log_dir: base.join("logs"),
         config_file: base.join("config/gitpulse.toml"),
-        database_file: base.join("data/gitpulse.sqlite3"),
     }
+}
+
+async fn create_test_db() -> String {
+    let admin_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://localhost/postgres".into());
+
+    let db_name = format!("gitpulse_t{}", Uuid::new_v4().to_string().replace('-', ""));
+
+    let pool = PgPool::connect(&admin_url)
+        .await
+        .expect("failed to connect to admin database; set DATABASE_URL env var to a postgres admin URL");
+
+    sqlx::query(&format!("CREATE DATABASE \"{}\"", db_name))
+        .execute(&pool)
+        .await
+        .expect("failed to create test database");
+
+    pool.close().await;
+
+    let base = admin_url.rfind('/').map(|i| &admin_url[..i]).unwrap_or(&admin_url);
+    format!("{}/{}", base, db_name)
 }
 
 fn git(args: &[&str], cwd: &Path) {
@@ -33,9 +55,12 @@ fn init_repo(root: &Path) {
 #[tokio::test]
 async fn key_pages_render_successfully() {
     let temp = tempdir().unwrap();
+    let mut config = AppConfig::default();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        AppConfig::default(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -62,9 +87,12 @@ async fn repository_pattern_form_updates_repo_overrides() {
     git(&["add", "."], &repo);
     git(&["commit", "-m", "initial"], &repo);
 
+    let mut config = AppConfig::default();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        AppConfig::default(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -99,6 +127,7 @@ async fn repository_pattern_form_updates_repo_overrides() {
 async fn settings_page_does_not_reflect_stored_github_token() {
     let temp = tempdir().unwrap();
     let mut config = AppConfig::default();
+    config.database_url = create_test_db().await;
     config.settings.github.enabled = true;
     config.settings.github.verify_remote_pushes = true;
     config.settings.github.token = Some("super-secret-token".into());

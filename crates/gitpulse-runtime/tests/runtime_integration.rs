@@ -1,10 +1,12 @@
 use std::{path::Path, process::Command};
 
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDate, Utc};
 use gitpulse_core::{AuthorIdentity, RepoPatternSettings};
 use gitpulse_infra::{AppConfig, AppPaths};
 use gitpulse_runtime::{BootstrapOptions, GitPulseRuntime};
+use sqlx::PgPool;
 use tempfile::tempdir;
+use uuid::Uuid;
 
 fn git(args: &[&str], cwd: &Path) {
     let status = Command::new("git").args(args).current_dir(cwd).status().unwrap();
@@ -29,12 +31,32 @@ fn test_paths(base: &Path) -> AppPaths {
         data_dir: base.join("data"),
         log_dir: base.join("logs"),
         config_file: base.join("config/gitpulse.toml"),
-        database_file: base.join("data/gitpulse.sqlite3"),
     }
 }
 
+async fn create_test_db() -> String {
+    let admin_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://localhost/postgres".into());
+
+    let db_name = format!("gitpulse_t{}", Uuid::new_v4().to_string().replace('-', ""));
+
+    let pool = PgPool::connect(&admin_url)
+        .await
+        .expect("failed to connect to admin database; set DATABASE_URL env var to a postgres admin URL");
+
+    sqlx::query(&format!("CREATE DATABASE \"{}\"", db_name))
+        .execute(&pool)
+        .await
+        .expect("failed to create test database");
+
+    pool.close().await;
+
+    let base = admin_url.rfind('/').map(|i| &admin_url[..i]).unwrap_or(&admin_url);
+    format!("{}/{}", base, db_name)
+}
+
 async fn count_file_activity_kind(runtime: &GitPulseRuntime, kind: &str) -> i64 {
-    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM file_activity_events WHERE kind = ?1")
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM file_activity_events WHERE kind = $1")
         .bind(kind)
         .fetch_one(runtime.db().pool())
         .await
@@ -62,9 +84,12 @@ async fn add_target_discovers_repositories_under_parent_folder() {
     init_repo(&alpha);
     init_repo(&beta);
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -86,9 +111,12 @@ async fn detects_push_when_ahead_count_drops() {
     git(&["remote", "add", "origin", remote.to_str().unwrap()], &repo);
     git(&["push", "-u", "origin", "main"], &repo);
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -119,9 +147,12 @@ async fn updates_repository_pattern_overrides() {
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let mut config = AppConfig::default();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        AppConfig::default(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -148,9 +179,12 @@ async fn import_history_is_idempotent_for_file_activity_rows() {
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -176,9 +210,12 @@ async fn rebuild_analytics_keeps_imported_commit_history_out_of_live_daily_total
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -211,9 +248,12 @@ async fn rebuild_analytics_uses_latest_snapshot_for_staged_only_days() {
     std::fs::write(repo.join("README.md"), "hello\n").unwrap();
     git(&["add", "README.md"], &repo);
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -240,9 +280,12 @@ async fn rebuild_analytics_uses_latest_refresh_snapshot_instead_of_summing_same_
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -275,9 +318,12 @@ async fn rebuild_analytics_carries_staged_snapshot_totals_into_rollups() {
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -314,9 +360,12 @@ async fn rebuild_analytics_prunes_stale_repo_scoped_rollup_rows() {
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -325,15 +374,15 @@ async fn rebuild_analytics_prunes_stale_repo_scoped_rollup_rows() {
     runtime.add_target(&repo).await.unwrap();
 
     let stale_scope = "stale-repo-scope";
-    sqlx::query("INSERT INTO daily_rollups (scope, day) VALUES (?1, ?2)")
+    sqlx::query("INSERT INTO daily_rollups (scope, day) VALUES ($1, $2)")
         .bind(stale_scope)
-        .bind("2099-01-01")
+        .bind(NaiveDate::from_ymd_opt(2099, 1, 1).unwrap())
         .execute(runtime.db().pool())
         .await
         .unwrap();
 
     let stale_before =
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM daily_rollups WHERE scope = ?1")
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM daily_rollups WHERE scope = $1")
             .bind(stale_scope)
             .fetch_one(runtime.db().pool())
             .await
@@ -343,7 +392,7 @@ async fn rebuild_analytics_prunes_stale_repo_scoped_rollup_rows() {
     runtime.rebuild_analytics().await.unwrap();
 
     let stale_after =
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM daily_rollups WHERE scope = ?1")
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM daily_rollups WHERE scope = $1")
             .bind(stale_scope)
             .fetch_one(runtime.db().pool())
             .await
@@ -359,9 +408,12 @@ async fn rebuild_analytics_report_matches_loaded_rows_and_outputs() {
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -410,9 +462,12 @@ async fn remove_repository_prunes_repo_scoped_rollups() {
     write_and_commit(&alpha, "README.md", "alpha\n", "initial alpha");
     write_and_commit(&beta, "README.md", "beta\n", "initial beta");
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -435,9 +490,13 @@ async fn remove_repository_prunes_repo_scoped_rollups() {
 #[tokio::test]
 async fn dashboard_and_achievements_ignore_stale_rollups_for_today_metrics_and_current_streak() {
     let temp = tempdir().unwrap();
+
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await
@@ -447,7 +506,7 @@ async fn dashboard_and_achievements_ignore_stale_rollups_for_today_metrics_and_c
     sqlx::query(
         "INSERT INTO daily_rollups (
             scope, day, live_additions, live_deletions, commits, focus_minutes, score
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7)",
     )
     .bind("all")
     .bind(stale_day)
@@ -480,10 +539,15 @@ async fn bootstrap_with_missing_monitored_repo_disables_it_instead_of_failing() 
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let db_url = create_test_db().await;
+
     let repo_id = {
+        let mut config = config_with_test_author();
+        config.database_url = db_url.clone();
+
         let runtime = GitPulseRuntime::bootstrap_in(
             test_paths(temp.path()),
-            config_with_test_author(),
+            config,
             BootstrapOptions { port_override: None, start_background_tasks: false },
         )
         .await
@@ -495,9 +559,12 @@ async fn bootstrap_with_missing_monitored_repo_disables_it_instead_of_failing() 
 
     std::fs::remove_dir_all(&repo).unwrap();
 
+    let mut config = config_with_test_author();
+    config.database_url = db_url;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: true },
     )
     .await
@@ -516,9 +583,12 @@ async fn refresh_with_missing_repo_disables_it_instead_of_erroring() {
     init_repo(&repo);
     write_and_commit(&repo, "README.md", "hello\n", "initial");
 
+    let mut config = config_with_test_author();
+    config.database_url = create_test_db().await;
+
     let runtime = GitPulseRuntime::bootstrap_in(
         test_paths(temp.path()),
-        config_with_test_author(),
+        config,
         BootstrapOptions { port_override: None, start_background_tasks: false },
     )
     .await

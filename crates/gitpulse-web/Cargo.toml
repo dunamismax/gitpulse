@@ -19,5 +19,7 @@ tracing.workspace = true
 
 [dev-dependencies]
 gitpulse-infra = { version = "0.1.0", path = "../gitpulse-infra" }
+sqlx.workspace = true
 tempfile.workspace = true
 tower = "0.5.2"
+uuid.workspace = true

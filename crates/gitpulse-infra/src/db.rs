@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, NaiveDate, Utc};
@@ -8,15 +8,16 @@ use gitpulse_core::{
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sqlx::{
-    Row, SqlitePool,
-    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    Row,
+    postgres::{PgConnectOptions, PgPoolOptions},
 };
+use sqlx::PgPool;
 use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct DatabasePaths {
-    pub file: PathBuf,
+    pub url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -35,33 +36,29 @@ pub struct PersistedAchievement {
 
 #[derive(Clone)]
 pub struct Database {
-    pool: SqlitePool,
+    pool: PgPool,
 }
 
 impl Database {
     pub async fn connect(paths: &DatabasePaths) -> Result<Self> {
-        if let Some(parent) = paths.file.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
+        let options: PgConnectOptions = paths.url.parse().with_context(|| {
+            format!("invalid database URL: {}", paths.url)
+        })?;
 
-        let options = SqliteConnectOptions::new().filename(&paths.file).create_if_missing(true);
-        let pool =
-            SqlitePoolOptions::new().max_connections(8).connect_with(options).await.with_context(
-                || format!("failed to connect to database at {}", paths.file.display()),
-            )?;
-
-        sqlx::query("PRAGMA journal_mode = WAL;").execute(&pool).await?;
-        sqlx::query("PRAGMA synchronous = NORMAL;").execute(&pool).await?;
-        sqlx::query("PRAGMA foreign_keys = ON;").execute(&pool).await?;
+        let pool = PgPoolOptions::new()
+            .max_connections(8)
+            .connect_with(options)
+            .await
+            .with_context(|| format!("failed to connect to database at {}", paths.url))?;
 
         let migration_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
         sqlx::migrate::Migrator::new(migration_root.as_path()).await?.run(&pool).await?;
 
-        info!(database = %paths.file.display(), "database ready");
+        info!(database = %paths.url, "database ready");
         Ok(Self { pool })
     }
 
-    pub fn pool(&self) -> &SqlitePool {
+    pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
@@ -77,8 +74,8 @@ impl Database {
         let value_json = serde_json::to_string(value)?;
         sqlx::query(
             "INSERT INTO settings (key, value_json, updated_at_utc)
-             VALUES (?1, ?2, ?3)
-             ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at_utc = excluded.updated_at_utc",
+             VALUES ($1, $2, $3)
+             ON CONFLICT (key) DO UPDATE SET value_json = EXCLUDED.value_json, updated_at_utc = EXCLUDED.updated_at_utc",
         )
         .bind(key)
         .bind(value_json)
@@ -89,7 +86,7 @@ impl Database {
     }
 
     pub async fn load_json_setting<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
-        let row = sqlx::query("SELECT value_json FROM settings WHERE key = ?1")
+        let row = sqlx::query("SELECT value_json FROM settings WHERE key = $1")
             .bind(key)
             .fetch_optional(&self.pool)
             .await?;
@@ -104,8 +101,8 @@ impl Database {
         let id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO tracked_targets (id, path, kind, created_at_utc)
-             VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(path) DO UPDATE SET kind = excluded.kind",
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (path) DO UPDATE SET kind = EXCLUDED.kind",
         )
         .bind(id)
         .bind(path)
@@ -114,7 +111,7 @@ impl Database {
         .execute(&self.pool)
         .await?;
 
-        let existing_id = sqlx::query("SELECT id FROM tracked_targets WHERE path = ?1")
+        let existing_id = sqlx::query("SELECT id FROM tracked_targets WHERE path = $1")
             .bind(path)
             .fetch_one(&self.pool)
             .await?
@@ -123,7 +120,7 @@ impl Database {
     }
 
     pub async fn mark_target_scanned(&self, target_id: Uuid) -> Result<()> {
-        sqlx::query("UPDATE tracked_targets SET last_scan_at_utc = ?2 WHERE id = ?1")
+        sqlx::query("UPDATE tracked_targets SET last_scan_at_utc = $2 WHERE id = $1")
             .bind(target_id)
             .bind(Utc::now())
             .execute(&self.pool)
@@ -140,7 +137,7 @@ impl Database {
         default_branch: Option<&str>,
     ) -> Result<Repository> {
         let now = Utc::now();
-        let repo_id = sqlx::query("SELECT id FROM repositories WHERE root_path = ?1")
+        let repo_id = sqlx::query("SELECT id FROM repositories WHERE root_path = $1")
             .bind(root_path)
             .fetch_optional(&self.pool)
             .await?
@@ -150,13 +147,13 @@ impl Database {
         sqlx::query(
             "INSERT INTO repositories (
                 id, target_id, name, root_path, remote_url, default_branch, created_at_utc, updated_at_utc, state
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active')
-             ON CONFLICT(root_path) DO UPDATE SET
-                target_id = excluded.target_id,
-                name = excluded.name,
-                remote_url = excluded.remote_url,
-                default_branch = excluded.default_branch,
-                updated_at_utc = excluded.updated_at_utc,
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+             ON CONFLICT (root_path) DO UPDATE SET
+                target_id = EXCLUDED.target_id,
+                name = EXCLUDED.name,
+                remote_url = EXCLUDED.remote_url,
+                default_branch = EXCLUDED.default_branch,
+                updated_at_utc = EXCLUDED.updated_at_utc,
                 state = 'active'",
         )
         .bind(repo_id)
@@ -186,7 +183,7 @@ impl Database {
     pub async fn get_repository(&self, repo_id: Uuid) -> Result<Repository> {
         let row = sqlx::query(
             "SELECT id, name, root_path, remote_url, default_branch, is_monitored, state, created_at_utc, updated_at_utc, last_error
-             FROM repositories WHERE id = ?1",
+             FROM repositories WHERE id = $1",
         )
         .bind(repo_id)
         .fetch_one(&self.pool)
@@ -197,7 +194,7 @@ impl Database {
     pub async fn find_repository(&self, selector: &str) -> Result<Option<Repository>> {
         let row = sqlx::query(
             "SELECT id, name, root_path, remote_url, default_branch, is_monitored, state, created_at_utc, updated_at_utc, last_error
-             FROM repositories WHERE id = ?1 OR name = ?1 OR root_path = ?1 LIMIT 1",
+             FROM repositories WHERE id::text = $1 OR name = $1 OR root_path = $1 LIMIT 1",
         )
         .bind(selector)
         .fetch_optional(&self.pool)
@@ -218,8 +215,8 @@ impl Database {
         };
         sqlx::query(
             "UPDATE repositories
-             SET state = ?2, is_monitored = ?3, updated_at_utc = ?4
-             WHERE id = ?1",
+             SET state = $2, is_monitored = $3, updated_at_utc = $4
+             WHERE id = $1",
         )
         .bind(repo_id)
         .bind(state)
@@ -238,8 +235,8 @@ impl Database {
     ) -> Result<()> {
         sqlx::query(
             "UPDATE repositories
-             SET include_patterns_json = ?2, exclude_patterns_json = ?3, updated_at_utc = ?4
-             WHERE id = ?1",
+             SET include_patterns_json = $2, exclude_patterns_json = $3, updated_at_utc = $4
+             WHERE id = $1",
         )
         .bind(repo_id)
         .bind(serde_json::to_string(include)?)
@@ -252,7 +249,7 @@ impl Database {
 
     pub async fn repository_patterns(&self, repo_id: Uuid) -> Result<(Vec<String>, Vec<String>)> {
         let row = sqlx::query(
-            "SELECT include_patterns_json, exclude_patterns_json FROM repositories WHERE id = ?1",
+            "SELECT include_patterns_json, exclude_patterns_json FROM repositories WHERE id = $1",
         )
         .bind(repo_id)
         .fetch_one(&self.pool)
@@ -269,7 +266,7 @@ impl Database {
                 id, repo_id, observed_at_utc, branch, is_detached, head_sha, upstream_ref, upstream_head_sha,
                 ahead_count, behind_count, live_additions, live_deletions, live_files, staged_additions,
                 staged_deletions, staged_files, files_touched, repo_size_bytes, language_breakdown_json
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)",
         )
         .bind(snapshot.id)
         .bind(snapshot.repo_id)
@@ -297,7 +294,7 @@ impl Database {
 
     pub async fn latest_snapshot(&self, repo_id: Uuid) -> Result<Option<RepoStatusSnapshot>> {
         let row = sqlx::query(
-            "SELECT * FROM repo_status_snapshots WHERE repo_id = ?1 ORDER BY observed_at_utc DESC LIMIT 1",
+            "SELECT * FROM repo_status_snapshots WHERE repo_id = $1 ORDER BY observed_at_utc DESC LIMIT 1",
         )
         .bind(repo_id)
         .fetch_optional(&self.pool)
@@ -311,7 +308,7 @@ impl Database {
         limit: i64,
     ) -> Result<Vec<RepoStatusSnapshot>> {
         let rows = sqlx::query(
-            "SELECT * FROM repo_status_snapshots WHERE repo_id = ?1 ORDER BY observed_at_utc DESC LIMIT ?2",
+            "SELECT * FROM repo_status_snapshots WHERE repo_id = $1 ORDER BY observed_at_utc DESC LIMIT $2",
         )
         .bind(repo_id)
         .bind(limit)
@@ -330,7 +327,7 @@ impl Database {
         for (relative_path, additions, deletions, kind) in entries {
             sqlx::query(
                 "INSERT INTO file_activity_events (id, repo_id, observed_at_utc, relative_path, additions, deletions, kind)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
             )
             .bind(Uuid::new_v4())
             .bind(repo_id)
@@ -354,10 +351,10 @@ impl Database {
         let rows = sqlx::query(
             "SELECT relative_path, COUNT(*) AS touches
              FROM file_activity_events
-             WHERE repo_id = ?1
+             WHERE repo_id = $1
              GROUP BY relative_path
              ORDER BY touches DESC, relative_path ASC
-             LIMIT ?2",
+             LIMIT $2",
         )
         .bind(repo_id)
         .bind(limit)
@@ -390,7 +387,7 @@ impl Database {
              FROM file_activity_events f
              JOIN repositories r ON r.id = f.repo_id
              ORDER BY observed_at DESC
-             LIMIT ?1",
+             LIMIT $1",
         )
         .bind(limit)
         .fetch_all(&self.pool)
@@ -407,10 +404,11 @@ impl Database {
         let mut transaction = self.pool.begin().await?;
         for commit in commits {
             let result = sqlx::query(
-                "INSERT OR IGNORE INTO commit_events (
+                "INSERT INTO commit_events (
                     id, repo_id, commit_sha, authored_at_utc, author_name, author_email, summary, branch,
                     additions, deletions, files_changed, is_merge, imported_at_utc
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                 ON CONFLICT (repo_id, commit_sha) DO NOTHING",
             )
             .bind(commit.id)
             .bind(commit.repo_id)
@@ -442,14 +440,14 @@ impl Database {
     ) -> Result<Vec<CommitEvent>> {
         let rows = if let Some(repo_id) = repo_id {
             sqlx::query(
-                "SELECT * FROM commit_events WHERE repo_id = ?1 ORDER BY authored_at_utc DESC LIMIT ?2",
+                "SELECT * FROM commit_events WHERE repo_id = $1 ORDER BY authored_at_utc DESC LIMIT $2",
             )
             .bind(repo_id)
             .bind(limit)
             .fetch_all(&self.pool)
             .await?
         } else {
-            sqlx::query("SELECT * FROM commit_events ORDER BY authored_at_utc DESC LIMIT ?1")
+            sqlx::query("SELECT * FROM commit_events ORDER BY authored_at_utc DESC LIMIT $1")
                 .bind(limit)
                 .fetch_all(&self.pool)
                 .await?
@@ -462,7 +460,7 @@ impl Database {
         sqlx::query(
             "INSERT INTO push_events (
                 id, repo_id, observed_at_utc, kind, head_sha, pushed_commit_count, upstream_ref, notes
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         )
         .bind(push.id)
         .bind(push.repo_id)
@@ -486,13 +484,13 @@ impl Database {
         limit: i64,
     ) -> Result<Vec<PushEvent>> {
         let rows = if let Some(repo_id) = repo_id {
-            sqlx::query("SELECT * FROM push_events WHERE repo_id = ?1 ORDER BY observed_at_utc DESC LIMIT ?2")
+            sqlx::query("SELECT * FROM push_events WHERE repo_id = $1 ORDER BY observed_at_utc DESC LIMIT $2")
                 .bind(repo_id)
                 .bind(limit)
                 .fetch_all(&self.pool)
                 .await?
         } else {
-            sqlx::query("SELECT * FROM push_events ORDER BY observed_at_utc DESC LIMIT ?1")
+            sqlx::query("SELECT * FROM push_events ORDER BY observed_at_utc DESC LIMIT $1")
                 .bind(limit)
                 .fetch_all(&self.pool)
                 .await?
@@ -507,7 +505,7 @@ impl Database {
             sqlx::query(
                 "INSERT INTO focus_sessions (
                     id, started_at_utc, ended_at_utc, active_minutes, repo_ids_json, event_count, total_changed_lines
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7)",
             )
             .bind(session.id)
             .bind(session.started_at_utc)
@@ -525,7 +523,7 @@ impl Database {
 
     pub async fn list_focus_sessions(&self, limit: i64) -> Result<Vec<FocusSession>> {
         let rows =
-            sqlx::query("SELECT * FROM focus_sessions ORDER BY started_at_utc DESC LIMIT ?1")
+            sqlx::query("SELECT * FROM focus_sessions ORDER BY started_at_utc DESC LIMIT $1")
                 .bind(limit)
                 .fetch_all(&self.pool)
                 .await?;
@@ -542,7 +540,7 @@ impl Database {
                     scope, day, live_additions, live_deletions, staged_additions, staged_deletions,
                     committed_additions, committed_deletions, commits, pushes, focus_minutes, files_touched,
                     languages_touched, score
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
             )
             .bind(scope)
             .bind(rollup.day)
@@ -572,7 +570,7 @@ impl Database {
     ) -> Result<Vec<DailyRollup>> {
         let scope = repo_id.map(|id| id.to_string()).unwrap_or_else(|| "all".into());
         let rows =
-            sqlx::query("SELECT * FROM daily_rollups WHERE scope = ?1 ORDER BY day DESC LIMIT ?2")
+            sqlx::query("SELECT * FROM daily_rollups WHERE scope = $1 ORDER BY day DESC LIMIT $2")
                 .bind(scope)
                 .bind(days)
                 .fetch_all(&self.pool)
@@ -585,7 +583,7 @@ impl Database {
         sqlx::query("DELETE FROM achievements").execute(&mut *transaction).await?;
         for achievement in achievements {
             sqlx::query(
-                "INSERT INTO achievements (kind, unlocked_at_utc, day, reason) VALUES (?1, ?2, ?3, ?4)",
+                "INSERT INTO achievements (kind, unlocked_at_utc, day, reason) VALUES ($1, $2, $3, $4)",
             )
             .bind(achievement.kind.title())
             .bind(Utc::now())
@@ -614,7 +612,7 @@ impl Database {
     }
 }
 
-fn map_repository_row(row: sqlx::sqlite::SqliteRow) -> Result<Repository> {
+fn map_repository_row(row: sqlx::postgres::PgRow) -> Result<Repository> {
     Ok(Repository {
         id: row.get("id"),
         name: row.get("name"),
@@ -633,7 +631,7 @@ fn map_repository_row(row: sqlx::sqlite::SqliteRow) -> Result<Repository> {
     })
 }
 
-fn map_snapshot_row(row: sqlx::sqlite::SqliteRow) -> Result<RepoStatusSnapshot> {
+fn map_snapshot_row(row: sqlx::postgres::PgRow) -> Result<RepoStatusSnapshot> {
     Ok(RepoStatusSnapshot {
         id: row.get("id"),
         repo_id: row.get("repo_id"),
@@ -661,7 +659,7 @@ fn map_snapshot_row(row: sqlx::sqlite::SqliteRow) -> Result<RepoStatusSnapshot> 
     })
 }
 
-fn map_commit_row(row: sqlx::sqlite::SqliteRow) -> Result<CommitEvent> {
+fn map_commit_row(row: sqlx::postgres::PgRow) -> Result<CommitEvent> {
     Ok(CommitEvent {
         id: row.get("id"),
         repo_id: row.get("repo_id"),
@@ -679,7 +677,7 @@ fn map_commit_row(row: sqlx::sqlite::SqliteRow) -> Result<CommitEvent> {
     })
 }
 
-fn map_push_row(row: sqlx::sqlite::SqliteRow) -> Result<PushEvent> {
+fn map_push_row(row: sqlx::postgres::PgRow) -> Result<PushEvent> {
     Ok(PushEvent {
         id: row.get("id"),
         repo_id: row.get("repo_id"),
@@ -695,7 +693,7 @@ fn map_push_row(row: sqlx::sqlite::SqliteRow) -> Result<PushEvent> {
     })
 }
 
-fn map_session_row(row: sqlx::sqlite::SqliteRow) -> Result<FocusSession> {
+fn map_session_row(row: sqlx::postgres::PgRow) -> Result<FocusSession> {
     Ok(FocusSession {
         id: row.get("id"),
         started_at_utc: row.get("started_at_utc"),
@@ -707,7 +705,7 @@ fn map_session_row(row: sqlx::sqlite::SqliteRow) -> Result<FocusSession> {
     })
 }
 
-fn map_rollup_row(row: sqlx::sqlite::SqliteRow) -> Result<DailyRollup> {
+fn map_rollup_row(row: sqlx::postgres::PgRow) -> Result<DailyRollup> {
     let scope: String = row.get("scope");
     Ok(DailyRollup {
         repo_id: if scope == "all" { None } else { Some(Uuid::parse_str(scope.as_str())?) },

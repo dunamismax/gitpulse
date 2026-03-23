@@ -9,7 +9,6 @@ pub struct AppPaths {
     pub data_dir: PathBuf,
     pub log_dir: PathBuf,
     pub config_file: PathBuf,
-    pub database_file: PathBuf,
 }
 
 impl AppPaths {
@@ -20,8 +19,7 @@ impl AppPaths {
         let data_dir = project.data_dir().to_path_buf();
         let log_dir = project.data_local_dir().join("logs");
         let config_file = config_dir.join("gitpulse.toml");
-        let database_file = data_dir.join("gitpulse.sqlite3");
-        Ok(Self { config_dir, data_dir, log_dir, config_file, database_file })
+        Ok(Self { config_dir, data_dir, log_dir, config_file })
     }
 
     pub fn ensure(&self) -> Result<()> {
