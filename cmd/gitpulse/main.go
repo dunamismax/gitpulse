@@ -85,10 +85,10 @@ func serveCmd(cfgFile *string) *cobra.Command {
 				host = cfg.Server.Host
 			}
 
-			// Locate web assets relative to the binary or cwd.
-			templatesDir, assetsDir, frontendDir := locateWebDirs()
+			// Locate the built SPA relative to the binary or cwd.
+			spaDir := locateSPADir()
 
-			srv, err := web.New(rt, templatesDir, assetsDir, *cfgFile, frontendDir)
+			srv, err := web.New(rt, *cfgFile, spaDir)
 			if err != nil {
 				return fmt.Errorf("create server: %w", err)
 			}
@@ -303,20 +303,18 @@ func doctorCmd(cfgFile *string) *cobra.Command {
 	}
 }
 
-// locateWebDirs finds the legacy templates/assets directories and the built
-// Astro frontend output relative to the working directory or binary.
-func locateWebDirs() (templatesDir, assetsDir, frontendDir string) {
+// locateSPADir finds the built React SPA output relative to the working
+// directory or binary.
+func locateSPADir() string {
 	cwd, _ := os.Getwd()
-	tDir := filepath.Join(cwd, "templates")
-	aDir := filepath.Join(cwd, "assets")
-	fDir := filepath.Join(cwd, "frontend", "dist")
-	if _, err := os.Stat(tDir); err == nil {
-		return tDir, aDir, fDir
+	cwdDir := filepath.Join(cwd, "web", "dist")
+	if _, err := os.Stat(filepath.Join(cwdDir, "index.html")); err == nil {
+		return cwdDir
 	}
 
 	exe, _ := os.Executable()
 	base := filepath.Dir(exe)
-	return filepath.Join(base, "templates"), filepath.Join(base, "assets"), filepath.Join(base, "frontend", "dist")
+	return filepath.Join(base, "web", "dist")
 }
 
 // displayDatabasePath normalizes empty database paths for diagnostic output.

@@ -16,7 +16,7 @@ The active stack is:
 Storage doctrine for this repo:
 
 - SQLite is the implemented default
-- Go owns persistence; the React SPA frontend is an operator surface, not the system of record
+- Go owns persistence; the React SPA is an operator surface, not the system of record
 - keep data relational and local-first
 - keep plain SQL unless backend complexity later earns `sqlc`
 
@@ -50,7 +50,7 @@ Storage doctrine for this repo:
                      └───────┬────────┘
                              │
                      ┌───────▼────────┐
-                     │ frontend/      │
+                     │ web/           │
                      │ React + Vite   │
                      └────────────────┘
 ```
@@ -61,9 +61,9 @@ Storage doctrine for this repo:
 
 Cobra CLI entrypoint. Owns command wiring only.
 
-### `frontend`
+### `web`
 
-React SPA with Vite build, TanStack Router routes, TanStack Query data fetching, Tailwind CSS styling, and Biome linting. Builds to `frontend/dist`.
+React SPA with Vite build, TanStack Router routes, TanStack Query data fetching, Tailwind CSS styling, and Biome linting. Builds to `web/dist`.
 
 ### `internal/config`
 
@@ -87,7 +87,7 @@ Score, streak, and achievement logic.
 
 ### `internal/models`
 
-Shared data structures passed between runtime, DB, JSON API, and frontend.
+Shared data structures passed between runtime, DB, JSON API, and the browser UI.
 
 ### `internal/runtime`
 
@@ -99,7 +99,7 @@ Sessionization logic over activity points.
 
 ### `internal/web`
 
-`net/http` handlers, JSON endpoints, SPA frontend serving with catch-all fallback, and temporary legacy template fallback.
+`net/http` handlers, JSON endpoints, and SPA serving.
 
 ## Data flow
 
@@ -107,7 +107,7 @@ Sessionization logic over activity points.
 2. `internal/git` discovers git roots and probes repo metadata.
 3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, and achievements.
 4. `internal/runtime` rebuilds derived analytics from raw events.
-5. `internal/web` exposes JSON endpoints and serves the built SPA with a catch-all fallback to `index.html` for client-side routing.
+5. `internal/web` exposes JSON endpoints and serves the built SPA with an `index.html` catch-all for client-side routing.
 6. The React SPA fetches those JSON endpoints via TanStack Query and renders the operator workflow in the browser.
 
 ## Persistence model

@@ -14,7 +14,7 @@ The repository currently centers on:
 
 - Go runtime and CLI
 - SQLite persistence with plain SQL
-- a local browser dashboard built with Astro and served by the Go runtime
+- a local browser dashboard built as a React SPA and served by the Go runtime
 
 Near-term roadmap decisions:
 

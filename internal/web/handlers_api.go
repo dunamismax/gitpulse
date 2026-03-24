@@ -39,26 +39,6 @@ func (s *Server) handleAPIDashboard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, view)
 }
 
-func (s *Server) handleAPIDashboardSummary(w http.ResponseWriter, r *http.Request) {
-	view, err := s.rt.DashboardView(r.Context())
-	if err != nil {
-		slog.Error("api dashboard summary", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	writeJSON(w, http.StatusOK, view.Summary)
-}
-
-func (s *Server) handleAPIDashboardFeed(w http.ResponseWriter, r *http.Request) {
-	view, err := s.rt.DashboardView(r.Context())
-	if err != nil {
-		slog.Error("api dashboard feed", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	writeJSON(w, http.StatusOK, view.ActivityFeed)
-}
-
 func (s *Server) handleAPIRepositories(w http.ResponseWriter, r *http.Request) {
 	cards, err := s.rt.RepositoryCards(r.Context())
 	if err != nil {

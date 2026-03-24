@@ -92,7 +92,7 @@ See [gitpulse.example.toml](gitpulse.example.toml) for the full config surface.
 ### Build and run
 
 ```bash
-cd frontend && bun install && bun run build
+cd web && bun install && bun run build
 cd ..
 go test ./...
 go run ./cmd/gitpulse serve
@@ -100,20 +100,20 @@ go run ./cmd/gitpulse serve
 
 Then open <http://127.0.0.1:7467>.
 
-The Go server serves the built SPA from `frontend/dist`. If that build output is missing, the repo still contains the older Go template path as a temporary fallback during the transition.
+The Go server serves the built SPA from `web/dist`. Build the SPA before starting `gitpulse serve`.
 
 ### Frontend development
 
 ```bash
-cd frontend
+cd web
 bun install
 bun run dev
 ```
 
-For the Go server to use the SPA, build the frontend first:
+For the Go server to use the SPA, build the browser UI first:
 
 ```bash
-cd frontend
+cd web
 bun run build
 ```
 
@@ -152,7 +152,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ```text
 .
 ├── cmd/gitpulse/              # Cobra CLI entrypoint
-├── frontend/                  # Bun + React + Vite + TypeScript SPA
+├── web/                       # Bun + React + Vite + TypeScript SPA
 ├── internal/config/           # Config loading and platform paths
 ├── internal/db/               # SQLite connection + plain SQL queries + schema embed
 ├── internal/filter/           # Include/exclude path matching
@@ -162,8 +162,6 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── internal/runtime/          # Orchestration and view assembly
 ├── internal/sessions/         # Sessionization logic
 ├── internal/web/              # net/http handlers, JSON API routes, and SPA serving
-├── templates/                 # Legacy Go template fallback during frontend transition
-├── assets/                    # Legacy static asset fallback during frontend transition
 ├── migrations/                # SQLite migration files
 ├── docs/architecture.md       # Current architecture notes
 ├── BUILD.md                   # Execution manual and verification log
@@ -172,7 +170,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 
 ## Verification
 
-- `cd frontend && bun run build`
+- `cd web && bun run build`
 - `go test ./...`
 - `go build ./cmd/gitpulse`
 - `go run ./cmd/gitpulse --help`

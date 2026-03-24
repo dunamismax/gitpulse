@@ -1,6 +1,6 @@
 # Contributing to GitPulse
 
-GitPulse is an active Go application with a Bun/Astro frontend. Read [BUILD.md](BUILD.md) first, then [docs/architecture.md](docs/architecture.md).
+GitPulse is an active Go application with a Bun + React + Vite browser UI. Read [BUILD.md](BUILD.md) first, then [docs/architecture.md](docs/architecture.md).
 
 ## Development setup
 
@@ -15,7 +15,7 @@ GitPulse is an active Go application with a Bun/Astro frontend. Read [BUILD.md](
 ```bash
 git clone https://github.com/dunamismax/gitpulse.git
 cd gitpulse
-cd frontend && bun install && bun run build
+cd web && bun install && bun run build
 cd ..
 go test ./...
 go build ./cmd/gitpulse
@@ -36,12 +36,12 @@ See [gitpulse.example.toml](gitpulse.example.toml) for the full config surface.
 
 ## Architecture rules
 
-GitPulse uses a Go-first backend with an Astro browser frontend.
+GitPulse uses a Go-first backend with a React + Vite SPA browser UI.
 
 | Path | Owns |
 |------|------|
 | `cmd/gitpulse` | CLI command wiring |
-| `frontend` | Astro pages, layout, styles, and browser-side TypeScript/Alpine |
+| `web` | React + Vite SPA source, routing, styles, and browser-side TypeScript |
 | `internal/config` | config loading and platform paths |
 | `internal/db` | SQLite connection, schema, migrations, and plain SQL queries |
 | `internal/filter` | include/exclude matching |
@@ -50,13 +50,13 @@ GitPulse uses a Go-first backend with an Astro browser frontend.
 | `internal/models` | shared data and API/view structs |
 | `internal/runtime` | orchestration and view assembly |
 | `internal/sessions` | sessionization |
-| `internal/web` | HTTP handlers, JSON API, and frontend serving |
+| `internal/web` | HTTP handlers, JSON API, and SPA serving |
 
 Rules:
 
 - New backend implementation work goes in Go.
-- Astro owns the browser page/layout lane.
-- Alpine handles light browser interaction; avoid heavy hydration unless it clearly earns its keep.
+- React + Vite own the browser page and routing lane.
+- TanStack Router handles client-side navigation, and TanStack Query handles server-state fetching.
 - Keep persistence relational, local, and Go-owned.
 - Keep plain SQL explicit in `internal/db`.
 - Keep repo-controlled strings treated as untrusted input.
@@ -68,7 +68,7 @@ Rules:
 Run the narrowest useful checks first:
 
 ```bash
-cd frontend && bun run build
+cd web && bun run build
 cd ..
 go test ./...
 go build ./cmd/gitpulse

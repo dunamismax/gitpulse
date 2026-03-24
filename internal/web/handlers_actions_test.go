@@ -1,18 +1,18 @@
 package web
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/dunamismax/gitpulse/internal/config"
 	gitruntime "github.com/dunamismax/gitpulse/internal/runtime"
 )
 
-func TestHandleSettingsSavePersistsConfig(t *testing.T) {
+func TestHandleAPISettingsSavePersistsConfig(t *testing.T) {
 	t.Parallel()
 
 	token := "keep-me"
@@ -62,37 +62,39 @@ func TestHandleSettingsSavePersistsConfig(t *testing.T) {
 
 	cfgFile := filepath.Join(t.TempDir(), "gitpulse.toml")
 	srv := &Server{
+		mux:        http.NewServeMux(),
 		rt:         rt,
 		configFile: cfgFile,
 	}
 
-	form := url.Values{
-		"authors":                     {"old@example.com\nnew@example.com\nold@example.com"},
-		"changed_lines_per_day":       {"321"},
-		"commits_per_day":             {"5"},
-		"focus_minutes_per_day":       {"135"},
-		"timezone":                    {"America/Chicago"},
-		"day_boundary_minutes":        {"45"},
-		"session_gap_minutes":         {"25"},
-		"import_days":                 {"14"},
-		"include_patterns":            {"cmd/**\ndocs/**"},
-		"exclude_patterns":            {".git/**\ndist/**"},
-		"github_enabled":              {"on"},
-		"github_verify_remote_pushes": {"on"},
-		"github_token":                {""},
+	body := map[string]any{
+		"authors":                     []string{"old@example.com", "new@example.com"},
+		"changed_lines_per_day":       321,
+		"commits_per_day":             5,
+		"focus_minutes_per_day":       135,
+		"timezone":                    "America/Chicago",
+		"day_boundary_minutes":        45,
+		"session_gap_minutes":         25,
+		"import_days":                 14,
+		"include_patterns":            []string{"cmd/**", "docs/**"},
+		"exclude_patterns":            []string{".git/**", "dist/**"},
+		"github_enabled":              true,
+		"github_verify_remote_pushes": true,
+		"github_token":                "",
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/settings", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := httptest.NewRequest(http.MethodPost, "/api/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	srv.handleSettingsSave(rec, req)
+	srv.handleAPISettingsSave(rec, req)
 
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
-	}
-	if got := rec.Header().Get("Location"); got != "/settings?saved=1" {
-		t.Fatalf("redirect = %q, want %q", got, "/settings?saved=1")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
 	loaded, err := config.Load(cfgFile)

@@ -1,5 +1,5 @@
 {
-  "name": "gitpulse-frontend",
+  "name": "gitpulse-web",
   "private": true,
   "type": "module",
   "scripts": {

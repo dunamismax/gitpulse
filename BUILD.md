@@ -25,7 +25,7 @@ Product rules:
 - all persisted state stays local
 - relational data stays the default
 - SQLite is the active storage layer
-- Go owns the persistence layer; the React SPA frontend is an operator surface, not the system of record
+- Go owns the persistence layer; the React SPA is an operator surface, not the system of record
 - plain SQL stays explicit and inspectable unless backend complexity later earns `sqlc`
 - CLI and local web UI share one runtime
 
@@ -33,7 +33,7 @@ Product rules:
 
 ## Current repo snapshot
 
-Last reviewed: 2026-03-23
+Last reviewed: 2026-03-24
 Branch: `main`
 Host used for this pass: macOS
 
@@ -43,7 +43,7 @@ The active implementation lives in:
 
 - `go.mod`
 - `cmd/gitpulse/`
-- `frontend/`
+- `web/`
 - `internal/config/`
 - `internal/db/`
 - `internal/filter/`
@@ -55,23 +55,18 @@ The active implementation lives in:
 - `internal/web/`
 - `migrations/`
 
-Transition-only fallback paths still present:
-
-- `templates/`
-- `assets/`
 
 ### Implementation status
 
-What is done in the current Go + Astro path:
+What is done in the current Go + SPA path:
 
 - Cobra CLI with `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
 - SQLite connection setup, embedded schema, and plain SQL query files
 - git subprocess helpers for repo discovery, snapshot parsing, and history import
 - analytics rebuild flow for sessions, rollups, streaks, score, and achievements
 - `net/http` server with JSON API routes for dashboard, repositories, repository detail, sessions, achievements, and settings
-- Bun + TypeScript + React + Vite SPA under `frontend/` with TanStack Router, TanStack Query, Tailwind CSS, and Biome
-- Go server wiring that serves the built SPA from `frontend/dist` with catch-all fallback
-- legacy Go template rendering still available as a fallback when the SPA build output is missing
+- Bun + TypeScript + React + Vite SPA under `web/` with TanStack Router, TanStack Query, Tailwind CSS, and Biome
+- Go server wiring that serves the built SPA from `web/dist` with a client-side routing catch-all
 
 What is not done yet:
 
@@ -88,8 +83,8 @@ What is not done yet:
 | `BUILD.md` | execution truth, verification log, next steps |
 | `README.md` | public-facing project status and local run instructions |
 | `AGENTS.md` | concise repo memory for future agents |
-| `docs/architecture.md` | active Go + Astro architecture |
-| `frontend/` | browser UI source (React + Vite SPA), build output in `dist/` |
+| `docs/architecture.md` | active Go + SPA architecture |
+| `web/` | browser UI source (React + Vite SPA), build output in `dist/` |
 | `gitpulse.example.toml` | config surface for the Go runtime |
 | `internal/db/schema.sql` | embedded startup schema |
 | `migrations/` | repo-visible SQL migration history |
@@ -131,7 +126,7 @@ path = "/absolute/path/to/gitpulse.db"
 ### Local commands
 
 ```bash
-cd frontend && bun install && bun run build
+cd web && bun install && bun run build
 cd ..
 go test ./...
 go run ./cmd/gitpulse serve
@@ -145,7 +140,7 @@ go run ./cmd/gitpulse doctor
 ### Frontend-only development
 
 ```bash
-cd frontend
+cd web
 bun install
 bun run dev
 bun run build
@@ -154,7 +149,7 @@ bun run build
 ### CI commands
 
 ```bash
-cd frontend && bun install && bun run build
+cd web && bun install && bun run build
 cd ..
 go test ./...
 go build ./cmd/gitpulse
@@ -166,9 +161,18 @@ go build ./cmd/gitpulse
 
 Only record commands that actually passed.
 
-### Verified on 2026-03-23
+### Verified on 2026-03-24
 
-- `cd frontend && bun run build`
+- `cd web && bun run build`
+- `go test ./internal/web ./cmd/gitpulse/...`
+- `cd web && bun run check`
+- `cd web && bun run test`
+- `go test ./...`
+- `go build ./cmd/gitpulse`
+
+### Previously verified on 2026-03-23
+
+- `cd web && bun run build`
 - `go mod tidy`
 - `go test ./...`
 - `go build ./cmd/gitpulse`
@@ -193,7 +197,7 @@ Checklist:
 - [x] CLI commands for `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
 - [x] SQLite-backed storage and analytics rebuild path
 - [x] React SPA dashboard pages backed by Go JSON endpoints
-- [x] top-level docs aligned with the active runtime and frontend lane
+- [x] top-level docs aligned with the active runtime and browser UI lane
 
 ### Phase 2 — operator-ready verification
 
