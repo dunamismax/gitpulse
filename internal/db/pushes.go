@@ -49,7 +49,6 @@ func ListPushEvents(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit in
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanPushes(rows)
 }
 
@@ -63,11 +62,16 @@ func AllPushEventsForAnalytics(ctx context.Context, db *sql.DB) ([]models.PushEv
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanPushes(rows)
 }
 
-func scanPushes(rows *sql.Rows) ([]models.PushEvent, error) {
+func scanPushes(rows *sql.Rows) (_ []models.PushEvent, err error) {
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close push rows: %w", closeErr)
+		}
+	}()
+
 	var pushes []models.PushEvent
 	for rows.Next() {
 		var p models.PushEvent
@@ -107,5 +111,8 @@ func scanPushes(rows *sql.Rows) ([]models.PushEvent, error) {
 
 		pushes = append(pushes, p)
 	}
-	return pushes, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return pushes, nil
 }

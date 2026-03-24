@@ -40,14 +40,14 @@ func InsertFileActivity(ctx context.Context, db *sql.DB, events []models.FileAct
 
 // TopFilesTouched returns the most frequently touched file paths. If repoID is
 // nil, the query is global.
-func TopFilesTouched(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit int) ([]string, error) {
+func TopFilesTouched(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit int) (_ []string, err error) {
 	var (
-		rows *sql.Rows
-		err  error
+		rows     *sql.Rows
+		queryErr error
 	)
 
 	if repoID != nil {
-		rows, err = db.QueryContext(ctx, `
+		rows, queryErr = db.QueryContext(ctx, `
 			SELECT relative_path
 			FROM file_activity_events
 			WHERE repo_id = ?
@@ -56,7 +56,7 @@ func TopFilesTouched(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit i
 			LIMIT ?
 		`, repoID.String(), limit)
 	} else {
-		rows, err = db.QueryContext(ctx, `
+		rows, queryErr = db.QueryContext(ctx, `
 			SELECT relative_path
 			FROM file_activity_events
 			GROUP BY relative_path
@@ -64,10 +64,14 @@ func TopFilesTouched(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit i
 			LIMIT ?
 		`, limit)
 	}
-	if err != nil {
-		return nil, err
+	if queryErr != nil {
+		return nil, queryErr
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close top files rows: %w", closeErr)
+		}
+	}()
 
 	var paths []string
 	for rows.Next() {
@@ -77,11 +81,14 @@ func TopFilesTouched(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit i
 		}
 		paths = append(paths, path)
 	}
-	return paths, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return paths, nil
 }
 
 // AllFileActivityForAnalytics loads all file activity events for a full rebuild.
-func AllFileActivityForAnalytics(ctx context.Context, db *sql.DB) ([]models.FileActivityEvent, error) {
+func AllFileActivityForAnalytics(ctx context.Context, db *sql.DB) (_ []models.FileActivityEvent, err error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT id, repo_id, observed_at_utc, relative_path, additions, deletions, kind
 		FROM file_activity_events
@@ -90,7 +97,11 @@ func AllFileActivityForAnalytics(ctx context.Context, db *sql.DB) ([]models.File
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close file activity rows: %w", closeErr)
+		}
+	}()
 
 	var events []models.FileActivityEvent
 	for rows.Next() {
@@ -125,5 +136,8 @@ func AllFileActivityForAnalytics(ctx context.Context, db *sql.DB) ([]models.File
 
 		events = append(events, e)
 	}
-	return events, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return events, nil
 }

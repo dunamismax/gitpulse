@@ -56,7 +56,6 @@ func ListRepositories(ctx context.Context, db *sql.DB) ([]models.Repository, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanRepos(rows)
 }
 
@@ -72,7 +71,6 @@ func GetRepository(ctx context.Context, db *sql.DB, id uuid.UUID) (*models.Repos
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	repos, err := scanRepos(rows)
 	if err != nil {
 		return nil, err
@@ -103,7 +101,6 @@ func FindRepository(ctx context.Context, db *sql.DB, selector string) (*models.R
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	repos, err := scanRepos(rows)
 	if err != nil {
 		return nil, err
@@ -153,7 +150,13 @@ func UpsertTrackedTarget(ctx context.Context, db *sql.DB, t models.TrackedTarget
 	return err
 }
 
-func scanRepos(rows *sql.Rows) ([]models.Repository, error) {
+func scanRepos(rows *sql.Rows) (_ []models.Repository, err error) {
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close repository rows: %w", closeErr)
+		}
+	}()
+
 	var repos []models.Repository
 	for rows.Next() {
 		var r models.Repository
@@ -215,5 +218,8 @@ func scanRepos(rows *sql.Rows) ([]models.Repository, error) {
 
 		repos = append(repos, r)
 	}
-	return repos, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return repos, nil
 }

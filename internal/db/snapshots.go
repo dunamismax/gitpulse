@@ -50,7 +50,6 @@ func LatestSnapshot(ctx context.Context, db *sql.DB, repoID uuid.UUID) (*models.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	snaps, err := scanSnapshots(rows)
 	if err != nil {
 		return nil, err
@@ -77,7 +76,6 @@ func RecentSnapshots(ctx context.Context, db *sql.DB, repoID uuid.UUID, limit in
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanSnapshots(rows)
 }
 
@@ -95,11 +93,16 @@ func AllSnapshotsForAnalytics(ctx context.Context, db *sql.DB) ([]models.RepoSta
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanSnapshots(rows)
 }
 
-func scanSnapshots(rows *sql.Rows) ([]models.RepoStatusSnapshot, error) {
+func scanSnapshots(rows *sql.Rows) (_ []models.RepoStatusSnapshot, err error) {
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close snapshot rows: %w", closeErr)
+		}
+	}()
+
 	var snaps []models.RepoStatusSnapshot
 	for rows.Next() {
 		var s models.RepoStatusSnapshot
@@ -151,5 +154,8 @@ func scanSnapshots(rows *sql.Rows) ([]models.RepoStatusSnapshot, error) {
 
 		snaps = append(snaps, s)
 	}
-	return snaps, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return snaps, nil
 }

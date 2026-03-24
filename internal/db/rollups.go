@@ -67,7 +67,6 @@ func ListDailyRollups(ctx context.Context, db *sql.DB, repoID *uuid.UUID, days i
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanRollups(rows)
 }
 
@@ -85,11 +84,16 @@ func AllRollupsForScope(ctx context.Context, db *sql.DB, scope string) ([]models
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanRollups(rows)
 }
 
-func scanRollups(rows *sql.Rows) ([]models.DailyRollup, error) {
+func scanRollups(rows *sql.Rows) (_ []models.DailyRollup, err error) {
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close rollup rows: %w", closeErr)
+		}
+	}()
+
 	var rollups []models.DailyRollup
 	for rows.Next() {
 		var r models.DailyRollup
@@ -105,5 +109,8 @@ func scanRollups(rows *sql.Rows) ([]models.DailyRollup, error) {
 		}
 		rollups = append(rollups, r)
 	}
-	return rollups, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return rollups, nil
 }

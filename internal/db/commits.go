@@ -79,7 +79,6 @@ func ListCommits(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit int) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanCommits(rows)
 }
 
@@ -94,11 +93,16 @@ func AllCommitsForAnalytics(ctx context.Context, db *sql.DB) ([]models.CommitEve
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	return scanCommits(rows)
 }
 
-func scanCommits(rows *sql.Rows) ([]models.CommitEvent, error) {
+func scanCommits(rows *sql.Rows) (_ []models.CommitEvent, err error) {
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close commit rows: %w", closeErr)
+		}
+	}()
+
 	var commits []models.CommitEvent
 	for rows.Next() {
 		var c models.CommitEvent
@@ -142,5 +146,8 @@ func scanCommits(rows *sql.Rows) ([]models.CommitEvent, error) {
 
 		commits = append(commits, c)
 	}
-	return commits, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return commits, nil
 }

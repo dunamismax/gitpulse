@@ -45,7 +45,7 @@ func ReplaceFocusSessions(ctx context.Context, db *sql.DB, sessions []models.Foc
 }
 
 // ListFocusSessions returns recent focus sessions ordered by start time descending.
-func ListFocusSessions(ctx context.Context, db *sql.DB, limit int) ([]models.FocusSession, error) {
+func ListFocusSessions(ctx context.Context, db *sql.DB, limit int) (_ []models.FocusSession, err error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT id, started_at_utc, ended_at_utc, active_minutes, repo_ids, event_count, total_changed_lines
 		FROM focus_sessions
@@ -55,7 +55,11 @@ func ListFocusSessions(ctx context.Context, db *sql.DB, limit int) ([]models.Foc
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close focus session rows: %w", closeErr)
+		}
+	}()
 
 	var sessions []models.FocusSession
 	for rows.Next() {
@@ -93,7 +97,10 @@ func ListFocusSessions(ctx context.Context, db *sql.DB, limit int) ([]models.Foc
 
 		sessions = append(sessions, s)
 	}
-	return sessions, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return sessions, nil
 }
 
 func uuidSliceToStrings(ids []uuid.UUID) []string {

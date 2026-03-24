@@ -10,7 +10,7 @@ import (
 
 // RecentActivityFeed returns the most recent activity across commits, pushes,
 // and file activity events, joined with repository names.
-func RecentActivityFeed(ctx context.Context, db *sql.DB, limit int) ([]models.ActivityFeedItem, error) {
+func RecentActivityFeed(ctx context.Context, db *sql.DB, limit int) (_ []models.ActivityFeedItem, err error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT kind, repo_name, observed_at, detail
 		FROM (
@@ -51,7 +51,11 @@ func RecentActivityFeed(ctx context.Context, db *sql.DB, limit int) ([]models.Ac
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close feed rows: %w", closeErr)
+		}
+	}()
 
 	var items []models.ActivityFeedItem
 	for rows.Next() {
@@ -67,5 +71,8 @@ func RecentActivityFeed(ctx context.Context, db *sql.DB, limit int) ([]models.Ac
 		item.Timestamp = parsed
 		items = append(items, item)
 	}
-	return items, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

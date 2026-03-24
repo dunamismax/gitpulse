@@ -35,7 +35,7 @@ func ReplaceAchievements(ctx context.Context, db *sql.DB, achievements []models.
 }
 
 // ListAchievements returns all unlocked achievements ordered by unlock time.
-func ListAchievements(ctx context.Context, db *sql.DB) ([]models.Achievement, error) {
+func ListAchievements(ctx context.Context, db *sql.DB) (_ []models.Achievement, err error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT kind, unlocked_at_utc, day, reason
 		FROM achievements
@@ -44,7 +44,11 @@ func ListAchievements(ctx context.Context, db *sql.DB) ([]models.Achievement, er
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close achievements rows: %w", closeErr)
+		}
+	}()
 
 	var achievements []models.Achievement
 	for rows.Next() {
@@ -65,5 +69,8 @@ func ListAchievements(ctx context.Context, db *sql.DB) ([]models.Achievement, er
 		a.UnlockedAt = parsed
 		achievements = append(achievements, a)
 	}
-	return achievements, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return achievements, nil
 }

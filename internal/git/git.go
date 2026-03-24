@@ -139,34 +139,6 @@ func parseNumstat(output string, f *filter.PathFilter) (models.DiffStats, []Touc
 	return stats, touched, nil
 }
 
-// countTextLines counts newlines in a text file. Returns 0 for files >= 1 MB
-// or files that appear to be binary.
-func countTextLines(path string) int {
-	const maxSize = 1 << 20 // 1 MB
-	info, err := os.Stat(path)
-	if err != nil || info.Size() > maxSize {
-		return 0
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return 0
-	}
-	if !isTextContent(data) {
-		return 0
-	}
-	return bytes.Count(data, []byte("\n"))
-}
-
-// isTextContent returns true if the content looks like text (no null bytes in
-// the first 512 bytes).
-func isTextContent(data []byte) bool {
-	sample := data
-	if len(sample) > 512 {
-		sample = sample[:512]
-	}
-	return !bytes.ContainsRune(sample, 0)
-}
-
 // GitVersion returns the installed git version string for diagnostics.
 func GitVersion(ctx context.Context) (string, error) {
 	out, err := run(ctx, ".", "version")

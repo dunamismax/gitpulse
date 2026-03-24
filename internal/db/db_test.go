@@ -21,7 +21,11 @@ func TestSQLiteBootstrapAndRepositoryRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Connect() error = %v", err)
 	}
-	defer handle.Close()
+	t.Cleanup(func() {
+		if err := handle.Close(); err != nil {
+			t.Fatalf("Close() error = %v", err)
+		}
+	})
 
 	if err := RunMigrations(ctx, handle); err != nil {
 		t.Fatalf("RunMigrations() error = %v", err)
