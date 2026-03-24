@@ -32,7 +32,7 @@ Product rules that stay locked unless the architecture really changes:
 
 ---
 
-## Current repo snapshot
+## Repo snapshot
 
 Last reviewed: 2026-03-24
 Branch: `main`
@@ -87,7 +87,7 @@ The repo is past the stack-churn phase. The highest-value work is now proving th
 
 ---
 
-## Source-of-truth map
+## Source-of-truth mapping
 
 | File | Owns |
 |------|------|
@@ -103,7 +103,7 @@ The repo is past the stack-churn phase. The highest-value work is now proving th
 
 ---
 
-## Build and run workflow
+## Build / run / verify
 
 ### Prerequisites
 
@@ -341,7 +341,7 @@ These are the real judgment points still hanging over the repo:
 
 ---
 
-## Recommended next move
+## Immediate next moves
 
 If only one substantial thing gets done next, make it this:
 
