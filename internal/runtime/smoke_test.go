@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -115,6 +116,13 @@ func newTestRuntime(t *testing.T) (*runtime.Runtime, *config.AppConfig) {
 	t.Cleanup(func() { rt.Close() })
 
 	return rt, cfg
+}
+
+func closeTestBody(t *testing.T, body io.Closer) {
+	t.Helper()
+	if err := body.Close(); err != nil {
+		t.Errorf("close response body: %v", err)
+	}
 }
 
 // TestSmokeOperatorLoop exercises the full add → import → rescan →
@@ -317,7 +325,7 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/dashboard: %v", err)
 	}
-	defer resp.Body.Close()
+	defer closeTestBody(t, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/dashboard status = %d, want 200", resp.StatusCode)
@@ -338,7 +346,7 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/repositories: %v", err)
 	}
-	defer resp2.Body.Close()
+	defer closeTestBody(t, resp2.Body)
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/repositories status = %d", resp2.StatusCode)
 	}
@@ -348,7 +356,7 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/sessions: %v", err)
 	}
-	defer resp3.Body.Close()
+	defer closeTestBody(t, resp3.Body)
 	if resp3.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/sessions status = %d", resp3.StatusCode)
 	}
@@ -358,7 +366,7 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/achievements: %v", err)
 	}
-	defer resp4.Body.Close()
+	defer closeTestBody(t, resp4.Body)
 	if resp4.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/achievements status = %d", resp4.StatusCode)
 	}
@@ -368,7 +376,7 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/repositories/{id}: %v", err)
 	}
-	defer resp5.Body.Close()
+	defer closeTestBody(t, resp5.Body)
 	if resp5.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/repositories/{id} status = %d", resp5.StatusCode)
 	}
