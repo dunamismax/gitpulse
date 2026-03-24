@@ -1,17 +1,25 @@
 # GitPulse
 
-Local-first git activity analytics for developers who want honest signals without uploading source code.
-
-GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a browser dashboard built with Bun, TypeScript, React, Vite, TanStack Router, TanStack Query, and Tailwind CSS.
-
 [![CI](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Status
+**Local-first git activity analytics for developers who want honest signals without uploading source code.**
 
-GitPulse is active and usable as a Go CLI plus local web dashboard.
+GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a browser dashboard built with Bun, TypeScript, React, Vite, TanStack Router, TanStack Query, and Tailwind CSS.
 
-Active stack:
+> **Status:** Active and usable today as a Go CLI plus local web dashboard. Broader add/import/rescan/rebuild smoke coverage, a background watcher, and packaged desktop releases are still ahead. See [BUILD.md](BUILD.md) for the execution ledger and next steps.
+
+## Why GitPulse?
+
+- **Local-first**: no source upload, no cloud dependency for core use
+- **Separate ledgers**: live work, committed work, and pushed work are not mashed into one fake metric
+- **Inspectable data**: the SQLite + plain SQL implementation keeps storage transparent
+- **Rebuildable analytics**: sessions, rollups, and achievements are derived from stored events
+- **Portable surface area**: CLI and browser dashboard share the same Go runtime
+
+## What Ships Today
+
+**Active stack**
 
 - Go 1.26.1
 - SQLite
@@ -26,7 +34,7 @@ Active stack:
 - Tailwind CSS + shadcn/ui patterns
 - Biome
 
-What exists today:
+**Implemented commands and surfaces**
 
 - `gitpulse serve` to start the local dashboard server
 - `gitpulse add <path>` to register a repo or discover repos under a folder
@@ -39,22 +47,6 @@ What exists today:
 - settings page writes the current configurable UI surface back to the active TOML config file
 - SQLite schema/query code for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings
 - sessionization, streak, score, and achievement logic in Go
-
-What is not finished yet:
-
-- broader repeatable add/import/rescan/rebuild smoke coverage captured in-repo
-- background watcher / continuous monitoring loop
-- packaged desktop release workflow
-
-For the execution ledger, verification history, and next steps, see [BUILD.md](BUILD.md).
-
-## Why GitPulse?
-
-- **Local-first**: no source upload, no cloud dependency for core use
-- **Separate ledgers**: live work, committed work, and pushed work are not mashed into one fake metric
-- **Inspectable data**: the SQLite + plain SQL implementation keeps storage transparent
-- **Rebuildable analytics**: sessions, rollups, and achievements are derived from stored events
-- **Portable surface area**: CLI and browser dashboard share the same Go runtime
 
 ## Quick start
 
@@ -136,7 +128,7 @@ go run ./cmd/gitpulse rebuild-rollups
 go run ./cmd/gitpulse doctor
 ```
 
-## Configuration paths
+## Configuration Paths
 
 Reported by `gitpulse doctor` and discovered by the Go runtime:
 
@@ -147,7 +139,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 - Linux data: `~/.config/gitpulse/data/gitpulse.db`
 - Windows data: `%APPDATA%\gitpulse\data\gitpulse.db`
 
-## Repository layout
+## Repository Layout
 
 ```text
 .
