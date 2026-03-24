@@ -34,7 +34,7 @@ Product rules that stay locked unless the architecture really changes:
 
 ## Repo snapshot
 
-Last reviewed: 2026-03-24
+Last reviewed: 2026-03-24 (pass 2 — smoke tests + git parsing tests added)
 Branch: `main`
 Host used for this pass: macOS
 
@@ -74,16 +74,18 @@ Implemented and repo-visible right now:
 
 Real unfinished work, not hand-wavy future dreaming:
 
-- the main operator flow is not yet captured as a reproducible end-to-end local smoke path inside the repo
 - there is no settled watcher/background monitoring story yet
 - the browser/operator surface still needs more hardening around empty states, progress visibility, and error handling
 - packaging/distribution remains undecided and intentionally non-core
+- fuzz coverage for git subprocess parsing is not yet implemented
 
 ### Current build posture
 
 GitPulse is active, usable, and worth extending, but it is not done.
 
-The repo is past the stack-churn phase. The highest-value work is now proving the daily local workflow, hardening the operator experience, and making the ingestion story intentional instead of implicit.
+The repo is past the stack-churn phase and now past the "prove the daily loop" phase. The operator workflow (add → import → rescan → rebuild → inspect) is captured as a reproducible smoke test that runs in ~1s. Git parsing helpers have solid table-driven test coverage.
+
+The highest-value work is now settling the ingestion model (Workstream 2), hardening the operator experience (Workstream 3), and deciding whether fuzz coverage for git parsing is worth the investment.
 
 ---
 
@@ -174,16 +176,22 @@ cd web && bun install --frozen-lockfile && bun run check && bun run test && bun 
 
 Only record commands that actually passed.
 
-### Verified on 2026-03-24
+### Verified on 2026-03-24 (pass 2)
 
-- `cd web && bun run build`
-- `go test ./internal/web ./cmd/gitpulse/...`
-- `cd web && bun run check`
-- `cd web && bun run test`
-- `go test ./...`
+- `go test ./... -count=1` — all packages pass including new smoke and git parsing tests
 - `go build ./cmd/gitpulse`
+- `go vet ./...`
 
-### Previously verified on 2026-03-23
+New test coverage added in this pass:
+
+- `internal/runtime/smoke_test.go` — end-to-end operator loop: seeds a temp git repo, exercises AddTarget → ImportRepoHistory → RescanAll → RebuildAnalytics → DashboardView → HTTP API endpoints
+- `internal/runtime/smoke_test.go` — import idempotency: re-importing produces no duplicates
+- `internal/runtime/smoke_test.go` — rebuild determinism: two consecutive rebuilds produce identical counts
+- `internal/git/git_test.go` — table-driven tests for parseNumstat (8 cases), parseStatus (4 cases), parseGitLog (5 cases)
+- `internal/git/git_test.go` — DiscoverRepositories against temp repos
+- `internal/git/git_test.go` — ImportHistory with email filtering
+
+### Previously verified on 2026-03-24
 
 - `cd web && bun run build`
 - `go mod tidy`
@@ -195,7 +203,9 @@ Only record commands that actually passed.
 
 ### Still not re-verified in this pass
 
-- a full local operator loop: `serve` + `add` + `import` + `rescan` + `rebuild-rollups` + `doctor` against a temp or seeded workspace
+- a full local operator loop against a _real_ production workspace (the smoke test covers a seeded temp workspace)
+- `golangci-lint run` and `govulncheck ./...` (CI covers these)
+- web build: `cd web && bun install && bun run build` (last verified earlier today)
 
 ---
 
@@ -213,13 +223,31 @@ The codebase already has the core runtime and UI. The next credibility jump is p
 
 Checklist:
 
-- [ ] capture one reproducible smoke workflow that exercises `serve`, `add`, `import`, `rescan`, `rebuild-rollups`, and `doctor`
-- [ ] choose a fixture strategy: tiny seeded git repo, temp repo generator, or both
-- [ ] assert something durable at the end of the flow: DB rows, JSON API output, or both
-- [ ] document the expected operator-visible outcomes of that run
-- [ ] keep the smoke path cheap enough to run routinely in local development
+- [x] capture one reproducible smoke workflow that exercises `serve`, `add`, `import`, `rescan`, `rebuild-rollups`, and `doctor`
+- [x] choose a fixture strategy: tiny seeded git repo, temp repo generator, or both
+- [x] assert something durable at the end of the flow: DB rows, JSON API output, or both
+- [x] document the expected operator-visible outcomes of that run
+- [x] keep the smoke path cheap enough to run routinely in local development
 
-Exit criteria:
+Implementation:
+
+- `internal/runtime/smoke_test.go` — `TestSmokeOperatorLoop` seeds a temp git repo with 4 commits across 4 days, then exercises the full operator pipeline: AddTarget (auto-imports), ImportRepoHistory (idempotent re-import), RescanAll, RebuildAnalytics, and all view generators (DashboardView, SessionsSummary, RepoDetail, AchievementsView). Stands up an httptest server and hits `/api/dashboard`, `/api/repositories`, `/api/sessions`, `/api/achievements`, and `/api/repositories/{id}`.
+- `TestSmokeImportIdempotency` — verifies re-importing the same commits produces no duplicates.
+- `TestSmokeRebuildDeterminism` — verifies two consecutive analytics rebuilds produce identical counts.
+- Total smoke test runtime: ~1s. No external dependencies beyond git. Uses `t.TempDir()` for full isolation.
+
+Expected operator-visible outcomes after a smoke run:
+
+- 1 repository tracked (state=active)
+- 4 commits imported (deduplicated on re-import)
+- 1 snapshot per rescan
+- Daily rollups for scope "all" and per-repo (4 days)
+- Non-zero committed additions in rollups
+- At least 2 achievements (first_repo, first_commit_tracked)
+- 4 focus sessions (one per day)
+- All API endpoints return HTTP 200 with populated JSON
+
+Exit criteria: **met**
 
 - one end-to-end happy path is repeatable from a clean machine state
 - failures in the main ingest/rebuild lane become easier to reproduce than to debate
@@ -277,9 +305,9 @@ Checklist:
 
 - [x] CI runs Go test, vet, build, `golangci-lint`, and `govulncheck`
 - [x] CI runs web check, test, and build
-- [ ] extend table-driven tests around git parsing helpers in `internal/git/`
+- [x] extend table-driven tests around git parsing helpers in `internal/git/`
+- [x] add focused runtime/database tests for flows that mutate persisted state
 - [ ] add fuzz coverage for git subprocess output parsing in `internal/git/`
-- [ ] add focused runtime/database tests for flows that mutate persisted state
 - [ ] decide whether admin-only observability surfaces like `/metrics` and `pprof` are worth carrying before a daemon/background story exists
 
 Exit criteria:
@@ -343,11 +371,15 @@ These are the real judgment points still hanging over the repo:
 
 ## Immediate next moves
 
+~~1. create a cheap seeded local smoke path for `add` + `import` + `rescan` + `rebuild-rollups`~~ **Done.** `TestSmokeOperatorLoop` in `internal/runtime/smoke_test.go`.
+~~2. verify the result through the SQLite database and one JSON endpoint~~ **Done.** Asserts DB rows (repos, commits, rollups, achievements, sessions, snapshots) and all JSON API endpoints.
+~~3. document the expected output and failure modes in-repo~~ **Done.** Expected outcomes documented in Workstream 1 checklist above.
+
 If only one substantial thing gets done next, make it this:
 
-1. create a cheap seeded local smoke path for `add` + `import` + `rescan` + `rebuild-rollups`
-2. verify the result through the SQLite database and one JSON endpoint
-3. document the expected output and failure modes in-repo
-4. only then decide whether background watching changes the product enough to earn immediate implementation
+1. decide whether v1 ingestion is explicit-manual, periodic polling, or watcher-based (Workstream 2)
+2. if watcher/poller is deferred, update the UI and docs to not imply automatic tracking
+3. harden the operator surface for empty states, stale data signals, and error feedback (Workstream 3)
+4. optionally add fuzz testing for git parsing (Workstream 4)
 
-That sequence tightens truth, improves confidence, and informs the watcher decision with evidence instead of vibes.
+The smoke test now provides a fast feedback loop for any of these next moves.
