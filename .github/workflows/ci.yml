@@ -14,8 +14,6 @@ concurrency:
 jobs:
   go:
     runs-on: ubuntu-latest
-    env:
-      GITPULSE_DATABASE__PATH: ${{ github.workspace }}/gitpulse-ci.db
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
