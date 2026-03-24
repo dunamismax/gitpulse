@@ -25,7 +25,7 @@ Product rules:
 - all persisted state stays local
 - relational data stays the default
 - SQLite is the active storage layer
-- Go owns the persistence layer; the Astro frontend is an operator surface, not the system of record
+- Go owns the persistence layer; the React SPA frontend is an operator surface, not the system of record
 - plain SQL stays explicit and inspectable unless backend complexity later earns `sqlc`
 - CLI and local web UI share one runtime
 
@@ -69,9 +69,9 @@ What is done in the current Go + Astro path:
 - git subprocess helpers for repo discovery, snapshot parsing, and history import
 - analytics rebuild flow for sessions, rollups, streaks, score, and achievements
 - `net/http` server with JSON API routes for dashboard, repositories, repository detail, sessions, achievements, and settings
-- Bun + TypeScript + Astro + Alpine browser frontend under `frontend/`
-- Go server wiring that serves the built Astro app from `frontend/dist`
-- legacy Go template rendering still available as a fallback when the Astro build output is missing
+- Bun + TypeScript + React + Vite SPA under `frontend/` with TanStack Router, TanStack Query, Tailwind CSS, and Biome
+- Go server wiring that serves the built SPA from `frontend/dist` with catch-all fallback
+- legacy Go template rendering still available as a fallback when the SPA build output is missing
 
 What is not done yet:
 
@@ -89,7 +89,7 @@ What is not done yet:
 | `README.md` | public-facing project status and local run instructions |
 | `AGENTS.md` | concise repo memory for future agents |
 | `docs/architecture.md` | active Go + Astro architecture |
-| `frontend/` | browser UI source, scripts, layout, styles, and Astro build output |
+| `frontend/` | browser UI source (React + Vite SPA), build output in `dist/` |
 | `gitpulse.example.toml` | config surface for the Go runtime |
 | `internal/db/schema.sql` | embedded startup schema |
 | `migrations/` | repo-visible SQL migration history |
@@ -192,7 +192,7 @@ Checklist:
 
 - [x] CLI commands for `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
 - [x] SQLite-backed storage and analytics rebuild path
-- [x] Astro-owned local web dashboard pages backed by Go JSON endpoints
+- [x] React SPA dashboard pages backed by Go JSON endpoints
 - [x] top-level docs aligned with the active runtime and frontend lane
 
 ### Phase 2 — operator-ready verification
@@ -217,7 +217,7 @@ Exit criteria:
 Checklist:
 
 - [x] dashboard, repository detail, sessions, achievements, and settings routes exist in the Go tree
-- [x] browser UI migrated to Bun/Astro/TypeScript/Alpine with a narrow JSON API boundary
+- [x] browser UI migrated to Bun/React/Vite/TypeScript with TanStack Router, TanStack Query, Tailwind CSS, and Biome
 - [ ] harden those routes into a more polished operator surface
 - [ ] implement or intentionally defer the continuous watcher / polling loop
 - [ ] decide whether GitHub remote verification parity is still worth keeping and document the answer

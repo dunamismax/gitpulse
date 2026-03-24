@@ -37,8 +37,8 @@ What exists today:
 - SQLite schema + plain SQL query layer
 - Git subprocess integration for repo discovery, snapshots, and history import
 - rebuildable sessions, rollups, streaks, scoring, and achievements logic
-- `net/http` server with JSON API routes and Astro frontend serving
-- Bun + Astro + TypeScript + Alpine browser UI under `frontend/`
+- `net/http` server with JSON API routes and SPA frontend serving
+- Bun + React + Vite + TypeScript SPA under `frontend/` with TanStack Router, TanStack Query, Tailwind CSS, and Biome
 
 What is not complete yet:
 

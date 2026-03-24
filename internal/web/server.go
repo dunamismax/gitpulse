@@ -19,10 +19,10 @@ type Server struct {
 	partials    map[string]*template.Template // legacy partial name -> standalone template
 	rt          *runtime.Runtime
 	configFile  string
-	frontendDir string // path to Astro build output (frontend/dist)
+	frontendDir string // path to SPA build output (frontend/dist)
 }
 
-// New creates a Server and loads the legacy templates only when the Astro
+// New creates a Server and loads the legacy templates only when the SPA
 // frontend build output is not present.
 func New(rt *runtime.Runtime, templatesDir, assetsDir, configFile, frontendDir string) (*Server, error) {
 	s := &Server{
@@ -44,7 +44,7 @@ func New(rt *runtime.Runtime, templatesDir, assetsDir, configFile, frontendDir s
 	return s, nil
 }
 
-// hasFrontend reports whether the built Astro frontend exists.
+// hasFrontend reports whether the built SPA frontend exists.
 func (s *Server) hasFrontend() bool {
 	if s.frontendDir == "" {
 		return false
@@ -127,7 +127,7 @@ func (s *Server) registerRoutes(assetsDir string) {
 	mux.HandleFunc("POST /api/settings", s.handleAPISettingsSave)
 
 	if s.hasFrontend() {
-		slog.Info("serving Astro frontend", "dir", s.frontendDir)
+		slog.Info("serving SPA frontend", "dir", s.frontendDir)
 		s.registerFrontendRoutes()
 		return
 	}
@@ -138,23 +138,37 @@ func (s *Server) registerRoutes(assetsDir string) {
 
 func (s *Server) registerFrontendRoutes() {
 	mux := s.mux
+
+	// Serve static assets from the Vite build output.
 	fs := http.FileServer(http.Dir(s.frontendDir))
+	mux.Handle("GET /assets/", fs)
 
-	mux.Handle("GET /_astro/", fs)
+	// SPA catch-all: serve index.html for any non-API, non-static GET request
+	// so the client-side router can handle the path.
+	indexPath := filepath.Join(s.frontendDir, "index.html")
+	spaFallback := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.ServeFile(w, r, indexPath)
+	})
 
-	servePage := func(filePath string) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			http.ServeFile(w, r, filepath.Join(s.frontendDir, filePath))
-		}
-	}
-
-	mux.HandleFunc("GET /{$}", servePage("index.html"))
-	mux.HandleFunc("GET /repositories", servePage(filepath.Join("repositories", "index.html")))
-	mux.HandleFunc("GET /repositories/{id}", servePage(filepath.Join("repositories", "detail", "index.html")))
-	mux.HandleFunc("GET /sessions", servePage(filepath.Join("sessions", "index.html")))
-	mux.HandleFunc("GET /achievements", servePage(filepath.Join("achievements", "index.html")))
-	mux.HandleFunc("GET /settings", servePage(filepath.Join("settings", "index.html")))
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		spaFallback.ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /repositories", func(w http.ResponseWriter, r *http.Request) {
+		spaFallback.ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /repositories/{id}", func(w http.ResponseWriter, r *http.Request) {
+		spaFallback.ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /sessions", func(w http.ResponseWriter, r *http.Request) {
+		spaFallback.ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /achievements", func(w http.ResponseWriter, r *http.Request) {
+		spaFallback.ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
+		spaFallback.ServeHTTP(w, r)
+	})
 
 	// Keep legacy form posts working as a thin compatibility layer.
 	mux.HandleFunc("POST /repositories/add", s.handleRepoAdd)

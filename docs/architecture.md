@@ -1,18 +1,22 @@
 # GitPulse Architecture
 
-GitPulse is a local-first Go application with a browser dashboard built with Astro. The active implementation persists state in SQLite via `database/sql` and `modernc.org/sqlite`, with plain SQL kept inside the Go runtime.
+GitPulse is a local-first Go application with a browser dashboard built as a React SPA. The active implementation persists state in SQLite via `database/sql` and `modernc.org/sqlite`, with plain SQL kept inside the Go runtime.
 
 The active stack is:
 
 - Go for CLI, runtime, JSON API, git integration, analytics, and data access
 - SQLite persistence via `database/sql`
 - plain SQL for the data layer
-- Bun + TypeScript + Astro + Alpine.js for the browser UI
+- Bun + TypeScript + React + Vite for the browser UI
+- TanStack Router for client-side routing
+- TanStack Query for server-state management
+- Tailwind CSS for styling
+- Biome for lint and format
 
 Storage doctrine for this repo:
 
 - SQLite is the implemented default
-- Go owns persistence; the Astro frontend is an operator surface, not the system of record
+- Go owns persistence; the React SPA frontend is an operator surface, not the system of record
 - keep data relational and local-first
 - keep plain SQL unless backend complexity later earns `sqlc`
 
@@ -42,12 +46,12 @@ Storage doctrine for this repo:
                      ┌───────▼────────┐
                      │ internal/web   │
                      │ JSON API +     │
-                     │ Astro serving  │
+                     │ SPA serving    │
                      └───────┬────────┘
                              │
                      ┌───────▼────────┐
                      │ frontend/      │
-                     │ Astro + Alpine │
+                     │ React + Vite   │
                      └────────────────┘
 ```
 
@@ -59,7 +63,7 @@ Cobra CLI entrypoint. Owns command wiring only.
 
 ### `frontend`
 
-Astro pages, shared layout, TypeScript browser code, Alpine components, and CSS. Builds to `frontend/dist`.
+React SPA with Vite build, TanStack Router routes, TanStack Query data fetching, Tailwind CSS styling, and Biome linting. Builds to `frontend/dist`.
 
 ### `internal/config`
 
@@ -95,7 +99,7 @@ Sessionization logic over activity points.
 
 ### `internal/web`
 
-`net/http` handlers, JSON endpoints, Astro frontend serving, and temporary legacy template fallback.
+`net/http` handlers, JSON endpoints, SPA frontend serving with catch-all fallback, and temporary legacy template fallback.
 
 ## Data flow
 
@@ -103,8 +107,8 @@ Sessionization logic over activity points.
 2. `internal/git` discovers git roots and probes repo metadata.
 3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, and achievements.
 4. `internal/runtime` rebuilds derived analytics from raw events.
-5. `internal/web` exposes JSON endpoints and serves the built Astro app.
-6. The Astro frontend fetches those JSON endpoints and renders the operator workflow in the browser.
+5. `internal/web` exposes JSON endpoints and serves the built SPA with a catch-all fallback to `index.html` for client-side routing.
+6. The React SPA fetches those JSON endpoints via TanStack Query and renders the operator workflow in the browser.
 
 ## Persistence model
 
@@ -130,10 +134,11 @@ Schema sources:
 
 - New backend implementation work belongs in Go.
 - SQLite is the supported database target.
-- Keep persistence in Go; do not move schema ownership into the Astro lane unless the architecture materially changes.
+- Keep persistence in Go; do not move schema ownership into the SPA lane unless the architecture materially changes.
 - Keep data relational and local-first.
 - Keep plain SQL unless backend complexity later earns `sqlc`.
-- Astro owns the page/layout lane for the browser UI.
-- Alpine handles light browser interaction; keep hydration modest.
+- React owns the route/page lane for the browser UI via TanStack Router.
+- TanStack Query handles all server-state fetching and caching.
+- Zod validates API responses at the boundary.
 - Keep repo-controlled strings treated as untrusted input.
 - Document new runtime or release surfaces only when code for them exists.

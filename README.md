@@ -2,7 +2,7 @@
 
 Local-first git activity analytics for developers who want honest signals without uploading source code.
 
-GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a browser dashboard built with Bun, TypeScript, Astro, and Alpine.js.
+GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a browser dashboard built with Bun, TypeScript, React, Vite, TanStack Router, TanStack Query, and Tailwind CSS.
 
 [![CI](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/dunamismax/gitpulse/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -21,8 +21,10 @@ Active stack:
 - `net/http`
 - Bun
 - TypeScript
-- Astro
-- Alpine.js
+- React + Vite
+- TanStack Router + TanStack Query
+- Tailwind CSS + shadcn/ui patterns
+- Biome
 
 What exists today:
 
@@ -32,7 +34,7 @@ What exists today:
 - `gitpulse import` to import commit history
 - `gitpulse rebuild-rollups` to recompute sessions, rollups, and achievements
 - `gitpulse doctor` for environment and configuration diagnostics
-- Astro-owned dashboard, repositories, repository detail, sessions, achievements, and settings pages
+- React SPA dashboard, repositories, repository detail, sessions, achievements, and settings pages
 - Go-served JSON API endpoints backing the browser UI
 - settings page writes the current configurable UI surface back to the active TOML config file
 - SQLite schema/query code for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings
@@ -98,7 +100,7 @@ go run ./cmd/gitpulse serve
 
 Then open <http://127.0.0.1:7467>.
 
-The Go server serves the built Astro app from `frontend/dist`. If that build output is missing, the repo still contains the older Go template path as a temporary fallback during the transition.
+The Go server serves the built SPA from `frontend/dist`. If that build output is missing, the repo still contains the older Go template path as a temporary fallback during the transition.
 
 ### Frontend development
 
@@ -108,7 +110,7 @@ bun install
 bun run dev
 ```
 
-For the Go server to use the Astro UI, build the frontend first:
+For the Go server to use the SPA, build the frontend first:
 
 ```bash
 cd frontend
@@ -150,7 +152,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ```text
 .
 ├── cmd/gitpulse/              # Cobra CLI entrypoint
-├── frontend/                  # Bun + Astro + TypeScript + Alpine browser app
+├── frontend/                  # Bun + React + Vite + TypeScript SPA
 ├── internal/config/           # Config loading and platform paths
 ├── internal/db/               # SQLite connection + plain SQL queries + schema embed
 ├── internal/filter/           # Include/exclude path matching
@@ -159,7 +161,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── internal/models/           # Shared domain/view structs and API shapes
 ├── internal/runtime/          # Orchestration and view assembly
 ├── internal/sessions/         # Sessionization logic
-├── internal/web/              # net/http handlers, JSON API routes, and frontend serving
+├── internal/web/              # net/http handlers, JSON API routes, and SPA serving
 ├── templates/                 # Legacy Go template fallback during frontend transition
 ├── assets/                    # Legacy static asset fallback during frontend transition
 ├── migrations/                # SQLite migration files
