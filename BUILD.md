@@ -6,10 +6,10 @@ This is the execution manual for GitPulse.
 
 Use it to answer four things quickly:
 
-- what the active codepath is
-- what currently works
-- what still blocks an operator-ready workflow
-- what the next sensible implementation step should be
+- what the active runtime is
+- what is actually implemented today
+- what work is still materially unfinished
+- what the next build-worthy move should be
 
 If code and docs disagree, fix both in the same change.
 
@@ -17,17 +17,18 @@ If code and docs disagree, fix both in the same change.
 
 ## Mission
 
-Ship a local-first git analytics tool that tracks repository activity without uploading source code.
+Ship a local-first git activity tool that gives an individual operator honest signals about their work without uploading source code.
 
-Product rules:
+Product rules that stay locked unless the architecture really changes:
 
-- live work, committed work, and pushed work remain separate ledgers
-- all persisted state stays local
+- live work, committed work, and pushed work stay separate ledgers
+- all persisted state stays local by default
 - relational data stays the default
 - SQLite is the active storage layer
-- Go owns the persistence layer; the React SPA is an operator surface, not the system of record
+- Go owns persistence and orchestration
+- the React SPA is an operator surface, not the system of record
 - plain SQL stays explicit and inspectable unless backend complexity later earns `sqlc`
-- CLI and local web UI share one runtime
+- CLI and local web UI remain one runtime, not two drifting products
 
 ---
 
@@ -39,7 +40,7 @@ Host used for this pass: macOS
 
 ### Active implementation path
 
-The active implementation lives in:
+The current shipping path lives in:
 
 - `go.mod`
 - `cmd/gitpulse/`
@@ -55,24 +56,34 @@ The active implementation lives in:
 - `internal/web/`
 - `migrations/`
 
+### What exists today
 
-### Implementation status
-
-What is done in the current Go + SPA path:
+Implemented and repo-visible right now:
 
 - Cobra CLI with `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
-- SQLite connection setup, embedded schema, and plain SQL query files
-- git subprocess helpers for repo discovery, snapshot parsing, and history import
-- analytics rebuild flow for sessions, rollups, streaks, score, and achievements
-- `net/http` server with JSON API routes for dashboard, repositories, repository detail, sessions, achievements, and settings
-- Bun + TypeScript + React + Vite SPA under `web/` with TanStack Router, TanStack Query, Tailwind CSS, and Biome
-- Go server wiring that serves the built SPA from `web/dist` with a client-side routing catch-all
+- SQLite connection setup, embedded schema, repo-visible migration file, and plain SQL query layer
+- git subprocess integration for repo discovery, snapshot parsing, commit history import, and push-related data capture paths
+- rebuildable sessions, streaks, score, rollups, and achievements logic in Go
+- `net/http` JSON API routes for dashboard, repositories, repository detail, sessions, achievements, and settings
+- Bun + TypeScript + React + Vite SPA with TanStack Router, TanStack Query, Tailwind CSS, and Biome
+- Go runtime serving the built SPA from `web/dist` with client-side routing fallback
+- settings writes back to the active TOML config surface through the Go runtime
+- CI coverage for Go test/vet/build/lint/vuln checks plus web check/test/build
 
-What is not done yet:
+### What is still not done
 
-- broader live local smoke coverage beyond compile/test/build checks
-- continuous watcher / background monitoring loop
-- packaged desktop release workflow
+Real unfinished work, not hand-wavy future dreaming:
+
+- the main operator flow is not yet captured as a reproducible end-to-end local smoke path inside the repo
+- there is no settled watcher/background monitoring story yet
+- the browser/operator surface still needs more hardening around empty states, progress visibility, and error handling
+- packaging/distribution remains undecided and intentionally non-core
+
+### Current build posture
+
+GitPulse is active, usable, and worth extending, but it is not done.
+
+The repo is past the stack-churn phase. The highest-value work is now proving the daily local workflow, hardening the operator experience, and making the ingestion story intentional instead of implicit.
 
 ---
 
@@ -80,15 +91,15 @@ What is not done yet:
 
 | File | Owns |
 |------|------|
-| `BUILD.md` | execution truth, verification log, next steps |
-| `README.md` | public-facing project status and local run instructions |
-| `AGENTS.md` | concise repo memory for future agents |
+| `BUILD.md` | execution truth, verification ledger, live work board |
+| `README.md` | public-facing status and local run instructions |
+| `ROADMAP.md` | product direction beyond the immediate execution lane |
+| `AGENTS.md` | concise repo memory and working rules |
 | `docs/architecture.md` | active Go + SPA architecture |
-| `web/` | browser UI source (React + Vite SPA), build output in `dist/` |
 | `gitpulse.example.toml` | config surface for the Go runtime |
 | `internal/db/schema.sql` | embedded startup schema |
-| `migrations/` | repo-visible SQL migration history |
-| `.github/workflows/ci.yml` | automated validation for the active Go path |
+| `migrations/` | repo-visible SQLite migration history |
+| `.github/workflows/ci.yml` | automated validation for the current Go + web path |
 
 ---
 
@@ -146,18 +157,20 @@ bun run dev
 bun run build
 ```
 
-### CI commands
+### CI commands currently enforced
 
 ```bash
-cd web && bun install && bun run build
-cd ..
 go test ./...
+go vet ./...
 go build ./cmd/gitpulse
+golangci-lint run
+govulncheck ./...
+cd web && bun install --frozen-lockfile && bun run check && bun run test && bun run build
 ```
 
 ---
 
-## Verification log
+## Verification ledger
 
 Only record commands that actually passed.
 
@@ -180,90 +193,161 @@ Only record commands that actually passed.
 - `go run ./cmd/gitpulse doctor`
 - `go test ./internal/... ./cmd/gitpulse/...`
 
-### Not yet re-verified in this pass
+### Still not re-verified in this pass
 
-- live local add/import/rescan/rebuild workflow against a seeded database
-
----
-
-## Phase board
-
-### Phase 1 — core local workflow
-
-**Status:** done / checked
-
-Checklist:
-
-- [x] CLI commands for `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
-- [x] SQLite-backed storage and analytics rebuild path
-- [x] React SPA dashboard pages backed by Go JSON endpoints
-- [x] top-level docs aligned with the active runtime and browser UI lane
-
-### Phase 2 — operator-ready verification
-
-**Status:** in progress
-
-Checklist:
-
-- [ ] validate real current startup, add, import, rescan, and rebuild flows
-- [x] add focused integration coverage around the SQLite bootstrap and repository path
-- [ ] improve config validation and operator-facing error messages
-
-Exit criteria:
-
-- one local operator flow is verified end to end
-- integration coverage exists for the runtime paths that mutate persisted state
-
-### Phase 3 — product hardening
-
-**Status:** in progress
-
-Checklist:
-
-- [x] dashboard, repository detail, sessions, achievements, and settings routes exist in the Go tree
-- [x] browser UI migrated to Bun/React/Vite/TypeScript with TanStack Router, TanStack Query, Tailwind CSS, and Biome
-- [ ] harden those routes into a more polished operator surface
-- [ ] implement or intentionally defer the continuous watcher / polling loop
-- [ ] decide whether GitHub remote verification parity is still worth keeping and document the answer
-
-### Phase 4 — optional distribution work
-
-**Status:** planned
-
-Checklist:
-
-- [ ] decide whether packaged desktop releases are worth carrying at all
-- [ ] define a release workflow only if it earns its keep
-- [ ] keep desktop packaging clearly optional until the core runtime is operator-solid
-
-### Phase 5 — stack alignment and quality
-
-**Status:** in progress
-
-Checklist:
-
-- [x] align runtime storage with the SQLite-first repo doctrine
-- [x] keep data relational and local-first
-- [x] keep plain SQL instead of adding a query abstraction layer
-- [x] update `go.mod` toolchain directive to Go 1.26.1
-- [ ] replace `viper` with `koanf` or plain env vars and flags only if config churn justifies it
-- [ ] add a `golangci-lint` step to `ci.yml`
-- [ ] add a `govulncheck` step to `ci.yml`
-- [ ] add a `/metrics` Prometheus endpoint behind an explicit flag or admin listener
-- [ ] expose `pprof` on an admin-only path separate from the public web listener
-- [ ] extend test coverage with table-driven tests for git parsing functions in `internal/git/`
-- [ ] add fuzz tests for git subprocess output parsers in `snapshot.go` and `git.go`
-
-Exit criteria:
-
-- repo docs match the implementation
-- the runtime is SQLite-first in both code and documentation
-- `go.mod` toolchain matches Go 1.26.1
+- a full local operator loop: `serve` + `add` + `import` + `rescan` + `rebuild-rollups` + `doctor` against a temp or seeded workspace
 
 ---
 
-## Current assessment
+## Active work board
 
-- The codebase now matches the stack docs: local-first, relational, SQLite-backed, and plain SQL-first.
-- The remaining risk is operational verification, not storage mismatch.
-- The highest-value next step is an end-to-end local smoke flow that exercises `serve`, `add`, `import`, `rescan`, `rebuild-rollups`, and `doctor` against a temporary workspace.
+These are ordered workstreams, not a fake finished roadmap.
+
+### Workstream 1 — prove the daily operator loop
+
+**Status:** active / highest priority
+
+Why this matters:
+
+The codebase already has the core runtime and UI. The next credibility jump is proving that a fresh local operator can build, start, add repositories, import history, rescan, rebuild analytics, and inspect results without undocumented handholding.
+
+Checklist:
+
+- [ ] capture one reproducible smoke workflow that exercises `serve`, `add`, `import`, `rescan`, `rebuild-rollups`, and `doctor`
+- [ ] choose a fixture strategy: tiny seeded git repo, temp repo generator, or both
+- [ ] assert something durable at the end of the flow: DB rows, JSON API output, or both
+- [ ] document the expected operator-visible outcomes of that run
+- [ ] keep the smoke path cheap enough to run routinely in local development
+
+Exit criteria:
+
+- one end-to-end happy path is repeatable from a clean machine state
+- failures in the main ingest/rebuild lane become easier to reproduce than to debate
+
+### Workstream 2 — settle the ingestion model
+
+**Status:** active / design decision pending
+
+Why this matters:
+
+GitPulse currently has strong manual commands, but the product story is still blurry unless the repo clearly decides whether activity capture is manual-first, poll-based, or watcher-based.
+
+Checklist:
+
+- [ ] decide whether v1 is explicit-manual, periodic polling, filesystem watcher, or a staged combination
+- [ ] if watcher/poller work is deferred, document that deferment plainly so the UI and docs do not imply automatic tracking that does not exist
+- [ ] if background capture is pursued, define bounds first: scan cadence, debouncing, repo count expectations, and failure visibility
+- [ ] specify how background work interacts with imports, rescans, and rebuilds without corrupting operator expectations
+- [ ] decide whether pushed-work verification stays local-only or grows remote checks where justified
+
+Exit criteria:
+
+- the docs and UI tell the same truth about how new activity appears in GitPulse
+- the ingestion model is intentional rather than assumed
+
+### Workstream 3 — harden the operator surface
+
+**Status:** active
+
+Why this matters:
+
+The dashboard exists, but operator trust is won in the awkward moments: empty databases, long imports, bad config, giant repos, and partial failures.
+
+Checklist:
+
+- [ ] tighten config validation and operator-facing error messages
+- [ ] improve empty states for a fresh database with no tracked repos
+- [ ] surface progress, last-run timestamps, or other freshness signals for rescan/import/rebuild actions
+- [ ] verify settings writes are predictable, atomic, and clearly reflected back into the UI
+- [ ] review the repository detail and sessions views for places where derived analytics need clearer explanation
+
+Exit criteria:
+
+- a new local operator can tell what happened, what failed, and what to do next without reading the source
+
+### Workstream 4 — keep the runtime honest under load
+
+**Status:** active
+
+Why this matters:
+
+The stack direction is now stable enough to spend effort on confidence-building tests instead of more stack migration churn.
+
+Checklist:
+
+- [x] CI runs Go test, vet, build, `golangci-lint`, and `govulncheck`
+- [x] CI runs web check, test, and build
+- [ ] extend table-driven tests around git parsing helpers in `internal/git/`
+- [ ] add fuzz coverage for git subprocess output parsing in `internal/git/`
+- [ ] add focused runtime/database tests for flows that mutate persisted state
+- [ ] decide whether admin-only observability surfaces like `/metrics` and `pprof` are worth carrying before a daemon/background story exists
+
+Exit criteria:
+
+- the risky parsing and persistence edges are covered better than they are today
+- quality work tracks the real failure modes of this repo, not generic checklist theater
+
+### Workstream 5 — keep packaging optional until earned
+
+**Status:** planned / intentionally not current gate
+
+Why this matters:
+
+Shipping a desktop wrapper or installer before the local runtime is operator-solid would create more surface area than value.
+
+Checklist:
+
+- [ ] decide whether packaged desktop releases belong in the first real release at all
+- [ ] if yes, write down the minimum acceptable release workflow and support burden
+- [ ] if no, keep `go run`/binary + browser dashboard as the explicit product story for now
+
+Exit criteria:
+
+- packaging is either deliberately deferred or justified by actual operator pain, not ambition drift
+
+---
+
+## Decisions already made
+
+These should be treated as current operating truth, not open brainstorming:
+
+- GitPulse is local-first
+- SQLite is the default and implemented database
+- Go owns persistence and runtime orchestration
+- plain SQL is the data access approach today
+- the browser UI is React + Vite under `web/`
+- the Go server serves the built SPA
+- packaging is optional, not part of the current done definition
+
+## Decisions that still need a call
+
+These are the real judgment points still hanging over the repo:
+
+- watcher vs poller vs manual-first ingestion for v1
+- how much push verification or remote-state parity is actually worth carrying
+- whether a schema/version story beyond bootstrap + migration file needs to move up in priority
+- whether observability endpoints belong before a background service mode exists
+- whether desktop packaging is a real product need or just tempting scope
+
+---
+
+## Risks and constraints
+
+- The biggest product risk is not stack mismatch anymore; it is ambiguity in the operator workflow.
+- A watcher/background loop can easily become complexity bait if it lands before the manual workflow is deeply verified.
+- The React UI can create false confidence if it suggests freshness or automation the runtime does not yet guarantee.
+- Packaging too early would multiply support burden while the core loop is still settling.
+- Because analytics are rebuildable, the repo should prefer deterministic raw event capture and explicit rebuild flows over magical hidden state.
+
+---
+
+## Recommended next move
+
+If only one substantial thing gets done next, make it this:
+
+1. create a cheap seeded local smoke path for `add` + `import` + `rescan` + `rebuild-rollups`
+2. verify the result through the SQLite database and one JSON endpoint
+3. document the expected output and failure modes in-repo
+4. only then decide whether background watching changes the product enough to earn immediate implementation
+
+That sequence tightens truth, improves confidence, and informs the watcher decision with evidence instead of vibes.
