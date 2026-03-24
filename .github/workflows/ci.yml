@@ -4,11 +4,18 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: gitpulse-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   go:
     runs-on: ubuntu-latest
     env:
-      GITPULSE_DATABASE__PATH: ${{ runner.temp }}/gitpulse-ci.db
+      GITPULSE_DATABASE__PATH: ${{ github.workspace }}/gitpulse-ci.db
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
