@@ -24,10 +24,9 @@ Product rules:
 - live work, committed work, and pushed work remain separate ledgers
 - all persisted state stays local
 - relational data stays the default
-- GitPulse is SQLite-shaped by product doctrine, but the current implementation still runs on PostgreSQL until a deliberate migration lands
+- SQLite is the active storage layer
 - Go owns the persistence layer; the Astro frontend is an operator surface, not the system of record
-- plain SQL can stay explicit and inspectable unless backend complexity later earns `sqlc`
-- no MongoDB pivot
+- plain SQL stays explicit and inspectable unless backend complexity later earns `sqlc`
 - CLI and local web UI share one runtime
 
 ---
@@ -66,8 +65,7 @@ Transition-only fallback paths still present:
 What is done in the current Go + Astro path:
 
 - Cobra CLI with `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
-- layered config loading, platform path discovery, and atomic TOML writes for settings
-- current PostgreSQL connection, embedded schema, and plain SQL query files
+- SQLite connection setup, embedded schema, and plain SQL query files
 - git subprocess helpers for repo discovery, snapshot parsing, and history import
 - analytics rebuild flow for sessions, rollups, streaks, score, and achievements
 - `net/http` server with JSON API routes for dashboard, repositories, repository detail, sessions, achievements, and settings
@@ -77,8 +75,7 @@ What is done in the current Go + Astro path:
 
 What is not done yet:
 
-- broader live PostgreSQL smoke coverage beyond compile/test/build checks
-- a deliberate SQLite migration plan and cutover path for this local-first product
+- broader live local smoke coverage beyond compile/test/build checks
 - continuous watcher / background monitoring loop
 - packaged desktop release workflow
 
@@ -104,14 +101,13 @@ What is not done yet:
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.26.1
 - Bun 1.1+
 - Git 2.30+
-- PostgreSQL 14+ for the current implementation
 
 ### Local config
 
-The current code still expects a PostgreSQL DSN. A SQLite-first cutover has not been implemented in this pass because the runtime, schema, queries, tests, and docs are still PostgreSQL-coupled.
+The runtime defaults to a SQLite file in the platform data directory. A config file is optional.
 
 Default config paths:
 
@@ -119,17 +115,22 @@ Default config paths:
 - Linux: `~/.config/gitpulse/gitpulse.toml`
 - Windows: `%APPDATA%\gitpulse\gitpulse.toml`
 
-Minimum config:
+Default database paths:
+
+- macOS: `~/Library/Application Support/gitpulse/data/gitpulse.db`
+- Linux: `~/.config/gitpulse/data/gitpulse.db`
+- Windows: `%APPDATA%\gitpulse\data\gitpulse.db`
+
+Minimum optional config:
 
 ```toml
 [database]
-dsn = "postgres://localhost/gitpulse?sslmode=disable"
+path = "/absolute/path/to/gitpulse.db"
 ```
 
 ### Local commands
 
 ```bash
-createdb gitpulse
 cd frontend && bun install && bun run build
 cd ..
 go test ./...
@@ -167,16 +168,17 @@ Only record commands that actually passed.
 
 ### Verified on 2026-03-23
 
-- `cd frontend && bun install`
 - `cd frontend && bun run build`
-- `GOCACHE=/tmp/gitpulse-gocache go test ./internal/config ./internal/runtime ./internal/web ./cmd/gitpulse`
-- `GOCACHE=/tmp/gitpulse-gocache go build ./cmd/gitpulse`
+- `go mod tidy`
+- `go test ./...`
+- `go build ./cmd/gitpulse`
+- `go run ./cmd/gitpulse --help`
+- `go run ./cmd/gitpulse doctor`
+- `go test ./internal/... ./cmd/gitpulse/...`
 
 ### Not yet re-verified in this pass
 
-- full add/import/rescan/rebuild workflow against a live PostgreSQL database
-- browser route smoke against a running local server with a seeded database
-- any SQLite-backed runtime path, because none exists yet
+- live local add/import/rescan/rebuild workflow against a seeded database
 
 ---
 
@@ -189,7 +191,7 @@ Only record commands that actually passed.
 Checklist:
 
 - [x] CLI commands for `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
-- [x] current PostgreSQL-backed storage and analytics rebuild path
+- [x] SQLite-backed storage and analytics rebuild path
 - [x] Astro-owned local web dashboard pages backed by Go JSON endpoints
 - [x] top-level docs aligned with the active runtime and frontend lane
 
@@ -199,13 +201,13 @@ Checklist:
 
 Checklist:
 
-- [ ] validate real current PostgreSQL startup, add, import, rescan, and rebuild flows
-- [ ] add focused integration tests around DB-backed runtime behavior
+- [ ] validate real current startup, add, import, rescan, and rebuild flows
+- [x] add focused integration coverage around the SQLite bootstrap and repository path
 - [ ] improve config validation and operator-facing error messages
 
 Exit criteria:
 
-- one live current-PostgreSQL operator flow is verified end to end
+- one local operator flow is verified end to end
 - integration coverage exists for the runtime paths that mutate persisted state
 
 ### Phase 3 — product hardening
@@ -230,19 +232,16 @@ Checklist:
 - [ ] define a release workflow only if it earns its keep
 - [ ] keep desktop packaging clearly optional until the core runtime is operator-solid
 
-### Phase 5 — data-layer and stack alignment
+### Phase 5 — stack alignment and quality
 
-**Status:** planned
+**Status:** in progress
 
 Checklist:
 
-- [ ] document the storage doctrine honestly across the repo: SQLite-shaped product, current PostgreSQL implementation
-- [ ] write a safe SQLite migration plan for the Go-owned runtime instead of attempting a half-migration in-place
-- [ ] keep data relational and local-first throughout that migration plan
-- [ ] keep plain SQL unless query complexity or team workflow later proves `sqlc` is worth it
-- [ ] do not move persistence ownership into the Astro lane unless the architecture changes enough to justify Drizzle there
-- [ ] do not introduce MongoDB
-- [ ] update `go.mod` toolchain directive to Go 1.26.1 to match the canonical stack version
+- [x] align runtime storage with the SQLite-first repo doctrine
+- [x] keep data relational and local-first
+- [x] keep plain SQL instead of adding a query abstraction layer
+- [x] update `go.mod` toolchain directive to Go 1.26.1
 - [ ] replace `viper` with `koanf` or plain env vars and flags only if config churn justifies it
 - [ ] add a `golangci-lint` step to `ci.yml`
 - [ ] add a `govulncheck` step to `ci.yml`
@@ -253,41 +252,14 @@ Checklist:
 
 Exit criteria:
 
-- repo docs no longer imply PostgreSQL or `sqlc` are defaults for this product class
-- there is a concrete SQLite migration plan for the Go runtime
+- repo docs match the implementation
+- the runtime is SQLite-first in both code and documentation
 - `go.mod` toolchain matches Go 1.26.1
-- CI runs `golangci-lint` and `govulncheck` on every push
-- a `/metrics` endpoint exists and returns valid Prometheus exposition format
 
 ---
 
-## Decisions
+## Current assessment
 
-- 2026-03-23: The repo documentation should describe the active Go + PostgreSQL implementation directly.
-- 2026-03-23: GitPulse does not currently earn PostgreSQL by product shape; it is still a single-user, local-first tool whose likely long-term default is SQLite.
-- 2026-03-23: Do not fake a one-pass storage migration. The current code remains PostgreSQL-only until a deliberate SQLite cutover is designed and implemented.
-- 2026-03-23: Keep persistence owned by the Go runtime. Drizzle is not the default here unless storage ownership ever moves into the web lane.
-- 2026-03-23: Keep plain SQL for now; do not add `sqlc` unless the backend query surface or team workflow clearly earns it.
-- 2026-03-23: Keep top-level docs honest about scaffold and TODO areas instead of implying shipped parity that has not been re-verified.
-- 2026-03-23: Treat packaged desktop distribution as optional follow-on work, not a current product surface.
-- 2026-03-23: Move the browser-facing UI to a Bun + Astro + TypeScript + Alpine frontend, with Go serving the built app and owning the JSON API boundary.
-
----
-
-## Risks
-
-- The Go path compiles and the Astro frontend builds, but the end-to-end DB workflow still needs broader live verification.
-- GitPulse is doctrinally SQLite-shaped, but the implementation is still deeply PostgreSQL-coupled across config, connection setup, schema SQL, queries, tests, and docs.
-- A safe SQLite migration will require an explicit schema translation and compatibility plan; doing that piecemeal would be easy to get wrong.
-- The repo currently carries transition-only legacy template and asset paths to avoid a hard break when `frontend/dist` is missing.
-- Packaged desktop release work is intentionally out of scope until the core runtime is solid.
-
----
-
-## Next best moves
-
-1. Run a live current-PostgreSQL smoke path: `serve`, `add`, `import`, `rebuild-rollups`, `doctor`.
-2. Write the storage cutover plan from the current `pgx`/PostgreSQL implementation to a Go-owned SQLite default.
-3. Add focused API tests for the new JSON handlers in `internal/web/`.
-4. Decide whether to keep or fully remove the legacy template fallback after one more verification pass.
-5. Implement or intentionally defer the background monitoring loop with explicit docs.
+- The codebase now matches the stack docs: local-first, relational, SQLite-backed, and plain SQL-first.
+- The remaining risk is operational verification, not storage mismatch.
+- The highest-value next step is an end-to-end local smoke flow that exercises `serve`, `add`, `import`, `rescan`, `rebuild-rollups`, and `doctor` against a temporary workspace.

@@ -7,22 +7,8 @@ on:
 jobs:
   go:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: gitpulse_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
-      GITPULSE_DATABASE__DSN: postgres://postgres:postgres@localhost:5432/gitpulse_ci?sslmode=disable
+      GITPULSE_DATABASE__PATH: ${{ runner.temp }}/gitpulse-ci.db
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

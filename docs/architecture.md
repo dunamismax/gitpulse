@@ -1,22 +1,20 @@
 # GitPulse Architecture
 
-GitPulse is a local-first Go application with a browser dashboard built with Astro. The current implementation persists state in PostgreSQL, but that is a current-state implementation choice rather than the long-term default doctrine for this product.
+GitPulse is a local-first Go application with a browser dashboard built with Astro. The active implementation persists state in SQLite via `database/sql` and `modernc.org/sqlite`, with plain SQL kept inside the Go runtime.
 
 The active stack is:
 
 - Go for CLI, runtime, JSON API, git integration, analytics, and data access
-- current PostgreSQL persistence via `pgx/v5`
-- plain SQL for the current data layer
+- SQLite persistence via `database/sql`
+- plain SQL for the data layer
 - Bun + TypeScript + Astro + Alpine.js for the browser UI
 
 Storage doctrine for this repo:
 
-- GitPulse is still a single-user, local-first product, so SQLite is the more natural long-term default
-- the current code is deeply PostgreSQL-coupled, so this pass does not fake a half-migration
+- SQLite is the implemented default
 - Go owns persistence; the Astro frontend is an operator surface, not the system of record
 - keep data relational and local-first
 - keep plain SQL unless backend complexity later earns `sqlc`
-- do not pivot to MongoDB
 
 ## System overview
 
@@ -31,14 +29,14 @@ Storage doctrine for this repo:
                      │ orchestration   │
                      └───┬─────────┬───┘
                          │         │
-              ┌──────────▼───┐ ┌───▼──────────┐
-              │ internal/git │ │ internal/db  │
-              │ git CLI      │ │ pgx/plain SQL│
-              └──────┬───────┘ └──────┬───────┘
+              ┌──────────▼───┐ ┌───▼──────────────┐
+              │ internal/git │ │ internal/db      │
+              │ git CLI      │ │ SQLite/plain SQL │
+              └──────┬───────┘ └──────┬───────────┘
                      │                │
               ┌──────▼──────┐   ┌────▼────────┐
-              │ analytics + │   │ PostgreSQL  │
-              │ sessions    │   │ event store │
+              │ analytics + │   │ local event │
+              │ sessions    │   │ store       │
               └─────────────┘   └─────────────┘
                              │
                      ┌───────▼────────┐
@@ -69,7 +67,7 @@ Platform path discovery, layered config loading, and atomic TOML writes for the 
 
 ### `internal/db`
 
-Current PostgreSQL connection, embedded schema, plain SQL queries, and analytics persistence.
+SQLite connection setup, embedded schema, plain SQL queries, and analytics persistence.
 
 ### `internal/filter`
 
@@ -126,17 +124,15 @@ Current tables:
 Schema sources:
 
 - `internal/db/schema.sql` for the embedded startup schema path
-- `migrations/001_init.sql` for the repo-visible current PostgreSQL migration file
+- `migrations/0001_init.sql` for the repo-visible SQLite migration file
 
 ## Design constraints
 
 - New backend implementation work belongs in Go.
-- PostgreSQL is the only supported database target today because that is what the code implements right now.
-- GitPulse does not presently earn PostgreSQL as a product default; SQLite is the likelier storage landing zone once a real migration happens.
-- Keep persistence in Go; do not move schema ownership into the Astro lane unless the architecture materially changes and Drizzle becomes justified there.
+- SQLite is the supported database target.
+- Keep persistence in Go; do not move schema ownership into the Astro lane unless the architecture materially changes.
 - Keep data relational and local-first.
 - Keep plain SQL unless backend complexity later earns `sqlc`.
-- Do not introduce MongoDB.
 - Astro owns the page/layout lane for the browser UI.
 - Alpine handles light browser interaction; keep hydration modest.
 - Keep repo-controlled strings treated as untrusted input.

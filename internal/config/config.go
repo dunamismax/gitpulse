@@ -55,7 +55,7 @@ type GithubSettings struct {
 
 // DatabaseSettings holds the current database connection string.
 type DatabaseSettings struct {
-	DSN string `json:"dsn" mapstructure:"dsn" toml:"dsn"`
+	Path string `json:"path" mapstructure:"path" toml:"path"`
 }
 
 // ServerSettings holds the web server listen address.
@@ -181,6 +181,9 @@ func Load(cfgFile string) (*AppConfig, error) {
 	v.SetDefault("server.host", "127.0.0.1")
 	v.SetDefault("server.port", 7467)
 	v.SetDefault("patterns.exclude", defaultExcludePatterns)
+	if paths, err := DiscoverPaths(); err == nil {
+		v.SetDefault("database.path", filepath.Join(paths.DataDir, "gitpulse.db"))
+	}
 
 	resolvedCfgFile, err := ResolveConfigFile(cfgFile)
 	if err != nil {
@@ -188,7 +191,7 @@ func Load(cfgFile string) (*AppConfig, error) {
 	}
 	v.SetConfigFile(resolvedCfgFile)
 
-	// Environment variable overrides: GITPULSE_SERVER__PORT, GITPULSE_DATABASE__DSN, etc.
+	// Environment variable overrides: GITPULSE_SERVER__PORT, GITPULSE_DATABASE__PATH, etc.
 	v.SetEnvPrefix("GITPULSE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
 	v.AutomaticEnv()

@@ -2,11 +2,10 @@ package db
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dunamismax/gitpulse/internal/models"
 )
@@ -14,45 +13,44 @@ import (
 // ReplaceFocusSessions truncates the focus_sessions table and inserts fresh
 // data in a single transaction. Focus sessions are fully derived, so
 // truncate-replace is always correct.
-func ReplaceFocusSessions(ctx context.Context, pool *pgxpool.Pool, sessions []models.FocusSession) error {
-	tx, err := pool.Begin(ctx)
+func ReplaceFocusSessions(ctx context.Context, db *sql.DB, sessions []models.FocusSession) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck
 
-	if _, err := tx.Exec(ctx, "DELETE FROM focus_sessions"); err != nil {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM focus_sessions"); err != nil {
 		return fmt.Errorf("truncate sessions: %w", err)
 	}
 
 	for _, s := range sessions {
-		repoJSON, err := json.Marshal(uuidSliceToStrings(s.RepoIDs))
+		repoJSON, err := encodeJSON(uuidSliceToStrings(s.RepoIDs))
 		if err != nil {
 			return fmt.Errorf("marshal repo_ids: %w", err)
 		}
-		_, err = tx.Exec(ctx, `
+		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO focus_sessions
 				(id, started_at_utc, ended_at_utc, active_minutes, repo_ids, event_count, total_changed_lines)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`,
-			s.ID, s.StartedAt.UTC(), s.EndedAt.UTC(), s.ActiveMinutes,
+			s.ID.String(), formatTime(s.StartedAt), formatTime(s.EndedAt), s.ActiveMinutes,
 			repoJSON, s.EventCount, s.TotalChangedLines,
-		)
-		if err != nil {
+		); err != nil {
 			return fmt.Errorf("insert session: %w", err)
 		}
 	}
 
-	return tx.Commit(ctx)
+	return tx.Commit()
 }
 
 // ListFocusSessions returns recent focus sessions ordered by start time descending.
-func ListFocusSessions(ctx context.Context, pool *pgxpool.Pool, limit int) ([]models.FocusSession, error) {
-	rows, err := pool.Query(ctx, `
+func ListFocusSessions(ctx context.Context, db *sql.DB, limit int) ([]models.FocusSession, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, started_at_utc, ended_at_utc, active_minutes, repo_ids, event_count, total_changed_lines
 		FROM focus_sessions
 		ORDER BY started_at_utc DESC
-		LIMIT $1
+		LIMIT ?
 	`, limit)
 	if err != nil {
 		return nil, err
@@ -62,17 +60,37 @@ func ListFocusSessions(ctx context.Context, pool *pgxpool.Pool, limit int) ([]mo
 	var sessions []models.FocusSession
 	for rows.Next() {
 		var s models.FocusSession
-		var repoJSON []byte
+		var idText string
+		var startedAt string
+		var endedAt string
+		var repoJSON string
+
 		if err := rows.Scan(
-			&s.ID, &s.StartedAt, &s.EndedAt, &s.ActiveMinutes,
+			&idText, &startedAt, &endedAt, &s.ActiveMinutes,
 			&repoJSON, &s.EventCount, &s.TotalChangedLines,
 		); err != nil {
 			return nil, fmt.Errorf("scan session: %w", err)
 		}
+
+		id, err := parseUUID(idText)
+		if err != nil {
+			return nil, err
+		}
+		s.ID = id
+		s.StartedAt, err = parseTime(startedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan session started_at: %w", err)
+		}
+		s.EndedAt, err = parseTime(endedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan session ended_at: %w", err)
+		}
+
 		var idStrs []string
-		if err := json.Unmarshal(repoJSON, &idStrs); err == nil {
+		if err := decodeJSON(repoJSON, &idStrs); err == nil {
 			s.RepoIDs = stringsToUUIDSlice(idStrs)
 		}
+
 		sessions = append(sessions, s)
 	}
 	return sessions, rows.Err()

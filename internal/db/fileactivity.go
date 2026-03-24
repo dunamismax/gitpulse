@@ -2,73 +2,67 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dunamismax/gitpulse/internal/models"
 )
 
 // InsertFileActivity batch-inserts file activity events in a transaction.
-func InsertFileActivity(ctx context.Context, pool *pgxpool.Pool, events []models.FileActivityEvent) error {
+func InsertFileActivity(ctx context.Context, db *sql.DB, events []models.FileActivityEvent) error {
 	if len(events) == 0 {
 		return nil
 	}
 
-	tx, err := pool.Begin(ctx)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck
 
 	for _, e := range events {
-		_, err := tx.Exec(ctx, `
+		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO file_activity_events
 				(id, repo_id, observed_at_utc, relative_path, additions, deletions, kind)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`,
-			e.ID, e.RepoID, e.ObservedAt.UTC(), e.RelativePath,
+			e.ID.String(), e.RepoID.String(), formatTime(e.ObservedAt), e.RelativePath,
 			e.Additions, e.Deletions, string(e.Kind),
-		)
-		if err != nil {
+		); err != nil {
 			return fmt.Errorf("insert file activity: %w", err)
 		}
 	}
 
-	return tx.Commit(ctx)
+	return tx.Commit()
 }
 
 // TopFilesTouched returns the most frequently touched file paths. If repoID is
 // nil, the query is global.
-func TopFilesTouched(ctx context.Context, pool *pgxpool.Pool, repoID *uuid.UUID, limit int) ([]string, error) {
-	var rows interface {
-		Next() bool
-		Scan(...any) error
-		Err() error
-		Close()
-	}
-	var err error
+func TopFilesTouched(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit int) ([]string, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
 
 	if repoID != nil {
-		r, e := pool.Query(ctx, `
+		rows, err = db.QueryContext(ctx, `
 			SELECT relative_path
 			FROM file_activity_events
-			WHERE repo_id = $1
+			WHERE repo_id = ?
 			GROUP BY relative_path
 			ORDER BY COUNT(*) DESC
-			LIMIT $2
-		`, *repoID, limit)
-		rows, err = r, e
+			LIMIT ?
+		`, repoID.String(), limit)
 	} else {
-		r, e := pool.Query(ctx, `
+		rows, err = db.QueryContext(ctx, `
 			SELECT relative_path
 			FROM file_activity_events
 			GROUP BY relative_path
 			ORDER BY COUNT(*) DESC
-			LIMIT $1
+			LIMIT ?
 		`, limit)
-		rows, err = r, e
 	}
 	if err != nil {
 		return nil, err
@@ -77,18 +71,18 @@ func TopFilesTouched(ctx context.Context, pool *pgxpool.Pool, repoID *uuid.UUID,
 
 	var paths []string
 	for rows.Next() {
-		var p string
-		if err := rows.Scan(&p); err != nil {
+		var path string
+		if err := rows.Scan(&path); err != nil {
 			return nil, fmt.Errorf("scan path: %w", err)
 		}
-		paths = append(paths, p)
+		paths = append(paths, path)
 	}
 	return paths, rows.Err()
 }
 
 // AllFileActivityForAnalytics loads all file activity events for a full rebuild.
-func AllFileActivityForAnalytics(ctx context.Context, pool *pgxpool.Pool) ([]models.FileActivityEvent, error) {
-	rows, err := pool.Query(ctx, `
+func AllFileActivityForAnalytics(ctx context.Context, db *sql.DB) ([]models.FileActivityEvent, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, repo_id, observed_at_utc, relative_path, additions, deletions, kind
 		FROM file_activity_events
 		ORDER BY repo_id, observed_at_utc ASC
@@ -101,14 +95,34 @@ func AllFileActivityForAnalytics(ctx context.Context, pool *pgxpool.Pool) ([]mod
 	var events []models.FileActivityEvent
 	for rows.Next() {
 		var e models.FileActivityEvent
+		var idText string
+		var repoIDText string
+		var observedAt string
 		var kind string
+
 		if err := rows.Scan(
-			&e.ID, &e.RepoID, &e.ObservedAt, &e.RelativePath,
+			&idText, &repoIDText, &observedAt, &e.RelativePath,
 			&e.Additions, &e.Deletions, &kind,
 		); err != nil {
 			return nil, fmt.Errorf("scan file activity: %w", err)
 		}
+
+		id, err := parseUUID(idText)
+		if err != nil {
+			return nil, err
+		}
+		repoID, err := parseUUID(repoIDText)
+		if err != nil {
+			return nil, err
+		}
+		e.ID = id
+		e.RepoID = repoID
 		e.Kind = models.ActivityKind(kind)
+		e.ObservedAt, err = parseTime(observedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan file activity observed_at: %w", err)
+		}
+
 		events = append(events, e)
 	}
 	return events, rows.Err()

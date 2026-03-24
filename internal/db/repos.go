@@ -2,54 +2,51 @@ package db
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dunamismax/gitpulse/internal/models"
 )
 
 // UpsertRepository inserts or updates a repository record keyed on root_path.
-func UpsertRepository(ctx context.Context, pool *pgxpool.Pool, r models.Repository) error {
-	inclJSON, err := json.Marshal(r.IncludePatterns)
+func UpsertRepository(ctx context.Context, db *sql.DB, r models.Repository) error {
+	inclJSON, err := encodeJSON(r.IncludePatterns)
 	if err != nil {
 		return fmt.Errorf("marshal include patterns: %w", err)
 	}
-	exclJSON, err := json.Marshal(r.ExcludePatterns)
+	exclJSON, err := encodeJSON(r.ExcludePatterns)
 	if err != nil {
 		return fmt.Errorf("marshal exclude patterns: %w", err)
 	}
 
-	_, err = pool.Exec(ctx, `
+	_, err = db.ExecContext(ctx, `
 		INSERT INTO repositories
 			(id, target_id, name, root_path, remote_url, default_branch,
 			 include_patterns, exclude_patterns, is_monitored, state,
 			 created_at_utc, updated_at_utc, last_error)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-		ON CONFLICT (root_path) DO UPDATE SET
-			name            = EXCLUDED.name,
-			remote_url      = EXCLUDED.remote_url,
-			default_branch  = EXCLUDED.default_branch,
-			is_monitored    = EXCLUDED.is_monitored,
-			state           = EXCLUDED.state,
-			updated_at_utc  = EXCLUDED.updated_at_utc,
-			last_error      = EXCLUDED.last_error
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(root_path) DO UPDATE SET
+			name = excluded.name,
+			remote_url = excluded.remote_url,
+			default_branch = excluded.default_branch,
+			is_monitored = excluded.is_monitored,
+			state = excluded.state,
+			updated_at_utc = excluded.updated_at_utc,
+			last_error = excluded.last_error
 	`,
-		r.ID, r.TargetID, r.Name, r.RootPath, r.RemoteURL, r.DefaultBranch,
+		r.ID.String(), nullableUUID(r.TargetID), r.Name, r.RootPath, nullableString(r.RemoteURL), nullableString(r.DefaultBranch),
 		inclJSON, exclJSON, r.IsMonitored, string(r.State),
-		r.CreatedAt.UTC(), r.UpdatedAt.UTC(), r.LastError,
+		formatTime(r.CreatedAt), formatTime(r.UpdatedAt), nullableString(r.LastError),
 	)
 	return err
 }
 
 // ListRepositories returns all repositories ordered by name.
-func ListRepositories(ctx context.Context, pool *pgxpool.Pool) ([]models.Repository, error) {
-	rows, err := pool.Query(ctx, `
+func ListRepositories(ctx context.Context, db *sql.DB) ([]models.Repository, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, target_id, name, root_path, remote_url, default_branch,
 		       include_patterns, exclude_patterns, is_monitored, state,
 		       created_at_utc, updated_at_utc, last_error
@@ -64,14 +61,14 @@ func ListRepositories(ctx context.Context, pool *pgxpool.Pool) ([]models.Reposit
 }
 
 // GetRepository returns a single repository by its UUID.
-func GetRepository(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID) (*models.Repository, error) {
-	rows, err := pool.Query(ctx, `
+func GetRepository(ctx context.Context, db *sql.DB, id uuid.UUID) (*models.Repository, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, target_id, name, root_path, remote_url, default_branch,
 		       include_patterns, exclude_patterns, is_monitored, state,
 		       created_at_utc, updated_at_utc, last_error
 		FROM repositories
-		WHERE id = $1
-	`, id)
+		WHERE id = ?
+	`, id.String())
 	if err != nil {
 		return nil, err
 	}
@@ -87,23 +84,22 @@ func GetRepository(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID) (*mode
 }
 
 // FindRepository locates a repository by UUID string, name, or root_path prefix.
-func FindRepository(ctx context.Context, pool *pgxpool.Pool, selector string) (*models.Repository, error) {
-	// Try exact UUID first.
+func FindRepository(ctx context.Context, db *sql.DB, selector string) (*models.Repository, error) {
 	if id, err := uuid.Parse(selector); err == nil {
-		return GetRepository(ctx, pool, id)
+		return GetRepository(ctx, db, id)
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, target_id, name, root_path, remote_url, default_branch,
 		       include_patterns, exclude_patterns, is_monitored, state,
 		       created_at_utc, updated_at_utc, last_error
 		FROM repositories
-		WHERE name = $1
-		   OR root_path = $1
-		   OR root_path LIKE $2
+		WHERE name = ?
+		   OR root_path = ?
+		   OR root_path LIKE ?
 		ORDER BY name ASC
 		LIMIT 1
-	`, selector, selector+"%")
+	`, selector, selector, selector+"%")
 	if err != nil {
 		return nil, err
 	}
@@ -119,81 +115,105 @@ func FindRepository(ctx context.Context, pool *pgxpool.Pool, selector string) (*
 }
 
 // SetRepositoryState updates a repository's state and monitoring flag.
-func SetRepositoryState(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, state models.RepositoryState, isMonitored bool) error {
-	_, err := pool.Exec(ctx, `
+func SetRepositoryState(ctx context.Context, db *sql.DB, id uuid.UUID, state models.RepositoryState, isMonitored bool) error {
+	_, err := db.ExecContext(ctx, `
 		UPDATE repositories
-		SET state = $2, is_monitored = $3, updated_at_utc = $4
-		WHERE id = $1
-	`, id, string(state), isMonitored, time.Now().UTC())
+		SET state = ?, is_monitored = ?, updated_at_utc = ?
+		WHERE id = ?
+	`, string(state), isMonitored, formatTime(time.Now().UTC()), id.String())
 	return err
 }
 
 // SetRepositoryPatterns stores include/exclude glob patterns for a repository.
-func SetRepositoryPatterns(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, include, exclude []string) error {
-	inclJSON, err := json.Marshal(include)
+func SetRepositoryPatterns(ctx context.Context, db *sql.DB, id uuid.UUID, include, exclude []string) error {
+	inclJSON, err := encodeJSON(include)
 	if err != nil {
 		return fmt.Errorf("marshal include: %w", err)
 	}
-	exclJSON, err := json.Marshal(exclude)
+	exclJSON, err := encodeJSON(exclude)
 	if err != nil {
 		return fmt.Errorf("marshal exclude: %w", err)
 	}
-	_, err = pool.Exec(ctx, `
+	_, err = db.ExecContext(ctx, `
 		UPDATE repositories
-		SET include_patterns = $2, exclude_patterns = $3, updated_at_utc = $4
-		WHERE id = $1
-	`, id, inclJSON, exclJSON, time.Now().UTC())
+		SET include_patterns = ?, exclude_patterns = ?, updated_at_utc = ?
+		WHERE id = ?
+	`, inclJSON, exclJSON, formatTime(time.Now().UTC()), id.String())
 	return err
 }
 
 // UpsertTrackedTarget inserts or updates a tracked target record.
-func UpsertTrackedTarget(ctx context.Context, pool *pgxpool.Pool, t models.TrackedTarget) error {
-	_, err := pool.Exec(ctx, `
+func UpsertTrackedTarget(ctx context.Context, db *sql.DB, t models.TrackedTarget) error {
+	_, err := db.ExecContext(ctx, `
 		INSERT INTO tracked_targets (id, path, kind, created_at_utc, last_scan_at_utc)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (path) DO UPDATE SET
-			last_scan_at_utc = EXCLUDED.last_scan_at_utc
-	`, t.ID, t.Path, t.Kind, t.CreatedAt.UTC(), t.LastScanAt)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(path) DO UPDATE SET
+			last_scan_at_utc = excluded.last_scan_at_utc
+	`, t.ID.String(), t.Path, t.Kind, formatTime(t.CreatedAt), nullableTime(t.LastScanAt))
 	return err
 }
 
-// scanRepos reads repository rows into a slice.
-func scanRepos(rows pgx.Rows) ([]models.Repository, error) {
+func scanRepos(rows *sql.Rows) ([]models.Repository, error) {
 	var repos []models.Repository
 	for rows.Next() {
 		var r models.Repository
-		var inclJSON, exclJSON []byte
+		var idText string
+		var targetID sql.NullString
+		var remoteURL sql.NullString
+		var defaultBranch sql.NullString
+		var inclJSON string
+		var exclJSON string
 		var state string
+		var createdAt string
+		var updatedAt string
+		var lastError sql.NullString
 
-		err := rows.Scan(
-			&r.ID, &r.TargetID, &r.Name, &r.RootPath, &r.RemoteURL, &r.DefaultBranch,
+		if err := rows.Scan(
+			&idText, &targetID, &r.Name, &r.RootPath, &remoteURL, &defaultBranch,
 			&inclJSON, &exclJSON, &r.IsMonitored, &state,
-			&r.CreatedAt, &r.UpdatedAt, &r.LastError,
-		)
-		if err != nil {
+			&createdAt, &updatedAt, &lastError,
+		); err != nil {
 			return nil, fmt.Errorf("scan repo: %w", err)
 		}
+
+		id, err := parseUUID(idText)
+		if err != nil {
+			return nil, err
+		}
+		r.ID = id
+
+		r.TargetID, err = parseOptionalUUID(targetID)
+		if err != nil {
+			return nil, err
+		}
+		r.RemoteURL = optionalString(remoteURL)
+		r.DefaultBranch = optionalString(defaultBranch)
+		r.LastError = optionalString(lastError)
 		r.State = models.RepositoryState(state)
-		if err := json.Unmarshal(inclJSON, &r.IncludePatterns); err != nil {
-			r.IncludePatterns = nil
+
+		r.CreatedAt, err = parseTime(createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan repo created_at: %w", err)
 		}
-		if err := json.Unmarshal(exclJSON, &r.ExcludePatterns); err != nil {
-			r.ExcludePatterns = nil
+		r.UpdatedAt, err = parseTime(updatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan repo updated_at: %w", err)
 		}
-		// Ensure nil slices become empty slices for consistent behavior.
+
+		if err := decodeJSON(inclJSON, &r.IncludePatterns); err != nil {
+			r.IncludePatterns = []string{}
+		}
+		if err := decodeJSON(exclJSON, &r.ExcludePatterns); err != nil {
+			r.ExcludePatterns = []string{}
+		}
 		if r.IncludePatterns == nil {
 			r.IncludePatterns = []string{}
 		}
 		if r.ExcludePatterns == nil {
 			r.ExcludePatterns = []string{}
 		}
+
 		repos = append(repos, r)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	// Keep the compiler happy about the strings import.
-	_ = strings.ToLower
-	return repos, nil
+	return repos, rows.Err()
 }

@@ -47,7 +47,7 @@ func TestSaveRoundTrip(t *testing.T) {
 			DayBoundaryMinutes: 90,
 		},
 		Database: DatabaseSettings{
-			DSN: "postgres://localhost/gitpulse?sslmode=disable",
+			Path: "/tmp/gitpulse.db",
 		},
 		Server: ServerSettings{
 			Host: "127.0.0.1",
@@ -81,7 +81,7 @@ func TestSaveOmitsEmptyAuthorDetails(t *testing.T) {
 	cfg := &AppConfig{
 		Authors: []AuthorIdentity{{Email: "you@example.com"}},
 		Database: DatabaseSettings{
-			DSN: "postgres://localhost/gitpulse?sslmode=disable",
+			Path: "/tmp/gitpulse.db",
 		},
 	}
 
@@ -110,13 +110,13 @@ func TestSaveOverwritesExistingConfig(t *testing.T) {
 	first := &AppConfig{
 		Goals: GoalSettings{ChangedLinesPerDay: 100},
 		Database: DatabaseSettings{
-			DSN: "postgres://localhost/first?sslmode=disable",
+			Path: "/tmp/first.db",
 		},
 	}
 	second := &AppConfig{
 		Goals: GoalSettings{ChangedLinesPerDay: 200},
 		Database: DatabaseSettings{
-			DSN: "postgres://localhost/second?sslmode=disable",
+			Path: "/tmp/second.db",
 		},
 	}
 
@@ -134,7 +134,7 @@ func TestSaveOverwritesExistingConfig(t *testing.T) {
 	if got := loaded.Goals.ChangedLinesPerDay; got != 200 {
 		t.Fatalf("changed_lines_per_day = %d, want 200", got)
 	}
-	if got := loaded.Database.DSN; got != second.Database.DSN {
-		t.Fatalf("database dsn = %q, want %q", got, second.Database.DSN)
+	if got := loaded.Database.Path; got != second.Database.Path {
+		t.Fatalf("database path = %q, want %q", got, second.Database.Path)
 	}
 }

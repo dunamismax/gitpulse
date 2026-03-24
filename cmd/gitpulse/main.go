@@ -29,7 +29,7 @@ func rootCmd() *cobra.Command {
 		Use:   "gitpulse",
 		Short: "Local-first git activity analytics",
 		Long: `GitPulse tracks commits, sessions, and streaks across repositories
-without uploading source code. All data stays local; the current implementation stores it in PostgreSQL.`,
+without uploading source code. All data stays local in a SQLite database.`,
 		SilenceUsage: true,
 	}
 
@@ -280,7 +280,7 @@ func doctorCmd(cfgFile *string) *cobra.Command {
 				fmt.Printf("config: error: %v\n", err)
 				return nil
 			}
-			fmt.Printf("database DSN: %s\n", maskDSN(cfg.Database.DSN))
+			fmt.Printf("database path: %s\n", displayDatabasePath(cfg.Database.Path))
 
 			rt, _, err := loadRuntime(*cfgFile)
 			if err != nil {
@@ -319,11 +319,10 @@ func locateWebDirs() (templatesDir, assetsDir, frontendDir string) {
 	return filepath.Join(base, "templates"), filepath.Join(base, "assets"), filepath.Join(base, "frontend", "dist")
 }
 
-// maskDSN replaces the password portion of a DSN with asterisks for display.
-func maskDSN(dsn string) string {
-	if dsn == "" {
+// displayDatabasePath normalizes empty database paths for diagnostic output.
+func displayDatabasePath(path string) string {
+	if path == "" {
 		return "(not set)"
 	}
-	// Simple heuristic: hide anything after "://" up to the "@".
-	return "[configured]"
+	return path
 }

@@ -6,10 +6,9 @@ GitPulse is an active Go application with a Bun/Astro frontend. Read [BUILD.md](
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.26.1
 - Bun 1.1+
 - Git 2.30+
-- PostgreSQL 14+ for the current implementation
 
 ### First build
 
@@ -24,33 +23,27 @@ go build ./cmd/gitpulse
 
 ### Minimal local config
 
-The current code still expects PostgreSQL. Do not start a partial storage migration in an unrelated change.
+GitPulse defaults to a SQLite database in the platform data directory, so a config file is optional.
 
-Create a database:
-
-```bash
-createdb gitpulse
-```
-
-Then configure:
+Optional explicit config:
 
 ```toml
 [database]
-dsn = "postgres://localhost/gitpulse?sslmode=disable"
+path = "/absolute/path/to/gitpulse.db"
 ```
 
 See [gitpulse.example.toml](gitpulse.example.toml) for the full config surface.
 
 ## Architecture rules
 
-GitPulse currently uses a Go-first backend with an Astro browser frontend.
+GitPulse uses a Go-first backend with an Astro browser frontend.
 
 | Path | Owns |
 |------|------|
 | `cmd/gitpulse` | CLI command wiring |
 | `frontend` | Astro pages, layout, styles, and browser-side TypeScript/Alpine |
 | `internal/config` | config loading and platform paths |
-| `internal/db` | current pgx pool, schema, plain SQL queries |
+| `internal/db` | SQLite connection, schema, migrations, and plain SQL queries |
 | `internal/filter` | include/exclude matching |
 | `internal/git` | git subprocess integration and parsing |
 | `internal/metrics` | score, streak, achievement logic |
@@ -64,11 +57,8 @@ Rules:
 - New backend implementation work goes in Go.
 - Astro owns the browser page/layout lane.
 - Alpine handles light browser interaction; avoid heavy hydration unless it clearly earns its keep.
-- Database work stays on the current PostgreSQL implementation unless the change is explicitly about the storage migration.
-- GitPulse is doctrinally SQLite-shaped, but this repo does not yet have a safe SQLite path implemented.
-- Keep persistence relational and Go-owned.
-- Keep plain SQL via `pgx/v5` unless backend complexity later earns `sqlc`.
-- Do not add MongoDB.
+- Keep persistence relational, local, and Go-owned.
+- Keep plain SQL explicit in `internal/db`.
 - Keep repo-controlled strings treated as untrusted input.
 - Keep docs aligned when product behavior changes.
 - Do not document release workflows that are not present in-tree.
@@ -85,7 +75,7 @@ go build ./cmd/gitpulse
 go run ./cmd/gitpulse --help
 ```
 
-If your change touches runtime/database behavior, prefer adding an integration test once the current PostgreSQL harness exists, and keep future SQLite migration work explicit rather than incidental.
+If your change touches runtime or database behavior, prefer adding a focused integration test against a temporary SQLite file.
 
 ## Documentation expectations
 

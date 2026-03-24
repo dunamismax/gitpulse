@@ -89,7 +89,7 @@ func (s *Server) handleRepoPatterns(w http.ResponseWriter, r *http.Request) {
 	include := splitLines(r.FormValue("include_patterns"))
 	exclude := splitLines(r.FormValue("exclude_patterns"))
 
-	if err := db.SetRepositoryPatterns(r.Context(), s.rt.Pool(), id, include, exclude); err != nil {
+	if err := db.SetRepositoryPatterns(r.Context(), s.rt.DB(), id, include, exclude); err != nil {
 		slog.Error("set patterns", "id", id, "err", err)
 		http.Error(w, "save failed", http.StatusInternalServerError)
 		return

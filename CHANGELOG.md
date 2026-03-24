@@ -8,14 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Persist settings page changes to the active TOML config file and update the in-memory runtime config after save.
+- Add a focused SQLite integration test for schema bootstrap and repository persistence.
+- Default the runtime to a local SQLite database path in the platform data directory.
 
 ### Changed
-- Document the repository as a Go + PostgreSQL + raw SQL + local web UI project with `BUILD.md` as the execution ledger.
-- Align README, BUILD, architecture notes, and contributor docs with the current implementation.
-- Tighten release and packaging docs so they only describe workflows the repo actually has.
+- Replace the storage layer with SQLite via `database/sql` and `modernc.org/sqlite`.
+- Convert runtime queries, migrations, config examples, and CLI diagnostics to the SQLite path model.
+- Align README, BUILD, architecture notes, agent docs, roadmap, and contributor docs with the active implementation.
 
 ### Removed
-- The temporary handoff tracker file and stale references to it across the repo.
-- Stale migration-cleanup narration from active docs.
-- Outdated packaging and toolchain references that no longer describe the current repo.
+- The redundant second init migration file.
+- Stale storage documentation that described a different runtime than the code.

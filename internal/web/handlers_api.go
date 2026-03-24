@@ -203,7 +203,7 @@ func (s *Server) handleAPIRepoPatterns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := db.SetRepositoryPatterns(r.Context(), s.rt.Pool(), id, body.Include, body.Exclude); err != nil {
+	if err := db.SetRepositoryPatterns(r.Context(), s.rt.DB(), id, body.Include, body.Exclude); err != nil {
 		slog.Error("api set patterns", "id", id, "err", err)
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return

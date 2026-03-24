@@ -2,47 +2,48 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dunamismax/gitpulse/internal/models"
 )
 
 // InsertPushEvent stores a single push event.
-func InsertPushEvent(ctx context.Context, pool *pgxpool.Pool, p models.PushEvent) error {
-	_, err := pool.Exec(ctx, `
+func InsertPushEvent(ctx context.Context, db *sql.DB, p models.PushEvent) error {
+	_, err := db.ExecContext(ctx, `
 		INSERT INTO push_events
 			(id, repo_id, observed_at_utc, kind, head_sha, pushed_commit_count, upstream_ref, notes)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		p.ID, p.RepoID, p.ObservedAt.UTC(), string(p.Kind),
-		p.HeadSHA, p.PushedCommitCount, p.UpstreamRef, p.Notes,
+		p.ID.String(), p.RepoID.String(), formatTime(p.ObservedAt), string(p.Kind),
+		nullableString(p.HeadSHA), p.PushedCommitCount, nullableString(p.UpstreamRef), nullableString(p.Notes),
 	)
 	return err
 }
 
 // ListPushEvents returns recent push events. If repoID is nil, returns global results.
-func ListPushEvents(ctx context.Context, pool *pgxpool.Pool, repoID *uuid.UUID, limit int) ([]models.PushEvent, error) {
-	var rows pgx.Rows
-	var err error
+func ListPushEvents(ctx context.Context, db *sql.DB, repoID *uuid.UUID, limit int) ([]models.PushEvent, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
 
 	if repoID != nil {
-		rows, err = pool.Query(ctx, `
+		rows, err = db.QueryContext(ctx, `
 			SELECT id, repo_id, observed_at_utc, kind, head_sha, pushed_commit_count, upstream_ref, notes
 			FROM push_events
-			WHERE repo_id = $1
+			WHERE repo_id = ?
 			ORDER BY observed_at_utc DESC
-			LIMIT $2
-		`, *repoID, limit)
+			LIMIT ?
+		`, repoID.String(), limit)
 	} else {
-		rows, err = pool.Query(ctx, `
+		rows, err = db.QueryContext(ctx, `
 			SELECT id, repo_id, observed_at_utc, kind, head_sha, pushed_commit_count, upstream_ref, notes
 			FROM push_events
 			ORDER BY observed_at_utc DESC
-			LIMIT $1
+			LIMIT ?
 		`, limit)
 	}
 	if err != nil {
@@ -53,8 +54,8 @@ func ListPushEvents(ctx context.Context, pool *pgxpool.Pool, repoID *uuid.UUID, 
 }
 
 // AllPushEventsForAnalytics loads all push events for a full analytics rebuild.
-func AllPushEventsForAnalytics(ctx context.Context, pool *pgxpool.Pool) ([]models.PushEvent, error) {
-	rows, err := pool.Query(ctx, `
+func AllPushEventsForAnalytics(ctx context.Context, db *sql.DB) ([]models.PushEvent, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, repo_id, observed_at_utc, kind, head_sha, pushed_commit_count, upstream_ref, notes
 		FROM push_events
 		ORDER BY repo_id, observed_at_utc ASC
@@ -66,19 +67,44 @@ func AllPushEventsForAnalytics(ctx context.Context, pool *pgxpool.Pool) ([]model
 	return scanPushes(rows)
 }
 
-func scanPushes(rows pgx.Rows) ([]models.PushEvent, error) {
+func scanPushes(rows *sql.Rows) ([]models.PushEvent, error) {
 	var pushes []models.PushEvent
 	for rows.Next() {
 		var p models.PushEvent
+		var idText string
+		var repoIDText string
+		var observedAt string
 		var kind string
-		err := rows.Scan(
-			&p.ID, &p.RepoID, &p.ObservedAt, &kind,
-			&p.HeadSHA, &p.PushedCommitCount, &p.UpstreamRef, &p.Notes,
-		)
-		if err != nil {
+		var headSHA sql.NullString
+		var upstreamRef sql.NullString
+		var notes sql.NullString
+
+		if err := rows.Scan(
+			&idText, &repoIDText, &observedAt, &kind,
+			&headSHA, &p.PushedCommitCount, &upstreamRef, &notes,
+		); err != nil {
 			return nil, fmt.Errorf("scan push: %w", err)
 		}
+
+		id, err := parseUUID(idText)
+		if err != nil {
+			return nil, err
+		}
+		repoID, err := parseUUID(repoIDText)
+		if err != nil {
+			return nil, err
+		}
+		p.ID = id
+		p.RepoID = repoID
 		p.Kind = models.PushKind(kind)
+		p.HeadSHA = optionalString(headSHA)
+		p.UpstreamRef = optionalString(upstreamRef)
+		p.Notes = optionalString(notes)
+		p.ObservedAt, err = parseTime(observedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan push observed_at: %w", err)
+		}
+
 		pushes = append(pushes, p)
 	}
 	return pushes, rows.Err()

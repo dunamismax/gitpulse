@@ -3,6 +3,7 @@ package runtime
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dunamismax/gitpulse/internal/config"
 	"github.com/dunamismax/gitpulse/internal/db"
@@ -26,36 +26,36 @@ import (
 type Runtime struct {
 	cfgMu sync.RWMutex
 	cfg   *config.AppConfig
-	pool  *pgxpool.Pool
+	db    *sql.DB
 }
 
 // New connects to the database, runs migrations, and returns a Runtime.
 func New(ctx context.Context, cfg *config.AppConfig) (*Runtime, error) {
-	if cfg.Database.DSN == "" {
-		return nil, fmt.Errorf("database DSN is not configured (set database.dsn in config or GITPULSE_DATABASE__DSN env var)")
+	if cfg.Database.Path == "" {
+		return nil, fmt.Errorf("database path is not configured (set database.path in config or GITPULSE_DATABASE__PATH env var)")
 	}
 
-	pool, err := db.Connect(ctx, cfg.Database.DSN)
+	handle, err := db.Connect(ctx, cfg.Database.Path)
 	if err != nil {
 		return nil, fmt.Errorf("db connect: %w", err)
 	}
 
-	if err := db.RunMigrations(ctx, pool); err != nil {
-		pool.Close()
+	if err := db.RunMigrations(ctx, handle); err != nil {
+		_ = handle.Close()
 		return nil, fmt.Errorf("migrations: %w", err)
 	}
 
-	return &Runtime{cfg: cfg.Clone(), pool: pool}, nil
+	return &Runtime{cfg: cfg.Clone(), db: handle}, nil
 }
 
-// Close shuts down the database pool.
+// Close shuts down the database handle.
 func (rt *Runtime) Close() {
-	rt.pool.Close()
+	_ = rt.db.Close()
 }
 
-// Pool exposes the pgxpool for direct use in tests.
-func (rt *Runtime) Pool() *pgxpool.Pool {
-	return rt.pool
+// DB exposes the SQL database handle for direct use in handlers and tests.
+func (rt *Runtime) DB() *sql.DB {
+	return rt.db
 }
 
 // Config returns the loaded configuration.
@@ -83,12 +83,12 @@ func (rt *Runtime) SetConfig(cfg *config.AppConfig) {
 
 // ListRepos returns all tracked repositories ordered by name.
 func (rt *Runtime) ListRepos(ctx context.Context) ([]models.Repository, error) {
-	return db.ListRepositories(ctx, rt.pool)
+	return db.ListRepositories(ctx, rt.db)
 }
 
 // FindRepo resolves a repository by UUID, exact path, or name prefix.
 func (rt *Runtime) FindRepo(ctx context.Context, selector string) (*models.Repository, error) {
-	return db.FindRepository(ctx, rt.pool, selector)
+	return db.FindRepository(ctx, rt.db, selector)
 }
 
 // AddTarget discovers repositories at path, registers them, imports initial
@@ -120,7 +120,7 @@ func (rt *Runtime) AddTarget(ctx context.Context, path string) ([]models.Reposit
 		Kind:      kind,
 		CreatedAt: time.Now().UTC(),
 	}
-	if err := db.UpsertTrackedTarget(ctx, rt.pool, target); err != nil {
+	if err := db.UpsertTrackedTarget(ctx, rt.db, target); err != nil {
 		return nil, fmt.Errorf("upsert target: %w", err)
 	}
 
@@ -149,12 +149,12 @@ func (rt *Runtime) AddTarget(ctx context.Context, path string) ([]models.Reposit
 			repo.DefaultBranch = &defaultBranch
 		}
 
-		if err := db.UpsertRepository(ctx, rt.pool, repo); err != nil {
+		if err := db.UpsertRepository(ctx, rt.db, repo); err != nil {
 			return nil, fmt.Errorf("upsert repo %s: %w", root, err)
 		}
 
 		// Reload to get the canonical ID in case of conflict.
-		saved, err := db.FindRepository(ctx, rt.pool, root)
+		saved, err := db.FindRepository(ctx, rt.db, root)
 		if err != nil || saved == nil {
 			continue
 		}
@@ -177,7 +177,7 @@ func (rt *Runtime) AddTarget(ctx context.Context, path string) ([]models.Reposit
 // RefreshRepository snapshots a repository, detects pushes, inserts activity,
 // imports recent commits, and rebuilds analytics.
 func (rt *Runtime) RefreshRepository(ctx context.Context, repoID uuid.UUID, includeSizeScan bool) error {
-	repo, err := db.GetRepository(ctx, rt.pool, repoID)
+	repo, err := db.GetRepository(ctx, rt.db, repoID)
 	if err != nil || repo == nil {
 		return fmt.Errorf("repo not found: %v", repoID)
 	}
@@ -193,7 +193,7 @@ func (rt *Runtime) RefreshRepository(ctx context.Context, repoID uuid.UUID, incl
 	}
 
 	// Detect push: previous ahead_count > current ahead_count.
-	prevSnap, _ := db.LatestSnapshot(ctx, rt.pool, repoID)
+	prevSnap, _ := db.LatestSnapshot(ctx, rt.db, repoID)
 	if prevSnap != nil && prevSnap.AheadCount > snap.AheadCount {
 		push := models.PushEvent{
 			ID:                uuid.New(),
@@ -204,7 +204,7 @@ func (rt *Runtime) RefreshRepository(ctx context.Context, repoID uuid.UUID, incl
 			PushedCommitCount: prevSnap.AheadCount - snap.AheadCount,
 			UpstreamRef:       snap.UpstreamRef,
 		}
-		_ = db.InsertPushEvent(ctx, rt.pool, push)
+		_ = db.InsertPushEvent(ctx, rt.db, push)
 	}
 
 	// Insert file activity if there are changes.
@@ -222,7 +222,7 @@ func (rt *Runtime) RefreshRepository(ctx context.Context, repoID uuid.UUID, incl
 		})
 	}
 	if len(fileEvents) > 0 {
-		_ = db.InsertFileActivity(ctx, rt.pool, fileEvents)
+		_ = db.InsertFileActivity(ctx, rt.db, fileEvents)
 	}
 
 	// Store snapshot.
@@ -247,7 +247,7 @@ func (rt *Runtime) RefreshRepository(ctx context.Context, repoID uuid.UUID, incl
 		RepoSizeBytes:     snap.RepoSizeBytes,
 		LanguageBreakdown: snap.LanguageBreakdown,
 	}
-	_ = db.InsertSnapshot(ctx, rt.pool, dbSnap)
+	_ = db.InsertSnapshot(ctx, rt.db, dbSnap)
 
 	// Import recent history.
 	if _, err := rt.ImportRepoHistory(ctx, repoID, 2); err != nil {
@@ -259,7 +259,7 @@ func (rt *Runtime) RefreshRepository(ctx context.Context, repoID uuid.UUID, incl
 
 // RescanAll refreshes all active monitored repositories.
 func (rt *Runtime) RescanAll(ctx context.Context) error {
-	repos, err := db.ListRepositories(ctx, rt.pool)
+	repos, err := db.ListRepositories(ctx, rt.db)
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func (rt *Runtime) RescanAll(ctx context.Context) error {
 func (rt *Runtime) ImportRepoHistory(ctx context.Context, repoID uuid.UUID, days int) (int, error) {
 	cfg := rt.Config()
 
-	repo, err := db.GetRepository(ctx, rt.pool, repoID)
+	repo, err := db.GetRepository(ctx, rt.db, repoID)
 	if err != nil || repo == nil {
 		return 0, fmt.Errorf("repo not found: %v", repoID)
 	}
@@ -312,18 +312,18 @@ func (rt *Runtime) ImportRepoHistory(ctx context.Context, repoID uuid.UUID, days
 		}
 	}
 
-	n, err := db.InsertCommits(ctx, rt.pool, commits)
+	n, err := db.InsertCommits(ctx, rt.db, commits)
 	if err != nil {
 		return 0, err
 	}
-	_ = db.InsertFileActivity(ctx, rt.pool, fileEvents)
+	_ = db.InsertFileActivity(ctx, rt.db, fileEvents)
 
 	return n, nil
 }
 
 // ToggleRepository flips a repository between Active and Disabled states.
 func (rt *Runtime) ToggleRepository(ctx context.Context, repoID uuid.UUID) error {
-	repo, err := db.GetRepository(ctx, rt.pool, repoID)
+	repo, err := db.GetRepository(ctx, rt.db, repoID)
 	if err != nil || repo == nil {
 		return fmt.Errorf("repo not found: %v", repoID)
 	}
@@ -333,12 +333,12 @@ func (rt *Runtime) ToggleRepository(ctx context.Context, repoID uuid.UUID) error
 		newState = models.StateDisabled
 		monitored = false
 	}
-	return db.SetRepositoryState(ctx, rt.pool, repoID, newState, monitored)
+	return db.SetRepositoryState(ctx, rt.db, repoID, newState, monitored)
 }
 
 // RemoveRepository marks a repository as removed.
 func (rt *Runtime) RemoveRepository(ctx context.Context, repoID uuid.UUID) error {
-	return db.SetRepositoryState(ctx, rt.pool, repoID, models.StateRemoved, false)
+	return db.SetRepositoryState(ctx, rt.db, repoID, models.StateRemoved, false)
 }
 
 // ---------------------------------------------------------------------------
@@ -353,15 +353,15 @@ func (rt *Runtime) RebuildAnalytics(ctx context.Context) (*models.RebuildReport,
 		return nil, err
 	}
 
-	sess, err := db.ListFocusSessions(ctx, rt.pool, 9999)
+	sess, err := db.ListFocusSessions(ctx, rt.db, 9999)
 	if err != nil {
 		return nil, err
 	}
-	rollups, err := db.AllRollupsForScope(ctx, rt.pool, "all")
+	rollups, err := db.AllRollupsForScope(ctx, rt.db, "all")
 	if err != nil {
 		return nil, err
 	}
-	achs, err := db.ListAchievements(ctx, rt.pool)
+	achs, err := db.ListAchievements(ctx, rt.db)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +378,7 @@ func (rt *Runtime) RebuildAnalytics(ctx context.Context) (*models.RebuildReport,
 func (rt *Runtime) rebuildAnalyticsInternal(ctx context.Context) error {
 	cfg := rt.Config()
 
-	repos, err := db.ListRepositories(ctx, rt.pool)
+	repos, err := db.ListRepositories(ctx, rt.db)
 	if err != nil {
 		return err
 	}
@@ -389,19 +389,19 @@ func (rt *Runtime) rebuildAnalyticsInternal(ctx context.Context) error {
 		}
 	}
 
-	snapshots, err := db.AllSnapshotsForAnalytics(ctx, rt.pool)
+	snapshots, err := db.AllSnapshotsForAnalytics(ctx, rt.db)
 	if err != nil {
 		return err
 	}
-	commits, err := db.AllCommitsForAnalytics(ctx, rt.pool)
+	commits, err := db.AllCommitsForAnalytics(ctx, rt.db)
 	if err != nil {
 		return err
 	}
-	pushEvents, err := db.AllPushEventsForAnalytics(ctx, rt.pool)
+	pushEvents, err := db.AllPushEventsForAnalytics(ctx, rt.db)
 	if err != nil {
 		return err
 	}
-	fileActivity, err := db.AllFileActivityForAnalytics(ctx, rt.pool)
+	fileActivity, err := db.AllFileActivityForAnalytics(ctx, rt.db)
 	if err != nil {
 		return err
 	}
@@ -608,13 +608,13 @@ func (rt *Runtime) rebuildAnalyticsInternal(ctx context.Context) error {
 	achs := metrics.EvaluateAchievements(len(repoMap), totalPushes, allRollups, focusSessions)
 
 	// Persist.
-	if err := db.ReplaceFocusSessions(ctx, rt.pool, focusSessions); err != nil {
+	if err := db.ReplaceFocusSessions(ctx, rt.db, focusSessions); err != nil {
 		return fmt.Errorf("replace sessions: %w", err)
 	}
-	if err := db.ReplaceDailyRollups(ctx, rt.pool, rollups); err != nil {
+	if err := db.ReplaceDailyRollups(ctx, rt.db, rollups); err != nil {
 		return fmt.Errorf("replace rollups: %w", err)
 	}
-	if err := db.ReplaceAchievements(ctx, rt.pool, achs); err != nil {
+	if err := db.ReplaceAchievements(ctx, rt.db, achs); err != nil {
 		return fmt.Errorf("replace achievements: %w", err)
 	}
 
@@ -631,7 +631,7 @@ func (rt *Runtime) DashboardView(ctx context.Context) (*models.DashboardView, er
 	today := time.Now().UTC().Format("2006-01-02")
 
 	// Today's "all" rollup.
-	allRollups, err := db.AllRollupsForScope(ctx, rt.pool, "all")
+	allRollups, err := db.AllRollupsForScope(ctx, rt.db, "all")
 	if err != nil {
 		return nil, err
 	}
@@ -687,7 +687,7 @@ func (rt *Runtime) DashboardView(ctx context.Context) (*models.DashboardView, er
 		Goals:                goalProgress,
 	}
 
-	feed, err := db.RecentActivityFeed(ctx, rt.pool, 20)
+	feed, err := db.RecentActivityFeed(ctx, rt.db, 20)
 	if err != nil {
 		return nil, err
 	}
@@ -713,7 +713,7 @@ func (rt *Runtime) DashboardView(ctx context.Context) (*models.DashboardView, er
 
 // RepositoryCards builds display cards for all non-removed repositories.
 func (rt *Runtime) RepositoryCards(ctx context.Context) ([]models.RepoCard, error) {
-	repos, err := db.ListRepositories(ctx, rt.pool)
+	repos, err := db.ListRepositories(ctx, rt.db)
 	if err != nil {
 		return nil, err
 	}
@@ -725,10 +725,10 @@ func (rt *Runtime) RepositoryCards(ctx context.Context) ([]models.RepoCard, erro
 		if repo.State == models.StateRemoved {
 			continue
 		}
-		snap, _ := db.LatestSnapshot(ctx, rt.pool, repo.ID)
+		snap, _ := db.LatestSnapshot(ctx, rt.db, repo.ID)
 		health := assessHealth(snap)
 
-		repoRollups, err := db.AllRollupsForScope(ctx, rt.pool, repo.ID.String())
+		repoRollups, err := db.AllRollupsForScope(ctx, rt.db, repo.ID.String())
 		if err != nil {
 			repoRollups = nil
 		}
@@ -750,16 +750,16 @@ func (rt *Runtime) RepositoryCards(ctx context.Context) ([]models.RepoCard, erro
 
 // RepoDetail builds the full detail view for a single repository.
 func (rt *Runtime) RepoDetail(ctx context.Context, selector string) (*models.RepoDetailView, error) {
-	repo, err := db.FindRepository(ctx, rt.pool, selector)
+	repo, err := db.FindRepository(ctx, rt.db, selector)
 	if err != nil || repo == nil {
 		return nil, fmt.Errorf("repository not found: %s", selector)
 	}
 
-	snap, _ := db.LatestSnapshot(ctx, rt.pool, repo.ID)
+	snap, _ := db.LatestSnapshot(ctx, rt.db, repo.ID)
 	health := assessHealth(snap)
 	today := time.Now().UTC().Format("2006-01-02")
 
-	repoRollups, _ := db.AllRollupsForScope(ctx, rt.pool, repo.ID.String())
+	repoRollups, _ := db.AllRollupsForScope(ctx, rt.db, repo.ID.String())
 	todayMetrics := findRollup(repoRollups, today)
 	sparkline := buildSparkline(repoRollups, 7)
 
@@ -771,17 +771,17 @@ func (rt *Runtime) RepoDetail(ctx context.Context, selector string) (*models.Rep
 		Sparkline: sparkline,
 	}
 
-	commits, err := db.ListCommits(ctx, rt.pool, &repo.ID, 20)
+	commits, err := db.ListCommits(ctx, rt.db, &repo.ID, 20)
 	if err != nil {
 		commits = nil
 	}
-	pushes, err := db.ListPushEvents(ctx, rt.pool, &repo.ID, 10)
+	pushes, err := db.ListPushEvents(ctx, rt.db, &repo.ID, 10)
 	if err != nil {
 		pushes = nil
 	}
 
 	// Filter sessions that touched this repo.
-	allSessions, err := db.ListFocusSessions(ctx, rt.pool, 200)
+	allSessions, err := db.ListFocusSessions(ctx, rt.db, 200)
 	if err != nil {
 		allSessions = nil
 	}
@@ -803,7 +803,7 @@ func (rt *Runtime) RepoDetail(ctx context.Context, selector string) (*models.Rep
 		langBreakdown = snap.LanguageBreakdown
 	}
 
-	topFiles, _ := db.TopFilesTouched(ctx, rt.pool, &repo.ID, 12)
+	topFiles, _ := db.TopFilesTouched(ctx, rt.db, &repo.ID, 12)
 
 	return &models.RepoDetailView{
 		Card:              card,
@@ -819,7 +819,7 @@ func (rt *Runtime) RepoDetail(ctx context.Context, selector string) (*models.Rep
 
 // SessionsSummary builds the sessions page data.
 func (rt *Runtime) SessionsSummary(ctx context.Context) (*models.SessionSummary, error) {
-	sess, err := db.ListFocusSessions(ctx, rt.pool, 50)
+	sess, err := db.ListFocusSessions(ctx, rt.db, 50)
 	if err != nil {
 		return nil, err
 	}
@@ -847,12 +847,12 @@ func (rt *Runtime) SessionsSummary(ctx context.Context) (*models.SessionSummary,
 
 // AchievementsView returns achievements, streak summary, and today's score.
 func (rt *Runtime) AchievementsView(ctx context.Context) ([]models.Achievement, models.StreakSummary, int, error) {
-	achs, err := db.ListAchievements(ctx, rt.pool)
+	achs, err := db.ListAchievements(ctx, rt.db)
 	if err != nil {
 		return nil, models.StreakSummary{}, 0, err
 	}
 
-	allRollups, err := db.AllRollupsForScope(ctx, rt.pool, "all")
+	allRollups, err := db.AllRollupsForScope(ctx, rt.db, "all")
 	if err != nil {
 		return nil, models.StreakSummary{}, 0, err
 	}

@@ -49,7 +49,7 @@ func TestHandleSettingsSavePersistsConfig(t *testing.T) {
 			DayBoundaryMinutes: 0,
 		},
 		Database: config.DatabaseSettings{
-			DSN: "postgres://localhost/gitpulse?sslmode=disable",
+			Path: filepath.Join(t.TempDir(), "gitpulse.db"),
 		},
 		Server: config.ServerSettings{
 			Host: "127.0.0.1",

@@ -8,16 +8,16 @@
 #
 # Environment overrides use the GITPULSE_ prefix and double underscores for
 # nesting, for example:
-#   GITPULSE_DATABASE__DSN=postgres://localhost/gitpulse
+#   GITPULSE_DATABASE__PATH=/absolute/path/to/gitpulse.db
 #   GITPULSE_SERVER__PORT=9000
 
 [database]
-# Current implementation: PostgreSQL via pgx/v5 with plain SQL.
-# GitPulse itself is likely to move toward a SQLite-first local default later,
-# but that migration has not been implemented yet.
-# Example: createdb gitpulse
-# Add sslmode as needed for remote instances.
-dsn = "postgres://localhost/gitpulse?sslmode=disable"
+# SQLite is the default store.
+# If omitted, GitPulse uses the platform data directory:
+#   macOS:   ~/Library/Application Support/gitpulse/data/gitpulse.db
+#   Linux:   ~/.config/gitpulse/data/gitpulse.db
+#   Windows: %APPDATA%\gitpulse\data\gitpulse.db
+path = "/absolute/path/to/gitpulse.db"
 
 [server]
 host = "127.0.0.1"

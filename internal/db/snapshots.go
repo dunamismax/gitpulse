@@ -2,33 +2,31 @@ package db
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dunamismax/gitpulse/internal/models"
 )
 
 // InsertSnapshot stores a repository status snapshot.
-func InsertSnapshot(ctx context.Context, pool *pgxpool.Pool, s models.RepoStatusSnapshot) error {
-	langJSON, err := json.Marshal(s.LanguageBreakdown)
+func InsertSnapshot(ctx context.Context, db *sql.DB, s models.RepoStatusSnapshot) error {
+	langJSON, err := encodeJSON(s.LanguageBreakdown)
 	if err != nil {
 		return fmt.Errorf("marshal language breakdown: %w", err)
 	}
-	_, err = pool.Exec(ctx, `
+	_, err = db.ExecContext(ctx, `
 		INSERT INTO repo_status_snapshots
 			(id, repo_id, observed_at_utc, branch, is_detached, head_sha,
 			 upstream_ref, upstream_head_sha, ahead_count, behind_count,
 			 live_additions, live_deletions, live_files,
 			 staged_additions, staged_deletions, staged_files,
 			 files_touched, repo_size_bytes, language_breakdown)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		s.ID, s.RepoID, s.ObservedAt.UTC(), s.Branch, s.IsDetached, s.HeadSHA,
-		s.UpstreamRef, s.UpstreamHeadSHA, s.AheadCount, s.BehindCount,
+		s.ID.String(), s.RepoID.String(), formatTime(s.ObservedAt), nullableString(s.Branch), s.IsDetached, nullableString(s.HeadSHA),
+		nullableString(s.UpstreamRef), nullableString(s.UpstreamHeadSHA), s.AheadCount, s.BehindCount,
 		s.LiveAdditions, s.LiveDeletions, s.LiveFiles,
 		s.StagedAdditions, s.StagedDeletions, s.StagedFiles,
 		s.FilesTouched, s.RepoSizeBytes, langJSON,
@@ -37,18 +35,18 @@ func InsertSnapshot(ctx context.Context, pool *pgxpool.Pool, s models.RepoStatus
 }
 
 // LatestSnapshot returns the most recent snapshot for a repository.
-func LatestSnapshot(ctx context.Context, pool *pgxpool.Pool, repoID uuid.UUID) (*models.RepoStatusSnapshot, error) {
-	rows, err := pool.Query(ctx, `
+func LatestSnapshot(ctx context.Context, db *sql.DB, repoID uuid.UUID) (*models.RepoStatusSnapshot, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, repo_id, observed_at_utc, branch, is_detached, head_sha,
 		       upstream_ref, upstream_head_sha, ahead_count, behind_count,
 		       live_additions, live_deletions, live_files,
 		       staged_additions, staged_deletions, staged_files,
 		       files_touched, repo_size_bytes, language_breakdown
 		FROM repo_status_snapshots
-		WHERE repo_id = $1
+		WHERE repo_id = ?
 		ORDER BY observed_at_utc DESC
 		LIMIT 1
-	`, repoID)
+	`, repoID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -64,18 +62,18 @@ func LatestSnapshot(ctx context.Context, pool *pgxpool.Pool, repoID uuid.UUID) (
 }
 
 // RecentSnapshots returns the last N snapshots for a repository.
-func RecentSnapshots(ctx context.Context, pool *pgxpool.Pool, repoID uuid.UUID, limit int) ([]models.RepoStatusSnapshot, error) {
-	rows, err := pool.Query(ctx, `
+func RecentSnapshots(ctx context.Context, db *sql.DB, repoID uuid.UUID, limit int) ([]models.RepoStatusSnapshot, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, repo_id, observed_at_utc, branch, is_detached, head_sha,
 		       upstream_ref, upstream_head_sha, ahead_count, behind_count,
 		       live_additions, live_deletions, live_files,
 		       staged_additions, staged_deletions, staged_files,
 		       files_touched, repo_size_bytes, language_breakdown
 		FROM repo_status_snapshots
-		WHERE repo_id = $1
+		WHERE repo_id = ?
 		ORDER BY observed_at_utc DESC
-		LIMIT $2
-	`, repoID, limit)
+		LIMIT ?
+	`, repoID.String(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +82,8 @@ func RecentSnapshots(ctx context.Context, pool *pgxpool.Pool, repoID uuid.UUID, 
 }
 
 // AllSnapshotsForAnalytics loads the full snapshots table for analytics rebuild.
-func AllSnapshotsForAnalytics(ctx context.Context, pool *pgxpool.Pool) ([]models.RepoStatusSnapshot, error) {
-	rows, err := pool.Query(ctx, `
+func AllSnapshotsForAnalytics(ctx context.Context, db *sql.DB) ([]models.RepoStatusSnapshot, error) {
+	rows, err := db.QueryContext(ctx, `
 		SELECT id, repo_id, observed_at_utc, branch, is_detached, head_sha,
 		       upstream_ref, upstream_head_sha, ahead_count, behind_count,
 		       live_additions, live_deletions, live_files,
@@ -101,24 +99,56 @@ func AllSnapshotsForAnalytics(ctx context.Context, pool *pgxpool.Pool) ([]models
 	return scanSnapshots(rows)
 }
 
-func scanSnapshots(rows pgx.Rows) ([]models.RepoStatusSnapshot, error) {
+func scanSnapshots(rows *sql.Rows) ([]models.RepoStatusSnapshot, error) {
 	var snaps []models.RepoStatusSnapshot
 	for rows.Next() {
 		var s models.RepoStatusSnapshot
-		var langJSON []byte
-		err := rows.Scan(
-			&s.ID, &s.RepoID, &s.ObservedAt, &s.Branch, &s.IsDetached, &s.HeadSHA,
-			&s.UpstreamRef, &s.UpstreamHeadSHA, &s.AheadCount, &s.BehindCount,
+		var idText string
+		var repoIDText string
+		var observedAt string
+		var branch sql.NullString
+		var headSHA sql.NullString
+		var upstreamRef sql.NullString
+		var upstreamHeadSHA sql.NullString
+		var langJSON string
+
+		if err := rows.Scan(
+			&idText, &repoIDText, &observedAt, &branch, &s.IsDetached, &headSHA,
+			&upstreamRef, &upstreamHeadSHA, &s.AheadCount, &s.BehindCount,
 			&s.LiveAdditions, &s.LiveDeletions, &s.LiveFiles,
 			&s.StagedAdditions, &s.StagedDeletions, &s.StagedFiles,
 			&s.FilesTouched, &s.RepoSizeBytes, &langJSON,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, fmt.Errorf("scan snapshot: %w", err)
 		}
-		if err := json.Unmarshal(langJSON, &s.LanguageBreakdown); err != nil {
+
+		id, err := parseUUID(idText)
+		if err != nil {
+			return nil, err
+		}
+		repoID, err := parseUUID(repoIDText)
+		if err != nil {
+			return nil, err
+		}
+		s.ID = id
+		s.RepoID = repoID
+		s.Branch = optionalString(branch)
+		s.HeadSHA = optionalString(headSHA)
+		s.UpstreamRef = optionalString(upstreamRef)
+		s.UpstreamHeadSHA = optionalString(upstreamHeadSHA)
+
+		s.ObservedAt, err = parseTime(observedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan snapshot observed_at: %w", err)
+		}
+
+		if err := decodeJSON(langJSON, &s.LanguageBreakdown); err != nil {
 			s.LanguageBreakdown = nil
 		}
+		if s.LanguageBreakdown == nil {
+			s.LanguageBreakdown = []models.LanguageStat{}
+		}
+
 		snaps = append(snaps, s)
 	}
 	return snaps, rows.Err()
