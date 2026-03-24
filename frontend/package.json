@@ -4,13 +4,19 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev --host",
-    "build": "astro build"
+    "build": "astro build",
+    "check": "biome check . && astro check",
+    "format": "biome format . --write",
+    "test": "vitest run"
   },
   "dependencies": {
     "alpinejs": "^3.14.9",
     "astro": "^5.7.12"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@astrojs/check": "^0.9.8",
+    "@biomejs/biome": "^2.4.8",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.1"
   }
 }

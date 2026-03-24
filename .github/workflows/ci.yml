@@ -17,5 +17,34 @@ jobs:
           cache: true
       - name: Test
         run: go test ./...
+      - name: Vet
+        run: go vet ./...
       - name: CLI build smoke
         run: go build ./cmd/gitpulse
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Check
+        run: bun run check
+      - name: Test
+        run: bun run test
+      - name: Build
+        run: bun run build

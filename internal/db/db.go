@@ -44,10 +44,11 @@ func Connect(ctx context.Context, path string) (*sql.DB, error) {
 	db.SetMaxIdleConns(1)
 
 	for _, pragma := range []string{
-		"PRAGMA foreign_keys = ON",
-		"PRAGMA busy_timeout = 5000",
 		"PRAGMA journal_mode = WAL",
+		"PRAGMA busy_timeout = 5000",
 		"PRAGMA synchronous = NORMAL",
+		"PRAGMA foreign_keys = ON",
+		"PRAGMA cache_size = -20000",
 	} {
 		if _, err := db.ExecContext(ctx, pragma); err != nil {
 			_ = db.Close()
