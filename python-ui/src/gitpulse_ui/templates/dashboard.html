@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% if view %}
+    <section class="stats-grid six-up">
+      <article class="stat-card"><span class="label">Live Lines</span><strong>{{ view.summary.live_lines }}</strong></article>
+      <article class="stat-card"><span class="label">Staged Lines</span><strong>{{ view.summary.staged_lines }}</strong></article>
+      <article class="stat-card"><span class="label">Commits Today</span><strong>{{ view.summary.commits_today }}</strong></article>
+      <article class="stat-card"><span class="label">Pushes Today</span><strong>{{ view.summary.pushes_today }}</strong></article>
+      <article class="stat-card"><span class="label">Active Session</span><strong>{{ view.summary.active_session_minutes }} min</strong></article>
+      <article class="stat-card"><span class="label">Streak / Score</span><strong>{{ view.summary.streak_days }} / {{ view.summary.today_score }}</strong></article>
+    </section>
+
+    <section class="split-grid">
+      <article class="panel">
+        <div class="panel-head">
+          <h3>30 Day Trend</h3>
+          <span class="chip">Changed lines + score</span>
+        </div>
+        <div class="trend-bars">
+          {% for point in view.trend_points %}
+            <span title="{{ point.day }}: score {{ point.score }}" style="height: {{ [point.score, 4] | max }}px"></span>
+          {% endfor %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h3>12 Week Heatmap</h3>
+          <span class="chip">Consistency</span>
+        </div>
+        <div class="heatmap-grid">
+          {% for point in view.heatmap_days %}
+            <span class="heat-cell {{ heatmap_class(point.score) }}" title="{{ point.day }}: score {{ point.score }}"></span>
+          {% endfor %}
+        </div>
+      </article>
+    </section>
+
+    <section class="split-grid">
+      <article class="panel">
+        <div class="panel-head">
+          <h3>Activity Feed</h3>
+          <span class="chip">Live</span>
+        </div>
+        {% if view.activity_feed %}
+          <div class="list-stack">
+            {% for item in view.activity_feed %}
+              <div class="list-row">
+                <div>
+                  <strong>{{ item.repo_name }}</strong>
+                  <p>{{ item.detail }}</p>
+                </div>
+                <div class="row-meta">
+                  <span>{{ item.kind }}</span>
+                  <time>{{ item.timestamp | fmt_datetime }}</time>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No recent activity.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h3>Goals</h3>
+          <span class="chip">Transparent scoring</span>
+        </div>
+        {% if view.summary.goals %}
+          <div class="goal-stack">
+            {% for goal in view.summary.goals %}
+              <div>
+                <div class="goal-head">
+                  <span>{{ goal.label }}</span>
+                  <strong>{{ goal.current }}/{{ goal.target }}</strong>
+                </div>
+                <div class="progress"><span style="width: {{ goal.percent }}%"></span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No goals configured.</p>
+        {% endif %}
+      </article>
+    </section>
+
+    <section class="panel" id="dashboard-repositories">
+      <div class="panel-head">
+        <div>
+          <h3>Repository Pulse</h3>
+          <p class="panel-copy">Quick status from the Go runtime, rendered in Python.</p>
+        </div>
+        <span class="chip">{{ view.repo_cards | length }} tracked</span>
+      </div>
+      {% set show_repo_actions = False %}
+      {% if view.repo_cards %}
+        <div class="repo-grid">
+          {% for card in view.repo_cards %}
+            {% include 'partials/repository_card.html' %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">No repositories tracked yet.</p>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

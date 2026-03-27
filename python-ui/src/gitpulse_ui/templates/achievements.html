@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% if data %}
+    <section class="stats-grid three-up">
+      <article class="stat-card"><span class="label">Current Streak</span><strong>{{ data.streaks.current_days }} days</strong></article>
+      <article class="stat-card"><span class="label">Best Streak</span><strong>{{ data.streaks.best_days }} days</strong></article>
+      <article class="stat-card"><span class="label">Today's Score</span><strong>{{ data.today_score }}</strong></article>
+    </section>
+
+    {% if data.achievements %}
+      <section class="card-grid three-up">
+        {% for achievement in data.achievements %}
+          <article class="panel achievement-card">
+            <h3>{{ achievement.kind }}</h3>
+            <p>{{ achievement.reason }}</p>
+            <small>{% if achievement.day %}Unlocked on {{ achievement.day }}{% else %}Unlocked recently{% endif %}</small>
+          </article>
+        {% endfor %}
+      </section>
+    {% else %}
+      <p class="empty-state">No achievements unlocked yet. Keep coding.</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

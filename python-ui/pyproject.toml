@@ -1,0 +1,51 @@
+[project]
+name = "gitpulse-ui"
+version = "0.1.0"
+description = "FastAPI + Jinja2 operator UI for the GitPulse Go backend"
+readme = "README.md"
+authors = [
+    { name = "Stephen Sawyer", email = "dunamismax@tutamail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.135.2",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "pydantic-settings>=2.13.1",
+    "python-multipart>=0.0.22",
+    "uvicorn[standard]>=0.42.0",
+]
+
+[project.scripts]
+gitpulse-ui = "gitpulse_ui.main:main"
+
+[build-system]
+requires = ["uv_build>=0.10.7,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.408",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+reportMissingTypeStubs = false
+reportUnusedFunction = false
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

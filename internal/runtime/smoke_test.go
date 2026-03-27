@@ -318,15 +318,8 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatalf("web.New: %v", err)
 	}
 
-	ts := httptest.NewServer(srv)
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/api/dashboard")
-	if err != nil {
-		t.Fatalf("GET /api/dashboard: %v", err)
-	}
+	resp := performRequest(t, srv, http.MethodGet, "/api/dashboard")
 	defer closeTestBody(t, resp.Body)
-
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/dashboard status = %d, want 200", resp.StatusCode)
 	}
@@ -342,46 +335,43 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		len(dashJSON.RepoCards), dashJSON.Summary.CommitsToday, dashJSON.Summary.StreakDays)
 
 	// Verify /api/repositories returns data.
-	resp2, err := http.Get(ts.URL + "/api/repositories")
-	if err != nil {
-		t.Fatalf("GET /api/repositories: %v", err)
-	}
+	resp2 := performRequest(t, srv, http.MethodGet, "/api/repositories")
 	defer closeTestBody(t, resp2.Body)
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/repositories status = %d", resp2.StatusCode)
 	}
 
 	// Verify /api/sessions returns data.
-	resp3, err := http.Get(ts.URL + "/api/sessions")
-	if err != nil {
-		t.Fatalf("GET /api/sessions: %v", err)
-	}
+	resp3 := performRequest(t, srv, http.MethodGet, "/api/sessions")
 	defer closeTestBody(t, resp3.Body)
 	if resp3.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/sessions status = %d", resp3.StatusCode)
 	}
 
 	// Verify /api/achievements returns data.
-	resp4, err := http.Get(ts.URL + "/api/achievements")
-	if err != nil {
-		t.Fatalf("GET /api/achievements: %v", err)
-	}
+	resp4 := performRequest(t, srv, http.MethodGet, "/api/achievements")
 	defer closeTestBody(t, resp4.Body)
 	if resp4.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/achievements status = %d", resp4.StatusCode)
 	}
 
 	// Verify /api/repositories/{id} returns detail.
-	resp5, err := http.Get(ts.URL + "/api/repositories/" + repo.ID.String())
-	if err != nil {
-		t.Fatalf("GET /api/repositories/{id}: %v", err)
-	}
+	resp5 := performRequest(t, srv, http.MethodGet, "/api/repositories/"+repo.ID.String())
 	defer closeTestBody(t, resp5.Body)
 	if resp5.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/repositories/{id} status = %d", resp5.StatusCode)
 	}
 
 	t.Log("✓ Full operator smoke loop passed")
+}
+
+func performRequest(t *testing.T, handler http.Handler, method string, path string) *http.Response {
+	t.Helper()
+
+	req := httptest.NewRequest(method, path, nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	return recorder.Result()
 }
 
 // TestSmokeImportIdempotency verifies that re-importing the same commits

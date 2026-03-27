@@ -12,3 +12,10 @@ gitpulse-data
 /gitpulse
 /.claude
 /.claire
+
+# Python UI rewrite lane
+/python-ui/.venv
+/python-ui/.pytest_cache
+/python-ui/.ruff_cache
+/python-ui/.pyright
+/python-ui/**/__pycache__

@@ -1,58 +1,53 @@
 # GitPulse Architecture
 
-GitPulse is a local-first Go application with a browser dashboard built as a React SPA. The active implementation persists state in SQLite via `database/sql` and `modernc.org/sqlite`, with plain SQL kept inside the Go runtime.
+GitPulse is a local-first Go application with SQLite persistence and plain SQL in the Go runtime. The backend remains the source of truth. The browser surface is in transition from the shipping React SPA under `web/` to a server-rendered Python UI under `python-ui/`.
 
-The active stack is:
+## Active stack
 
-- Go for CLI, runtime, JSON API, git integration, analytics, and data access
+- Go for CLI, runtime orchestration, JSON API, git integration, analytics, and data access
 - SQLite persistence via `database/sql`
 - plain SQL for the data layer
-- Bun + TypeScript + React + Vite for the browser UI
-- TanStack Router for client-side routing
-- TanStack Query for server-state management
-- Tailwind CSS for styling
-- Biome for lint and format
+- `net/http` in Go for the current local server and JSON API
+- Bun + TypeScript + React + Vite for the current shipping dashboard in `web/`
+- FastAPI + Jinja2 + htmx for the Python rewrite lane in `python-ui/`
+- Alpine.js for small client-side interactions in the Python UI
+- HTTPX for Python-to-Go API calls
 
 Storage doctrine for this repo:
 
 - SQLite is the implemented default
-- Go owns persistence; the React SPA is an operator surface, not the system of record
+- Go owns persistence; both frontend lanes are operator surfaces, not the system of record
 - keep data relational and local-first
 - keep plain SQL unless backend complexity later earns `sqlc`
+- transition frontend behavior in reversible slices rather than a big-bang cutover
 
-## System overview
+## Transition architecture
 
 ```text
-┌──────────────────────────────────────────────────────────┐
-│                         surfaces                         │
-│                 CLI + browser dashboard                  │
-└────────────────────────────┬─────────────────────────────┘
-                             │
-                     ┌───────▼────────┐
-                     │ internal/runtime│
-                     │ orchestration   │
-                     └───┬─────────┬───┘
-                         │         │
-              ┌──────────▼───┐ ┌───▼──────────────┐
-              │ internal/git │ │ internal/db      │
-              │ git CLI      │ │ SQLite/plain SQL │
-              └──────┬───────┘ └──────┬───────────┘
-                     │                │
-              ┌──────▼──────┐   ┌────▼────────┐
-              │ analytics + │   │ local event │
-              │ sessions    │   │ store       │
-              └─────────────┘   └─────────────┘
-                             │
-                     ┌───────▼────────┐
-                     │ internal/web   │
-                     │ JSON API +     │
-                     │ SPA serving    │
-                     └───────┬────────┘
-                             │
-                     ┌───────▼────────┐
-                     │ web/           │
-                     │ React + Vite   │
-                     └────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                            surfaces                              │
+│    CLI + React SPA (`web/`) + Python UI companion (`python-ui/`)│
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │       internal/web      │
+                    │ JSON API + SPA serving  │
+                    └────────────┬────────────┘
+                                 │
+                     ┌───────────▼───────────┐
+                     │    internal/runtime    │
+                     │ orchestration + views   │
+                     └───────┬─────────┬──────┘
+                             │         │
+                  ┌──────────▼───┐ ┌───▼──────────────┐
+                  │ internal/git │ │ internal/db      │
+                  │ git CLI      │ │ SQLite/plain SQL │
+                  └──────┬───────┘ └──────┬───────────┘
+                         │                │
+                  ┌──────▼──────┐   ┌────▼────────┐
+                  │ analytics + │   │ local event │
+                  │ sessions    │   │ store       │
+                  └─────────────┘   └─────────────┘
 ```
 
 ## Package map
@@ -63,7 +58,11 @@ Cobra CLI entrypoint. Owns command wiring only.
 
 ### `web`
 
-React SPA with Vite build, TanStack Router routes, TanStack Query data fetching, Tailwind CSS styling, and Biome linting. Builds to `web/dist`.
+React SPA with Vite build, TanStack Router routes, TanStack Query data fetching, Tailwind CSS styling, and Biome linting. Builds to `web/dist`. This remains the current shipping UI.
+
+### `python-ui`
+
+FastAPI application that renders Jinja2 templates, serves vendored local Alpine.js and htmx assets, and forwards reads and writes to the existing Go JSON API. This is the active frontend rewrite lane.
 
 ### `internal/config`
 
@@ -87,7 +86,7 @@ Score, streak, and achievement logic.
 
 ### `internal/models`
 
-Shared data structures passed between runtime, DB, JSON API, and the browser UI.
+Shared data structures passed between runtime, DB, JSON API, and the frontend lanes.
 
 ### `internal/runtime`
 
@@ -103,12 +102,13 @@ Sessionization logic over activity points.
 
 ## Data flow
 
-1. A repo or folder is added through the CLI or the browser UI.
+1. A repo or folder is added through the CLI or either browser UI.
 2. `internal/git` discovers git roots and probes repo metadata.
-3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, and achievements.
+3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, achievements, and settings.
 4. `internal/runtime` rebuilds derived analytics from raw events.
-5. `internal/web` exposes JSON endpoints and serves the built SPA with an `index.html` catch-all for client-side routing.
-6. The React SPA fetches those JSON endpoints via TanStack Query and renders the operator workflow in the browser.
+5. `internal/web` exposes JSON endpoints and serves the built React SPA from `web/dist`.
+6. The React SPA fetches the JSON API directly.
+7. The Python UI calls the same JSON API through HTTPX and renders server-side templates.
 
 ## Persistence model
 
@@ -134,11 +134,9 @@ Schema sources:
 
 - New backend implementation work belongs in Go.
 - SQLite is the supported database target.
-- Keep persistence in Go; do not move schema ownership into the SPA lane unless the architecture materially changes.
+- Keep persistence in Go; do not move schema ownership into either frontend lane unless the architecture materially changes.
 - Keep data relational and local-first.
 - Keep plain SQL unless backend complexity later earns `sqlc`.
-- React owns the route/page lane for the browser UI via TanStack Router.
-- TanStack Query handles all server-state fetching and caching.
-- Zod validates API responses at the boundary.
+- The Python UI should reach parity by consuming the existing Go API, not by re-implementing backend logic.
 - Keep repo-controlled strings treated as untrusted input.
 - Document new runtime or release surfaces only when code for them exists.

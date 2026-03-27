@@ -26,15 +26,16 @@ Product rules that stay locked unless the architecture really changes:
 - relational data stays the default
 - SQLite is the active storage layer
 - Go owns persistence and orchestration
-- the React SPA is an operator surface, not the system of record
+- browser surfaces are operator UIs, not the system of record
 - plain SQL stays explicit and inspectable unless backend complexity later earns `sqlc`
-- CLI and local web UI remain one runtime, not two drifting products
+- the Go runtime remains the source of truth while the frontend transitions from React to Python
+- CLI and local web UI remain one product, even if the transition temporarily uses two UI implementations
 
 ---
 
 ## Repo snapshot
 
-Last reviewed: 2026-03-24 (pass 2 — smoke tests + git parsing tests added)
+Last reviewed: 2026-03-27 (frontend rewrite checkpoint 2 — Python UI hardening)
 Branch: `main`
 Host used for this pass: macOS
 
@@ -45,6 +46,7 @@ The current shipping path lives in:
 - `go.mod`
 - `cmd/gitpulse/`
 - `web/`
+- `python-ui/`
 - `internal/config/`
 - `internal/db/`
 - `internal/filter/`
@@ -66,8 +68,13 @@ Implemented and repo-visible right now:
 - rebuildable sessions, streaks, score, rollups, and achievements logic in Go
 - `net/http` JSON API routes for dashboard, repositories, repository detail, sessions, achievements, and settings
 - Bun + TypeScript + React + Vite SPA with TanStack Router, TanStack Query, Tailwind CSS, and Biome
+- FastAPI + Jinja2 + htmx Python UI companion under `python-ui/`, backed by the existing Go JSON API
 - Go runtime serving the built SPA from `web/dist` with client-side routing fallback
-- settings writes back to the active TOML config surface through the Go runtime
+- Python UI pages for dashboard, repositories, repository detail, sessions, achievements, and settings
+- vendored local Alpine.js and htmx assets in the Python UI, replacing CDN dependency at runtime
+- actionable Python UI recovery guidance when the configured Go API base URL is unreachable or returns unreadable transport responses
+- Python UI freshness visibility for repository snapshot timing, repo update timing, and recent push events via existing Go API fields
+- settings writes back to the active TOML config surface through both UI lanes via the Go runtime
 - CI coverage for Go test/vet/build/lint/vuln checks plus web check/test/build
 
 ### What is still not done
@@ -75,7 +82,8 @@ Implemented and repo-visible right now:
 Real unfinished work, not hand-wavy future dreaming:
 
 - there is no settled watcher/background monitoring story yet
-- the browser/operator surface still needs more hardening around empty states, progress visibility, and error handling
+- the Python rewrite lane still needs operator-surface parity hardening before it can replace the React SPA
+- the browser/operator surface still needs broader parity hardening around empty states, background action feedback, and operator workflow polish
 - packaging/distribution remains undecided and intentionally non-core
 - fuzz coverage for git subprocess parsing is not yet implemented
 
@@ -85,7 +93,7 @@ GitPulse is active, usable, and worth extending, but it is not done.
 
 The repo is past the stack-churn phase and now past the "prove the daily loop" phase. The operator workflow (add → import → rescan → rebuild → inspect) is captured as a reproducible smoke test that runs in ~1s. Git parsing helpers have solid table-driven test coverage.
 
-The highest-value work is now settling the ingestion model (Workstream 2), hardening the operator experience (Workstream 3), and deciding whether fuzz coverage for git parsing is worth the investment.
+The highest-value work is now settling the ingestion model (Workstream 2), pushing the Python operator surface from scaffold to parity (Workstream 3), and deciding whether fuzz coverage for git parsing is worth the investment.
 
 ---
 
@@ -97,7 +105,8 @@ The highest-value work is now settling the ingestion model (Workstream 2), harde
 | `README.md` | public-facing status and local run instructions |
 | `ROADMAP.md` | product direction beyond the immediate execution lane |
 | `AGENTS.md` | concise repo memory and working rules |
-| `docs/architecture.md` | active Go + SPA architecture |
+| `docs/architecture.md` | active Go runtime + dual-frontend transition architecture |
+| `python-ui/README.md` | Python UI checkpoint run and verify instructions |
 | `gitpulse.example.toml` | config surface for the Go runtime |
 | `internal/db/schema.sql` | embedded startup schema |
 | `migrations/` | repo-visible SQLite migration history |
@@ -110,7 +119,8 @@ The highest-value work is now settling the ingestion model (Workstream 2), harde
 ### Prerequisites
 
 - Go 1.26.1
-- Bun 1.1+
+- Bun 1.1+ for the current React SPA
+- Python 3.14+ and `uv` for the Python rewrite lane
 - Git 2.30+
 
 ### Local config
@@ -139,24 +149,38 @@ path = "/absolute/path/to/gitpulse.db"
 ### Local commands
 
 ```bash
+# Current shipping React dashboard
 cd web && bun install && bun run build
 cd ..
 go test ./...
 go run ./cmd/gitpulse serve
+
+# Core operator commands
 go run ./cmd/gitpulse add /path/to/repo-or-folder
 go run ./cmd/gitpulse import --all --days 30
 go run ./cmd/gitpulse rescan --all
 go run ./cmd/gitpulse rebuild-rollups
 go run ./cmd/gitpulse doctor
+
+# Python UI rewrite lane (run while the Go server is serving the API)
+cd python-ui
+uv sync
+uv run gitpulse-ui
 ```
 
 ### Frontend-only development
 
 ```bash
+# Current React lane
 cd web
 bun install
 bun run dev
 bun run build
+
+# Python rewrite lane
+cd python-ui
+uv sync
+uv run gitpulse-ui
 ```
 
 ### CI commands currently enforced
@@ -170,11 +194,57 @@ govulncheck ./...
 cd web && bun install --frozen-lockfile && bun run check && bun run test && bun run build
 ```
 
+### Python UI local verification commands
+
+```bash
+cd python-ui
+uv sync
+uv run ruff check .
+uv run ruff format --check .
+uv run pyright
+uv run pytest
+```
+
 ---
 
 ## Verification ledger
 
 Only record commands that actually passed.
+
+### Verified on 2026-03-27 (frontend rewrite checkpoint 2)
+
+- `cd python-ui && uv sync` — passes
+- `cd python-ui && uv run ruff check .` — passes
+- `cd python-ui && uv run ruff format --check .` — passes
+- `cd python-ui && uv run pyright` — passes
+- `cd python-ui && uv run pytest` — 9 tests pass
+- `go test ./... && go build ./cmd/gitpulse` — passes
+
+New verified frontend rewrite coverage added in this pass:
+
+- `python-ui/tests/test_app.py` — dashboard renders localized asset paths and freshness metadata
+- `python-ui/tests/test_app.py` — backend-unavailable dashboard guidance includes base URL and recovery steps
+- `python-ui/tests/test_app.py` — repository detail renders recent push visibility from the existing Go API payload
+- `python-ui/tests/test_service.py` — connect errors become actionable backend-unavailable failures
+- `python-ui/tests/test_service.py` — unreadable backend payloads become explicit transport-response failures
+
+### Verified on 2026-03-27 (frontend rewrite checkpoint 1)
+
+- `cd python-ui && uv sync && uv run ruff check .` — passes
+- `cd python-ui && uv run ruff format --check .` — passes
+- `cd python-ui && uv run pyright` — passes
+- `cd python-ui && uv run pytest` — 6 tests pass
+- `go test ./...` — passes after the Python UI lane was added
+- `go build ./cmd/gitpulse` — passes after the Python UI lane was added
+
+New verified frontend rewrite coverage added in this pass:
+
+- `python-ui/tests/test_app.py` — dashboard rendering
+- `python-ui/tests/test_app.py` — repositories page rendering
+- `python-ui/tests/test_app.py` — htmx add-target repository section update
+- `python-ui/tests/test_app.py` — repository detail rendering and pattern form presence
+- `python-ui/tests/test_app.py` — settings POST forwarding and redirect behavior
+- `python-ui/tests/test_app.py` — sessions and achievements page rendering
 
 ### Verified on 2026-03-24 (pass 2)
 
@@ -204,8 +274,9 @@ New test coverage added in this pass:
 ### Still not re-verified in this pass
 
 - a full local operator loop against a _real_ production workspace (the smoke test covers a seeded temp workspace)
+- the Python UI against a live long-running Go backend process outside test doubles
 - `golangci-lint run` and `govulncheck ./...` (CI covers these)
-- web build: `cd web && bun install && bun run build` (last verified earlier today)
+- web build: `cd web && bun install && bun run build` (not re-run in this frontend rewrite pass)
 
 ---
 
@@ -273,25 +344,35 @@ Exit criteria:
 - the docs and UI tell the same truth about how new activity appears in GitPulse
 - the ingestion model is intentional rather than assumed
 
-### Workstream 3 — harden the operator surface
+### Workstream 3 — replace the React operator surface with the Python UI in reversible slices
 
 **Status:** active
 
 Why this matters:
 
-The dashboard exists, but operator trust is won in the awkward moments: empty databases, long imports, bad config, giant repos, and partial failures.
+The frontend direction has changed. The Go backend still earns its keep, but the long-term browser surface should match the Python stack used elsewhere. The transition only works if each slice is verified, reversible, and honest about what has or has not reached parity.
 
-Checklist:
+Checkpoint completed in this pass:
 
-- [ ] tighten config validation and operator-facing error messages
-- [ ] improve empty states for a fresh database with no tracked repos
-- [ ] surface progress, last-run timestamps, or other freshness signals for rescan/import/rebuild actions
-- [ ] verify settings writes are predictable, atomic, and clearly reflected back into the UI
-- [ ] review the repository detail and sessions views for places where derived analytics need clearer explanation
+- [x] create `python-ui/` as a standalone FastAPI + Jinja2 + htmx rewrite lane
+- [x] keep the Go backend and JSON API unchanged as the source of truth
+- [x] render dashboard, repositories, repository detail, sessions, achievements, and settings pages from Python
+- [x] forward repository actions and settings writes through the Python UI to the Go API
+- [x] add Python verification with Ruff, Pyright, and pytest
+- [x] vendor local Alpine.js and htmx assets so the Python UI no longer depends on CDN script tags
+- [x] improve backend-unavailable and unreadable-response handling with actionable recovery guidance
+- [x] surface repository freshness signals from existing Go API fields, including snapshot timing, repo update timing, and recent push visibility
+
+Next checklist:
+
+- [ ] compare Python UI behavior against the React pages and close the biggest parity gaps first
+- [ ] improve operator feedback for long-running import, rescan, and rebuild actions
+- [ ] expand fresh-database empty states and first-run guidance across every Python UI page
+- [ ] decide when the Python UI is credible enough to become the default served surface
 
 Exit criteria:
 
-- a new local operator can tell what happened, what failed, and what to do next without reading the source
+- the Python UI covers the daily operator loop with enough confidence to replace the React SPA by default
 
 ### Workstream 4 — keep the runtime honest under load
 
@@ -343,8 +424,9 @@ These should be treated as current operating truth, not open brainstorming:
 - SQLite is the default and implemented database
 - Go owns persistence and runtime orchestration
 - plain SQL is the data access approach today
-- the browser UI is React + Vite under `web/`
-- the Go server serves the built SPA
+- the shipping browser UI is still React + Vite under `web/`
+- a verified Python UI rewrite lane now exists under `python-ui/`
+- the Go server still serves the built SPA today
 - packaging is optional, not part of the current done definition
 
 ## Decisions that still need a call
@@ -355,6 +437,7 @@ These are the real judgment points still hanging over the repo:
 - how much push verification or remote-state parity is actually worth carrying
 - whether a schema/version story beyond bootstrap + migration file needs to move up in priority
 - whether observability endpoints belong before a background service mode exists
+- when the Python UI becomes the default served frontend and what exact parity bar that requires
 - whether desktop packaging is a real product need or just tempting scope
 
 ---
@@ -364,6 +447,7 @@ These are the real judgment points still hanging over the repo:
 - The biggest product risk is not stack mismatch anymore; it is ambiguity in the operator workflow.
 - A watcher/background loop can easily become complexity bait if it lands before the manual workflow is deeply verified.
 - The React UI can create false confidence if it suggests freshness or automation the runtime does not yet guarantee.
+- Carrying two frontend lanes for too long would create drift unless the Python rewrite keeps landing verified parity slices.
 - Packaging too early would multiply support burden while the core loop is still settling.
 - Because analytics are rebuildable, the repo should prefer deterministic raw event capture and explicit rebuild flows over magical hidden state.
 
@@ -377,9 +461,9 @@ These are the real judgment points still hanging over the repo:
 
 If only one substantial thing gets done next, make it this:
 
-1. decide whether v1 ingestion is explicit-manual, periodic polling, or watcher-based (Workstream 2)
-2. if watcher/poller is deferred, update the UI and docs to not imply automatic tracking
-3. harden the operator surface for empty states, stale data signals, and error feedback (Workstream 3)
+1. compare the Python UI against the React flow page-by-page and close the most visible parity gaps first, especially fresh-database empty states and long-running action feedback (Workstream 3)
+2. decide whether v1 ingestion is explicit-manual, periodic polling, or watcher-based (Workstream 2)
+3. if watcher/poller is deferred, update both frontend lanes and docs to not imply automatic tracking
 4. optionally add fuzz testing for git parsing (Workstream 4)
 
-The smoke test now provides a fast feedback loop for any of these next moves.
+The smoke test plus the new Python UI tests now provide a fast feedback loop for any of these next moves.

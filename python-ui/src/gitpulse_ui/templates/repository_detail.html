@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% if view %}
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow-subtle">Tracked repository</p>
+          <h3>{{ view.card.repo.name }}</h3>
+          <p class="panel-copy">{{ view.card.repo.root_path }}</p>
+        </div>
+        <form method="post" action="/repositories/{{ view.card.repo.id }}/refresh">
+          <button class="button" type="submit">Rescan</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="stats-grid card-grid four-up">
+      <article class="stat-card">
+        <span class="label">Branch</span>
+        <strong>{{ view.card.snapshot.branch if view.card.snapshot and view.card.snapshot.branch else '(detached)' }}</strong>
+        <small>{{ view.card.snapshot.upstream_ref if view.card.snapshot and view.card.snapshot.upstream_ref else 'no upstream' }}</small>
+      </article>
+      <article class="stat-card">
+        <span class="label">Sync</span>
+        <strong>
+          {% if view.card.snapshot %}
+            +{{ view.card.snapshot.ahead_count }} / -{{ view.card.snapshot.behind_count }}
+          {% else %}
+            n/a
+          {% endif %}
+        </strong>
+        <small>{{ view.card.snapshot.upstream_ref if view.card.snapshot and view.card.snapshot.upstream_ref else 'no upstream tracking' }}</small>
+      </article>
+      <article class="stat-card">
+        <span class="label">Last Snapshot</span>
+        <strong>
+          {% if view.card.snapshot and view.card.snapshot.observed_at %}
+            {{ view.card.snapshot.observed_at | fmt_datetime }}
+          {% else %}
+            Not scanned yet
+          {% endif %}
+        </strong>
+        <small>
+          {{ view.card.snapshot.live_files if view.card.snapshot else 0 }} live files /
+          {{ view.card.snapshot.staged_files if view.card.snapshot else 0 }} staged files
+        </small>
+      </article>
+      <article class="stat-card">
+        <span class="label">Repo Updated</span>
+        <strong>{{ view.card.repo.updated_at | fmt_datetime if view.card.repo.updated_at else '-' }}</strong>
+        <small>{{ view.card.health }} · score {{ view.card.metrics.score if view.card.metrics else 0 }}</small>
+      </article>
+    </section>
+
+    <section class="stats-grid three-up">
+      <article class="stat-card">
+        <span class="label">Live / Staged</span>
+        <strong>{{ (view.card.snapshot.live_additions if view.card.snapshot else 0) + (view.card.snapshot.live_deletions if view.card.snapshot else 0) }} / {{ (view.card.snapshot.staged_additions if view.card.snapshot else 0) + (view.card.snapshot.staged_deletions if view.card.snapshot else 0) }}</strong>
+        <small>Changed lines</small>
+      </article>
+      <article class="stat-card">
+        <span class="label">Pushes Today</span>
+        <strong>{{ view.card.metrics.pushes if view.card.metrics else 0 }}</strong>
+        <small>From daily rollups</small>
+      </article>
+      <article class="stat-card">
+        <span class="label">Recent Pushes</span>
+        <strong>{{ view.recent_pushes | length }}</strong>
+        <small>Latest push visibility from the Go API</small>
+      </article>
+    </section>
+
+    <section class="split-grid">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h3>Pattern Overrides</h3>
+            <p class="panel-copy">These patterns apply only to this repository. Excludes always win.</p>
+          </div>
+        </div>
+        <form method="post" action="/repositories/{{ view.card.repo.id }}/patterns" class="stack">
+          <label>
+            <span>Repo Include Patterns</span>
+            <textarea name="include_patterns" rows="5">{{ include_patterns_value }}</textarea>
+          </label>
+          <label>
+            <span>Repo Exclude Patterns</span>
+            <textarea name="exclude_patterns" rows="7">{{ exclude_patterns_value }}</textarea>
+          </label>
+          <p class="panel-copy">Saving applies new filters to future refreshes for this repository.</p>
+          <div>
+            <button class="button" type="submit">Save Repo Patterns</button>
+          </div>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h3>Language Breakdown</h3>
+        </div>
+        {% if view.language_breakdown %}
+          <div class="list-stack">
+            {% for lang in view.language_breakdown %}
+              <div class="list-row simple">
+                <span>{{ lang.language }}</span>
+                <strong>{{ lang.code }} lines</strong>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No language data available.</p>
+        {% endif %}
+      </article>
+    </section>
+
+    <section class="split-grid">
+      <article class="panel">
+        <div class="panel-head"><h3>Recent Commits</h3></div>
+        {% if view.recent_commits %}
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>SHA</th><th>Summary</th><th>Lines</th><th>When</th></tr>
+              </thead>
+              <tbody>
+                {% for commit in view.recent_commits %}
+                  <tr>
+                    <td><code>{{ short_sha(commit.commit_sha) }}</code></td>
+                    <td>{{ commit.summary }}</td>
+                    <td>{{ commit.additions + commit.deletions }}</td>
+                    <td>{{ commit.authored_at | fmt_datetime }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="empty-state">No commits imported yet.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h3>Recent Pushes</h3></div>
+        {% if view.recent_pushes %}
+          <div class="list-stack">
+            {% for push in view.recent_pushes %}
+              <div class="list-row">
+                <div>
+                  <strong>{{ push_kind_label(push.kind) }}</strong>
+                  <p>{{ push.upstream_ref if push.upstream_ref else 'no upstream recorded' }}</p>
+                </div>
+                <div class="row-meta">
+                  <span>{{ push.pushed_commit_count }} commit{% if push.pushed_commit_count != 1 %}s{% endif %}</span>
+                  <time>{{ push.observed_at | fmt_datetime }}</time>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No push events recorded for this repository yet.</p>
+        {% endif %}
+      </article>
+    </section>
+
+    <section class="split-grid">
+      <article class="panel">
+        <div class="panel-head"><h3>Recent Sessions</h3></div>
+        {% if view.recent_sessions %}
+          <div class="list-stack">
+            {% for session in view.recent_sessions %}
+              <div class="list-row simple">
+                <div>
+                  <strong>{{ session.active_minutes }} min</strong>
+                  <p>{{ session.started_at | fmt_datetime }}</p>
+                </div>
+                <span class="chip">{{ session.total_changed_lines }} lines</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No sessions recorded for this repository.</p>
+        {% endif %}
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h3>Top Files Touched</h3></div>
+        {% if view.top_files %}
+          <div class="list-stack">
+            {% for file in view.top_files %}
+              <div class="file-pill"><code>{{ file }}</code></div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No file activity recorded.</p>
+        {% endif %}
+      </article>
+    </section>
+  {% endif %}
+{% endblock %}

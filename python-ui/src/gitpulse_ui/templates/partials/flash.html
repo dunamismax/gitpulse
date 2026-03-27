@@ -1,0 +1,6 @@
+{% if flash %}
+  <section class="notice notice-{{ flash.level }}" x-data="{ open: true }" x-show="open">
+    <div>{{ flash.message }}</div>
+    <button type="button" class="ghost-button" @click="open = false">Dismiss</button>
+  </section>
+{% endif %}

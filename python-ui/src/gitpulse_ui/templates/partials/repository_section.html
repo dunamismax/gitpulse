@@ -1,0 +1,29 @@
+<section class="panel" id="repositories-section">
+  <div class="panel-head">
+    <div>
+      <h3>All Repositories</h3>
+      <p class="panel-copy">Current tracked repositories and quick actions.</p>
+    </div>
+    <span class="chip">{{ cards | length }} total</span>
+  </div>
+
+  {% if message %}
+    <div class="notice notice-{{ level }} inline-notice">{{ message }}</div>
+  {% endif %}
+  {% if inline_backend_status | default(False) %}
+    {% include 'partials/backend_status.html' %}
+  {% endif %}
+  {% if error %}
+    <div class="notice notice-error inline-notice">{{ error }}</div>
+  {% endif %}
+
+  {% if cards %}
+    <div class="repo-grid">
+      {% for card in cards %}
+        {% include 'partials/repository_card.html' %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty-state">No repositories tracked yet. Add a path above to get started.</p>
+  {% endif %}
+</section>
