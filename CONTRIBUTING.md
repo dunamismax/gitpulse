@@ -1,13 +1,14 @@
 # Contributing to GitPulse
 
-GitPulse is an active Go application with a Bun + React + Vite browser UI. Read [BUILD.md](BUILD.md) first, then [docs/architecture.md](docs/architecture.md).
+GitPulse is an active Go application with a Python operator UI served through the Go runtime. Read [BUILD.md](BUILD.md) first, then [docs/architecture.md](docs/architecture.md).
 
 ## Development setup
 
 ### Prerequisites
 
 - Go 1.26.1
-- Bun 1.1+
+- Python 3.14+
+- `uv`
 - Git 2.30+
 
 ### First build
@@ -15,10 +16,9 @@ GitPulse is an active Go application with a Bun + React + Vite browser UI. Read 
 ```bash
 git clone https://github.com/dunamismax/gitpulse.git
 cd gitpulse
-cd web && bun install && bun run build
-cd ..
 go test ./...
 go build ./cmd/gitpulse
+cd python-ui && uv sync
 ```
 
 ### Minimal local config
@@ -36,12 +36,12 @@ See [gitpulse.example.toml](gitpulse.example.toml) for the full config surface.
 
 ## Architecture rules
 
-GitPulse uses a Go-first backend with a React + Vite SPA browser UI.
+GitPulse uses a Go-first backend with a FastAPI + Jinja2 + htmx operator UI.
 
 | Path | Owns |
 |------|------|
-| `cmd/gitpulse` | CLI command wiring |
-| `web` | React + Vite SPA source, routing, styles, and browser-side TypeScript |
+| `cmd/gitpulse` | CLI command wiring and managed Python UI launch |
+| `python-ui` | FastAPI templates, htmx flows, static assets, and Python-side UI tests |
 | `internal/config` | config loading and platform paths |
 | `internal/db` | SQLite connection, schema, migrations, and plain SQL queries |
 | `internal/filter` | include/exclude matching |
@@ -50,13 +50,12 @@ GitPulse uses a Go-first backend with a React + Vite SPA browser UI.
 | `internal/models` | shared data and API/view structs |
 | `internal/runtime` | orchestration and view assembly |
 | `internal/sessions` | sessionization |
-| `internal/web` | HTTP handlers, JSON API, and SPA serving |
+| `internal/web` | HTTP handlers, JSON API, and UI proxying |
 
 Rules:
 
 - New backend implementation work goes in Go.
-- React + Vite own the browser page and routing lane.
-- TanStack Router handles client-side navigation, and TanStack Query handles server-state fetching.
+- The Python UI owns the browser surface, but not persistence or analytics logic.
 - Keep persistence relational, local, and Go-owned.
 - Keep plain SQL explicit in `internal/db`.
 - Keep repo-controlled strings treated as untrusted input.
@@ -68,11 +67,10 @@ Rules:
 Run the narrowest useful checks first:
 
 ```bash
-cd web && bun run build
-cd ..
 go test ./...
 go build ./cmd/gitpulse
 go run ./cmd/gitpulse --help
+cd python-ui && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
 ```
 
 If your change touches runtime or database behavior, prefer adding a focused integration test against a temporary SQLite file.

@@ -312,11 +312,7 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	// ---------------------------------------------------------------
 	// 13. Stand up HTTP server and hit /api/dashboard.
 	// ---------------------------------------------------------------
-	spaDir := createMinimalSPA(t)
-	srv, err := web.New(rt, "", spaDir)
-	if err != nil {
-		t.Fatalf("web.New: %v", err)
-	}
+	srv := web.New(rt, "", nil)
 
 	resp := performRequest(t, srv, http.MethodGet, "/api/dashboard")
 	defer closeTestBody(t, resp.Body)
@@ -449,21 +445,6 @@ func TestSmokeRebuildDeterminism(t *testing.T) {
 	}
 	t.Logf("✓ Rebuild determinism: rollups=%d, achievements=%d (stable across 2 runs)",
 		report1.RollupsWritten, report1.AchievementsWritten)
-}
-
-// createMinimalSPA creates a temp directory with a minimal index.html to
-// satisfy the web.New() SPA directory requirement.
-func createMinimalSPA(t *testing.T) string {
-	t.Helper()
-	dir := filepath.Join(t.TempDir(), "web", "dist")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("create SPA dir: %v", err)
-	}
-	indexPath := filepath.Join(dir, "index.html")
-	if err := os.WriteFile(indexPath, []byte("<!DOCTYPE html><html><body>test</body></html>"), 0o644); err != nil {
-		t.Fatalf("write index.html: %v", err)
-	}
-	return dir
 }
 
 // ptrStr dereferences a *string for logging; returns "<nil>" if nil.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class APIModel(BaseModel):
@@ -82,12 +82,18 @@ def _empty_int_list() -> list[int]:
     return []
 
 
+def _list_or_empty(value: object) -> object:
+    return [] if value is None else value
+
+
 class RepositoryCard(APIModel):
     repo: Repository
     health: str
     metrics: DailyRollup | None = None
     sparkline: list[int] = Field(default_factory=_empty_int_list)
     snapshot: RepoStatusSnapshot | None = None
+
+    _normalize_sparkline = field_validator("sparkline", mode="before")(_list_or_empty)
 
 
 class LanguageStat(APIModel):
@@ -138,6 +144,17 @@ class RepoDetailView(APIModel):
     language_breakdown: list[LanguageStat]
     top_files: list[str]
 
+    _normalize_lists = field_validator(
+        "include_patterns",
+        "exclude_patterns",
+        "recent_commits",
+        "recent_pushes",
+        "recent_sessions",
+        "language_breakdown",
+        "top_files",
+        mode="before",
+    )(_list_or_empty)
+
 
 class DashboardView(APIModel):
     summary: TodaySummary
@@ -146,12 +163,22 @@ class DashboardView(APIModel):
     activity_feed: list[ActivityFeedItem]
     repo_cards: list[RepositoryCard]
 
+    _normalize_lists = field_validator(
+        "trend_points",
+        "heatmap_days",
+        "activity_feed",
+        "repo_cards",
+        mode="before",
+    )(_list_or_empty)
+
 
 class SessionSummary(APIModel):
     sessions: list[FocusSession]
     total_minutes: int
     average_length_minutes: int
     longest_session_minutes: int
+
+    _normalize_sessions = field_validator("sessions", mode="before")(_list_or_empty)
 
 
 class Achievement(APIModel):
@@ -170,6 +197,8 @@ class AchievementsResponse(APIModel):
     achievements: list[Achievement]
     streaks: StreakSummary
     today_score: int
+
+    _normalize_achievements = field_validator("achievements", mode="before")(_list_or_empty)
 
 
 class AuthorIdentity(APIModel):
@@ -196,6 +225,8 @@ class PatternConfig(APIModel):
     include: list[str]
     exclude: list[str]
 
+    _normalize_lists = field_validator("include", "exclude", mode="before")(_list_or_empty)
+
 
 class GithubConfig(APIModel):
     enabled: bool
@@ -209,6 +240,8 @@ class RuntimeConfig(APIModel):
     ui: UIConfig
     patterns: PatternConfig
     github: GithubConfig
+
+    _normalize_authors = field_validator("authors", mode="before")(_list_or_empty)
 
 
 class AppPaths(APIModel):
@@ -228,6 +261,8 @@ class ActionResult(APIModel):
     summary: str
     lines: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+    _normalize_lists = field_validator("lines", "warnings", mode="before")(_list_or_empty)
 
 
 class SaveSettingsRequest(APIModel):

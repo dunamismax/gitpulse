@@ -2,11 +2,8 @@
 package web
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/dunamismax/gitpulse/internal/runtime"
 )
@@ -16,25 +13,26 @@ type Server struct {
 	mux        *http.ServeMux
 	rt         *runtime.Runtime
 	configFile string
-	spaDir     string // path to SPA build output (web/dist)
+	uiHandler  http.Handler
 }
 
-// New creates a Server that serves the React SPA and JSON API.
-func New(rt *runtime.Runtime, configFile, spaDir string) (*Server, error) {
-	indexPath := filepath.Join(spaDir, "index.html")
-	info, err := os.Stat(indexPath)
-	if err != nil || info.IsDir() {
-		return nil, fmt.Errorf("spa build not found at %s", indexPath)
+// New creates a Server that serves the Go JSON API and forwards browser
+// requests to the active operator UI handler.
+func New(rt *runtime.Runtime, configFile string, uiHandler http.Handler) *Server {
+	if uiHandler == nil {
+		uiHandler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "GitPulse operator UI is not available", http.StatusServiceUnavailable)
+		})
 	}
 
 	s := &Server{
 		mux:        http.NewServeMux(),
 		rt:         rt,
 		configFile: configFile,
-		spaDir:     spaDir,
+		uiHandler:  uiHandler,
 	}
 	s.registerRoutes()
-	return s, nil
+	return s
 }
 
 // ServeHTTP implements http.Handler.
@@ -71,24 +69,5 @@ func (s *Server) registerRoutes() {
 	mux.HandleFunc("POST /api/actions/rebuild", s.handleAPIRebuildAnalytics)
 	mux.HandleFunc("POST /api/settings", s.handleAPISettingsSave)
 
-	// SPA static assets from the Vite build output.
-	slog.Info("serving SPA", "dir", s.spaDir)
-	fs := http.FileServer(http.Dir(s.spaDir))
-	mux.Handle("GET /assets/", fs)
-
-	// Catch-all: serve index.html for any non-API GET so the client-side
-	// router handles the path. If the path maps to a real built file, serve it
-	// directly.
-	indexPath := filepath.Join(s.spaDir, "index.html")
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			fp := filepath.Join(s.spaDir, filepath.Clean(r.URL.Path))
-			if info, err := os.Stat(fp); err == nil && !info.IsDir() {
-				http.ServeFile(w, r, fp)
-				return
-			}
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		http.ServeFile(w, r, indexPath)
-	})
+	mux.Handle("/", s.uiHandler)
 }

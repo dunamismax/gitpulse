@@ -14,11 +14,11 @@ The repository currently centers on:
 
 - Go runtime and CLI
 - SQLite persistence with plain SQL
-- a local browser dashboard built as a React SPA and served by the Go runtime
+- a server-rendered Python operator UI launched by `gitpulse serve` and proxied through the Go runtime
 
 Near-term roadmap decisions:
 
-- stabilize the Go CLI + local web dashboard first
+- stabilize the Go CLI + Python operator UI daily loop
 - prove the local add/import/rescan/rebuild happy path end to end
 - harden the SQLite-backed runtime instead of adding extra infrastructure
 - treat packaging as optional follow-on work, not a current product surface
@@ -33,14 +33,14 @@ Targets:
 
 - CLI commands: `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, `doctor`
 - SQLite-backed event and rollup model
-- dashboard, repositories, sessions, achievements, and settings pages
+- dashboard, repositories, sessions, achievements, and settings pages through the Python UI
 - rebuilt sessions, streaks, score, and achievements logic
 - operator-facing docs and reproducible local setup
 
 Still needed:
 
-- live local smoke verification across the main CLI flow
-- more integration tests
+- live local smoke verification across the main CLI flow on a real workspace
+- more focused integration tests where they earn their keep
 - watcher/background monitoring loop
 - GitHub push verification parity where it is still worth keeping
 

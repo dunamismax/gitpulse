@@ -35,21 +35,21 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
-  web:
+  python-ui:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web
+        working-directory: python-ui
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install
-        run: bun install --frozen-lockfile
-      - name: Check
-        run: bun run check
+      - uses: astral-sh/setup-uv@v6
+      - name: Sync
+        run: uv sync
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Typecheck
+        run: uv run pyright
       - name: Test
-        run: bun run test
-      - name: Build
-        run: bun run build
+        run: uv run pytest

@@ -3,10 +3,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
-	"path/filepath"
+	"os/signal"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -85,17 +88,55 @@ func serveCmd(cfgFile *string) *cobra.Command {
 				host = cfg.Server.Host
 			}
 
-			// Locate the built SPA relative to the binary or cwd.
-			spaDir := locateSPADir()
-
-			srv, err := web.New(rt, *cfgFile, spaDir)
+			uiProjectDir, err := locatePythonUIProjectDir()
 			if err != nil {
-				return fmt.Errorf("create server: %w", err)
+				return err
 			}
 
+			managedUI, err := startManagedPythonUI(uiProjectDir, apiBaseURLForServeHost(host, port))
+			if err != nil {
+				return fmt.Errorf("start python UI: %w", err)
+			}
+			defer func() {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := managedUI.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
+					slog.Warn("python UI shutdown", "err", err)
+				}
+			}()
+
+			srv := web.New(rt, *cfgFile, managedUI.Handler())
 			addr := fmt.Sprintf("%s:%d", host, port)
+			httpServer := &http.Server{Addr: addr, Handler: srv}
+
+			serveCtx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
+			defer stop()
+
+			errCh := make(chan error, 1)
+			go func() {
+				slog.Info("web server listening", "addr", addr)
+				errCh <- httpServer.ListenAndServe()
+			}()
+
 			fmt.Printf("GitPulse running at http://%s\n", addr)
-			return srv.ListenAndServe(addr)
+
+			select {
+			case err := <-errCh:
+				if errors.Is(err, http.ErrServerClosed) {
+					return nil
+				}
+				return err
+			case <-serveCtx.Done():
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := httpServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
+					return fmt.Errorf("shutdown server: %w", err)
+				}
+				if err := <-errCh; err != nil && !errors.Is(err, http.ErrServerClosed) {
+					return err
+				}
+				return nil
+			}
 		},
 	}
 
@@ -301,20 +342,6 @@ func doctorCmd(cfgFile *string) *cobra.Command {
 			return nil
 		},
 	}
-}
-
-// locateSPADir finds the built React SPA output relative to the working
-// directory or binary.
-func locateSPADir() string {
-	cwd, _ := os.Getwd()
-	cwdDir := filepath.Join(cwd, "web", "dist")
-	if _, err := os.Stat(filepath.Join(cwdDir, "index.html")); err == nil {
-		return cwdDir
-	}
-
-	exe, _ := os.Executable()
-	base := filepath.Dir(exe)
-	return filepath.Join(base, "web", "dist")
 }
 
 // displayDatabasePath normalizes empty database paths for diagnostic output.

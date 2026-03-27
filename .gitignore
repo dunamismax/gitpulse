@@ -2,9 +2,6 @@
 /.sqlx
 /.DS_Store
 /dist
-/web/.astro
-/web/dist
-/web/node_modules
 /tmp
 /.idea
 /.vscode
@@ -13,7 +10,7 @@ gitpulse-data
 /.claude
 /.claire
 
-# Python UI rewrite lane
+# Python UI
 /python-ui/.venv
 /python-ui/.pytest_cache
 /python-ui/.ruff_cache

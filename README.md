@@ -4,9 +4,9 @@
 
 **Local-first git activity analytics for developers who want honest signals without uploading source code.**
 
-GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, a shipping Bun/TypeScript/React dashboard, and an active FastAPI + Jinja2 + htmx Python UI transition lane under `python-ui/`.
+GitPulse keeps live work, commit history, and push activity as separate ledgers. The codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a FastAPI + Jinja2 + htmx Python UI served through the Go runtime.
 
-> **Status:** Active and usable today as a Go CLI plus local web dashboard. The React SPA still ships from `gitpulse serve` today, and the Python UI companion now covers the main operator pages, first-run empty states, and explicit import/rescan/rebuild feedback against the existing Go API. The Python lane is materially closer to default-ready, but it still requires its own FastAPI process and therefore is not yet the default served frontend. Broader watcher/background decisions and packaged desktop releases are still ahead. See [BUILD.md](BUILD.md) for the execution ledger and next steps.
+> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` launches the Python UI automatically and reverse-proxies browser requests to it while keeping the Go JSON API as the source of truth. Broader watcher/background decisions and packaged desktop releases are still ahead. See [BUILD.md](BUILD.md) for the execution ledger and next steps.
 
 ## Why GitPulse?
 
@@ -26,12 +26,6 @@ GitPulse keeps live work, commit history, and push activity as separate ledgers.
 - `modernc.org/sqlite`
 - Cobra
 - `net/http`
-- Bun
-- TypeScript
-- React + Vite
-- TanStack Router + TanStack Query
-- Tailwind CSS + shadcn/ui patterns
-- Biome
 - Python 3.14+
 - `uv`
 - FastAPI + Jinja2 + htmx
@@ -41,27 +35,25 @@ GitPulse keeps live work, commit history, and push activity as separate ledgers.
 
 **Implemented commands and surfaces**
 
-- `gitpulse serve` to start the local dashboard server
+- `gitpulse serve` to start the local dashboard server (launches the Python UI automatically)
 - `gitpulse add <path>` to register a repo or discover repos under a folder
 - `gitpulse rescan` to refresh repository snapshots
 - `gitpulse import` to import commit history
 - `gitpulse rebuild-rollups` to recompute sessions, rollups, and achievements
 - `gitpulse doctor` for environment and configuration diagnostics
-- React SPA dashboard, repositories, repository detail, sessions, achievements, and settings pages
-- Python UI dashboard, repositories, repository detail, sessions, achievements, and settings pages under `python-ui/`
+- Python UI dashboard, repositories, repository detail, sessions, achievements, and settings pages
 - Python UI first-run guidance plus explicit import, rescan, and rebuild runbook controls backed by the Go API
-- Go-served JSON API endpoints backing both browser UI lanes
-- React and Python settings pages write the current configurable UI surface back to the active TOML config file
+- Go-served JSON API endpoints backing the browser UI
+- Settings page writes the current configurable UI surface back to the active TOML config file
 - SQLite schema/query code for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings
-- sessionization, streak, score, and achievement logic in Go
+- Sessionization, streak, score, and achievement logic in Go
 
 ## Quick start
 
 ### Prerequisites
 
 - Go 1.26.1
-- Bun 1.1+ for the current React SPA
-- Python 3.14+ and `uv` for the Python UI rewrite lane
+- Python 3.14+ and `uv`
 - Git 2.30+
 
 ### Configure GitPulse
@@ -89,57 +81,26 @@ export GITPULSE_DATABASE__PATH='/absolute/path/to/gitpulse.db'
 
 See [gitpulse.example.toml](gitpulse.example.toml) for the full config surface.
 
-### Build and run the current React dashboard
+### Build and run
 
 ```bash
-cd web && bun install && bun run build
-cd ..
 go test ./...
 go run ./cmd/gitpulse serve
 ```
 
 Then open <http://127.0.0.1:7467>.
 
-The Go server serves the built SPA from `web/dist`. Build the SPA before starting `gitpulse serve`.
-
-### Run the Python UI transition checkpoint
-
-Start the Go backend first so the JSON API is available:
-
-```bash
-go run ./cmd/gitpulse serve
-```
-
-Then start the Python UI in a second terminal:
-
-```bash
-cd python-ui
-uv sync
-uv run gitpulse-ui
-```
-
-Open <http://127.0.0.1:8001>.
-
-The Python UI now includes first-run guidance plus explicit import, rescan, and rebuild controls, but it still runs as a separate FastAPI process rather than replacing the Go-served React SPA by default.
+The Go server launches the Python UI automatically and reverse-proxies browser requests to it. The first run may take a few seconds while `uv` installs Python dependencies.
 
 ### Frontend development
 
-Current SPA lane:
-
-```bash
-cd web
-bun install
-bun run dev
-bun run build
-```
-
-Python rewrite lane:
-
 ```bash
 cd python-ui
 uv sync
 uv run gitpulse-ui
 ```
+
+For standalone development, the Python UI runs on port 8001 and calls the Go API on port 7467.
 
 ### Common commands
 
@@ -176,8 +137,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ```text
 .
 ├── cmd/gitpulse/              # Cobra CLI entrypoint
-├── web/                       # Bun + React + Vite + TypeScript SPA
-├── python-ui/                 # FastAPI + Jinja2 + htmx rewrite lane
+├── python-ui/                 # FastAPI + Jinja2 + htmx operator UI
 ├── internal/config/           # Config loading and platform paths
 ├── internal/db/               # SQLite connection + plain SQL queries + schema embed
 ├── internal/filter/           # Include/exclude path matching
@@ -186,7 +146,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── internal/models/           # Shared domain/view structs and API shapes
 ├── internal/runtime/          # Orchestration and view assembly
 ├── internal/sessions/         # Sessionization logic
-├── internal/web/              # net/http handlers, JSON API routes, and SPA serving
+├── internal/web/              # net/http handlers, JSON API routes, and UI proxy
 ├── migrations/                # SQLite migration files
 ├── docs/architecture.md       # Current architecture notes
 ├── BUILD.md                   # Execution manual and verification log
@@ -195,11 +155,10 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 
 ## Verification
 
-- `cd python-ui && uv sync && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest`
 - `go test ./...`
 - `go build ./cmd/gitpulse`
 - `go run ./cmd/gitpulse --help`
-- `cd web && bun run build`
+- `cd python-ui && uv sync && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest`
 
 ## License
 
