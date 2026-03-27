@@ -222,6 +222,14 @@ class SettingsResponse(APIModel):
     paths: AppPaths
 
 
+class ActionResult(APIModel):
+    action: str
+    title: str
+    summary: str
+    lines: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class SaveSettingsRequest(APIModel):
     authors: list[str]
     changed_lines_per_day: int

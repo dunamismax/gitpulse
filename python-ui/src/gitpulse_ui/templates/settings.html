@@ -8,6 +8,7 @@
         <span>Author Emails (one per line)</span>
         <textarea name="authors" rows="4">{{ form_values.authors if form_values.authors is string else split_lines(form_values.authors) }}</textarea>
       </label>
+      <p class="panel-copy">Set these before the first import if you want commit and push totals to match your local identity cleanly.</p>
     </section>
 
     <section class="split-grid">

@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from gitpulse_ui.app import create_app
 from gitpulse_ui.models import (
     AchievementsResponse,
+    ActionResult,
     DashboardView,
     RepoDetailView,
     RepositoryCard,
@@ -27,6 +28,10 @@ class FakeService:
         self.removed_repo_ids: list[str] = []
         self.saved_patterns: list[tuple[str, list[str], list[str]]] = []
         self.saved_settings: list[SaveSettingsRequest] = []
+        self.imported_repo_requests: list[tuple[str, int]] = []
+        self.import_runs: list[int] = []
+        self.rescan_runs = 0
+        self.rebuild_runs = 0
 
     async def dashboard(self) -> DashboardView:
         return DashboardView.model_validate(sample_dashboard_payload())
@@ -72,6 +77,38 @@ class FakeService:
     async def save_settings(self, payload: SaveSettingsRequest) -> None:
         self.saved_settings.append(payload)
 
+    async def import_repo(self, repo_id: str, *, days: int) -> ActionResult:
+        self.imported_repo_requests.append((repo_id, days))
+        return sample_action_result(
+            "import_repo",
+            f"Imported 3 commits for {repo_id} in 120ms.",
+            title="Repository import finished",
+        )
+
+    async def run_import(self, *, days: int) -> ActionResult:
+        self.import_runs.append(days)
+        return sample_action_result(
+            "import_all",
+            "Imported 5 commits across 1 repository in 220ms.",
+            title="History import finished",
+        )
+
+    async def run_rescan(self) -> ActionResult:
+        self.rescan_runs += 1
+        return sample_action_result(
+            "rescan_all",
+            "Rescanned 1 active repository in 180ms.",
+            title="Repository rescan finished",
+        )
+
+    async def run_rebuild(self) -> ActionResult:
+        self.rebuild_runs += 1
+        return sample_action_result(
+            "rebuild_analytics",
+            "Rebuilt sessions, rollups, and achievements in 95ms.",
+            title="Analytics rebuild finished",
+        )
+
 
 class BackendUnavailableService(FakeService):
     async def dashboard(self) -> DashboardView:
@@ -84,6 +121,48 @@ class BackendUnavailableService(FakeService):
             kind="backend_unreachable",
             base_url="http://127.0.0.1:7467",
         )
+
+
+class ZeroStateService(FakeService):
+    async def dashboard(self) -> DashboardView:
+        return DashboardView.model_validate(sample_empty_dashboard_payload())
+
+    async def repositories(self) -> list[RepositoryCard]:
+        return []
+
+    async def repo_detail(self, repo_id: str) -> RepoDetailView:
+        payload = sample_repo_detail_payload()
+        payload["card"] = {
+            **payload["card"],
+            "repo": {
+                **payload["card"]["repo"],
+                "id": repo_id,
+                "name": "empty-repo",
+            },
+            "snapshot": None,
+            "metrics": {"commits": 0, "pushes": 0, "files_touched": 0, "score": 0},
+        }
+        payload["recent_commits"] = []
+        payload["recent_pushes"] = []
+        payload["recent_sessions"] = []
+        payload["language_breakdown"] = []
+        payload["top_files"] = []
+        return RepoDetailView.model_validate(payload)
+
+    async def sessions(self) -> SessionSummary:
+        payload = sample_sessions_payload()
+        payload["sessions"] = []
+        payload["total_minutes"] = 0
+        payload["average_length_minutes"] = 0
+        payload["longest_session_minutes"] = 0
+        return SessionSummary.model_validate(payload)
+
+    async def achievements(self) -> AchievementsResponse:
+        payload = sample_achievements_payload()
+        payload["achievements"] = []
+        payload["today_score"] = 0
+        payload["streaks"] = {"current_days": 0, "best_days": 0}
+        return AchievementsResponse.model_validate(payload)
 
 
 def build_client(service: FakeService | None = None) -> tuple[TestClient, FakeService]:
@@ -118,6 +197,27 @@ def test_repositories_page_renders_add_form_and_card() -> None:
     assert "Add Target" in response.text
     assert "example-repo" in response.text
     assert "All Repositories" in response.text
+    assert "Operator Runbook" in response.text
+    assert "Import Recent History" in response.text
+
+
+def test_zero_state_pages_render_first_run_guidance() -> None:
+    client, _ = build_client(ZeroStateService())
+
+    dashboard = client.get("/")
+    repositories = client.get("/repositories")
+    sessions = client.get("/sessions")
+    achievements = client.get("/achievements")
+
+    assert dashboard.status_code == 200
+    assert "First Run Guide" in dashboard.text
+    assert "Fresh database detected" in dashboard.text
+    assert repositories.status_code == 200
+    assert "No repositories tracked yet" in repositories.text
+    assert sessions.status_code == 200
+    assert "Run rebuild analytics" in sessions.text
+    assert achievements.status_code == 200
+    assert "No achievements yet" in achievements.text
 
 
 def test_repositories_add_htmx_updates_section_and_calls_backend() -> None:
@@ -135,6 +235,21 @@ def test_repositories_add_htmx_updates_section_and_calls_backend() -> None:
     assert "repositories-section" in response.text
 
 
+def test_action_center_runs_import_and_returns_summary_partial() -> None:
+    client, service = build_client()
+
+    response = client.post(
+        "/actions/import",
+        data={"days": "14", "return_to": "/repositories"},
+        headers={"HX-Request": "true"},
+    )
+
+    assert response.status_code == 200
+    assert service.import_runs == [14]
+    assert "History import finished" in response.text
+    assert "Imported 5 commits across 1 repository" in response.text
+
+
 def test_repository_detail_renders_commits_and_patterns() -> None:
     client, _ = build_client()
 
@@ -148,6 +263,27 @@ def test_repository_detail_renders_commits_and_patterns() -> None:
     assert "Detected locally" in response.text
     assert "+2 / -1" in response.text
     assert "Top Files Touched" in response.text
+    assert "Import 30 Day History" in response.text
+
+
+def test_repository_detail_empty_state_and_import_post() -> None:
+    client, service = build_client(ZeroStateService())
+
+    response = client.get("/repositories/repo-empty")
+
+    assert response.status_code == 200
+    assert "Repository still being backfilled" in response.text
+    assert "Use the import button above" in response.text
+
+    post_response = client.post(
+        "/repositories/repo-empty/import",
+        data={"days": "21"},
+        follow_redirects=False,
+    )
+
+    assert post_response.status_code == 303
+    assert post_response.headers["location"].startswith("/repositories/repo-empty?")
+    assert service.imported_repo_requests == [("repo-empty", 21)]
 
 
 def test_dashboard_page_renders_backend_guidance_when_api_is_unreachable() -> None:
@@ -209,6 +345,18 @@ def test_sessions_and_achievements_pages_render() -> None:
     assert achievements_response.status_code == 200
     assert "Consistency, not gimmicks" in achievements_response.text
     assert "first_repo" in achievements_response.text
+
+
+def sample_action_result(action: str, summary: str, *, title: str | None = None) -> ActionResult:
+    return ActionResult.model_validate(
+        {
+            "action": action,
+            "title": title or (action.replace("_", " ").title() + " finished"),
+            "summary": summary,
+            "lines": ["Repositories processed: 1", "Commits imported: 5"],
+            "warnings": [],
+        }
+    )
 
 
 def sample_repo_card_payload() -> dict[str, Any]:
@@ -274,6 +422,26 @@ def sample_dashboard_payload() -> dict[str, Any]:
             }
         ],
         "repo_cards": [sample_repo_card_payload()],
+    }
+
+
+def sample_empty_dashboard_payload() -> dict[str, Any]:
+    return {
+        "summary": {
+            "live_lines": 0,
+            "staged_lines": 0,
+            "commits_today": 0,
+            "pushes_today": 0,
+            "active_session_minutes": 0,
+            "streak_days": 0,
+            "best_streak_days": 0,
+            "today_score": 0,
+            "goals": [],
+        },
+        "trend_points": [],
+        "heatmap_days": [],
+        "activity_feed": [],
+        "repo_cards": [],
     }
 
 

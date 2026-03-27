@@ -6,6 +6,7 @@ import httpx
 
 from .models import (
     AchievementsResponse,
+    ActionResult,
     DashboardView,
     RepoDetailView,
     RepositoryCard,
@@ -88,6 +89,22 @@ class GitPulseAPI:
 
     async def save_settings(self, payload: SaveSettingsRequest) -> None:
         await self._post_json("/api/settings", payload.model_dump())
+
+    async def import_repo(self, repo_id: str, *, days: int) -> ActionResult:
+        data = await self._post_json(f"/api/repositories/{repo_id}/import", {"days": days})
+        return ActionResult.model_validate(data)
+
+    async def run_import(self, *, days: int) -> ActionResult:
+        data = await self._post_json("/api/actions/import", {"days": days})
+        return ActionResult.model_validate(data)
+
+    async def run_rescan(self) -> ActionResult:
+        data = await self._post_json("/api/actions/rescan")
+        return ActionResult.model_validate(data)
+
+    async def run_rebuild(self) -> ActionResult:
+        data = await self._post_json("/api/actions/rebuild")
+        return ActionResult.model_validate(data)
 
     async def _get_json(self, path: str) -> Any:
         response = await self._request("GET", path)

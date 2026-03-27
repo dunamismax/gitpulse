@@ -2,15 +2,18 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/dunamismax/gitpulse/internal/config"
 	"github.com/dunamismax/gitpulse/internal/db"
+	"github.com/dunamismax/gitpulse/internal/models"
 )
 
 // writeJSON writes a JSON response with the given status code.
@@ -191,6 +194,145 @@ func (s *Server) handleAPIRepoPatterns(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+func (s *Server) handleAPIRepoImport(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	days, ok := decodeImportDays(r, s.rt.Config().Monitoring.ImportDays)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	repo, err := db.GetRepository(r.Context(), s.rt.DB(), id)
+	if err != nil || repo == nil {
+		slog.Error("api import repo resolve", "id", id, "err", err)
+		writeError(w, http.StatusNotFound, "repository not found")
+		return
+	}
+
+	start := time.Now()
+	imported, err := s.rt.ImportRepoHistory(r.Context(), id, days)
+	if err != nil {
+		slog.Error("api import repo", "id", id, "days", days, "err", err)
+		writeError(w, http.StatusInternalServerError, "import failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, models.OperatorActionResult{
+		Action:  "import_repo",
+		Title:   "Repository import finished",
+		Summary: fmt.Sprintf("Imported %d commit%s for %s in %s.", imported, pluralize(imported), repo.Name, time.Since(start).Round(time.Millisecond)),
+		Lines: []string{
+			fmt.Sprintf("Repository: %s", repo.Name),
+			fmt.Sprintf("Commits imported: %d", imported),
+			fmt.Sprintf("Window: last %d day%s", days, pluralize(days)),
+		},
+	})
+}
+
+func (s *Server) handleAPIImportAll(w http.ResponseWriter, r *http.Request) {
+	days, ok := decodeImportDays(r, s.rt.Config().Monitoring.ImportDays)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	start := time.Now()
+	repos, err := s.rt.ListRepos(r.Context())
+	if err != nil {
+		slog.Error("api import all list repos", "err", err)
+		writeError(w, http.StatusInternalServerError, "failed to list repositories")
+		return
+	}
+
+	processed := 0
+	importedTotal := 0
+	warnings := make([]string, 0)
+	for _, repo := range repos {
+		if repo.State == models.StateRemoved {
+			continue
+		}
+		processed++
+		imported, err := s.rt.ImportRepoHistory(r.Context(), repo.ID, days)
+		if err != nil {
+			slog.Warn("api import all repo failed", "repo", repo.Name, "err", err)
+			warnings = append(warnings, fmt.Sprintf("%s: %v", repo.Name, err))
+			continue
+		}
+		importedTotal += imported
+	}
+
+	writeJSON(w, http.StatusOK, models.OperatorActionResult{
+		Action:  "import_all",
+		Title:   "History import finished",
+		Summary: fmt.Sprintf("Imported %d commit%s across %d repositor%s in %s.", importedTotal, pluralize(importedTotal), processed, pluralizeRepository(processed), time.Since(start).Round(time.Millisecond)),
+		Lines: []string{
+			fmt.Sprintf("Repositories processed: %d", processed),
+			fmt.Sprintf("Commits imported: %d", importedTotal),
+			fmt.Sprintf("Window: last %d day%s", days, pluralize(days)),
+		},
+		Warnings: warnings,
+	})
+}
+
+func (s *Server) handleAPIRescanAll(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	repos, err := s.rt.ListRepos(r.Context())
+	if err != nil {
+		slog.Error("api rescan all list repos", "err", err)
+		writeError(w, http.StatusInternalServerError, "failed to list repositories")
+		return
+	}
+
+	processed := 0
+	warnings := make([]string, 0)
+	for _, repo := range repos {
+		if repo.State != models.StateActive || !repo.IsMonitored {
+			continue
+		}
+		processed++
+		if err := s.rt.RefreshRepository(r.Context(), repo.ID, false); err != nil {
+			slog.Warn("api rescan all repo failed", "repo", repo.Name, "err", err)
+			warnings = append(warnings, fmt.Sprintf("%s: %v", repo.Name, err))
+		}
+	}
+
+	writeJSON(w, http.StatusOK, models.OperatorActionResult{
+		Action:  "rescan_all",
+		Title:   "Repository rescan finished",
+		Summary: fmt.Sprintf("Rescanned %d active repositor%s in %s.", processed, pluralizeRepository(processed), time.Since(start).Round(time.Millisecond)),
+		Lines: []string{
+			fmt.Sprintf("Active monitored repositories: %d", processed),
+			"Live working-tree state refreshed from local git data.",
+		},
+		Warnings: warnings,
+	})
+}
+
+func (s *Server) handleAPIRebuildAnalytics(w http.ResponseWriter, r *http.Request) {
+	report, err := s.rt.RebuildAnalytics(r.Context())
+	if err != nil {
+		slog.Error("api rebuild analytics", "err", err)
+		writeError(w, http.StatusInternalServerError, "rebuild failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, models.OperatorActionResult{
+		Action:  "rebuild_analytics",
+		Title:   "Analytics rebuild finished",
+		Summary: fmt.Sprintf("Rebuilt sessions, rollups, and achievements in %s.", report.Elapsed.Round(time.Millisecond)),
+		Lines: []string{
+			fmt.Sprintf("Sessions written: %d", report.SessionsWritten),
+			fmt.Sprintf("Rollups written: %d", report.RollupsWritten),
+			fmt.Sprintf("Achievements written: %d", report.AchievementsWritten),
+		},
+	})
+}
+
 func (s *Server) handleAPISettingsSave(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Authors            []string `json:"authors"`
@@ -255,4 +397,38 @@ func (s *Server) handleAPISettingsSave(w http.ResponseWriter, r *http.Request) {
 	s.rt.SetConfig(next)
 	slog.Info("settings saved via api", "config_file", savedPath)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func decodeImportDays(r *http.Request, fallback int) (int, bool) {
+	if fallback < 1 {
+		fallback = 30
+	}
+	if r.ContentLength == 0 {
+		return fallback, true
+	}
+
+	var body struct {
+		Days int `json:"days"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		return 0, false
+	}
+	if body.Days < 1 {
+		return fallback, true
+	}
+	return body.Days, true
+}
+
+func pluralize(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+func pluralizeRepository(n int) string {
+	if n == 1 {
+		return "y"
+	}
+	return "ies"
 }

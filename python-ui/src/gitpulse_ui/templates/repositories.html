@@ -1,11 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
+  {% include 'partials/action_center.html' %}
+
   <section class="panel">
     <form method="post" action="/repositories/add" class="inline-form" hx-post="/repositories/add" hx-target="#repositories-section" hx-swap="outerHTML">
       <input type="text" name="path" value="{{ path_value }}" placeholder="/Users/you/code" required>
       <button class="button" type="submit">Add Target</button>
     </form>
+    <p class="panel-copy">Point GitPulse at one repo or a parent folder. Nested repositories are discovered and tracked individually.</p>
   </section>
 
   {% include 'partials/repository_section.html' %}

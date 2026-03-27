@@ -24,6 +24,13 @@
       {% endfor %}
     </div>
   {% else %}
-    <p class="empty-state">No repositories tracked yet. Add a path above to get started.</p>
+    <div class="empty-guide compact-guide">
+      <p class="empty-state">No repositories tracked yet. GitPulse will stay intentionally blank until you register local git roots.</p>
+      <ol class="step-list">
+        <li>Add a single repo path or a folder that contains multiple repos.</li>
+        <li>Import history to backfill commits and push events.</li>
+        <li>Rescan and rebuild from the operator runbook above to populate live status, sessions, and score.</li>
+      </ol>
+    </div>
   {% endif %}
 </section>

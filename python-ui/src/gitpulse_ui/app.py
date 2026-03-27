@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .models import (
+    ActionResult,
     DashboardView,
     RepoDetailView,
     RepositoryCard,
@@ -48,6 +49,10 @@ class GitPulseService(Protocol):
         exclude_patterns: list[str],
     ) -> None: ...
     async def save_settings(self, payload: SaveSettingsRequest) -> None: ...
+    async def import_repo(self, repo_id: str, *, days: int) -> ActionResult: ...
+    async def run_import(self, *, days: int) -> ActionResult: ...
+    async def run_rescan(self) -> ActionResult: ...
+    async def run_rebuild(self) -> ActionResult: ...
 
 
 @asynccontextmanager
@@ -90,6 +95,7 @@ def create_app(
         try:
             view = await svc.dashboard()
         except GitPulseAPIError as exc:
+            action_panel = await _action_panel_context(request, svc, return_to="/")
             return _render(
                 request,
                 "dashboard.html",
@@ -106,10 +112,17 @@ def create_app(
                         backend_status=_backend_status(request, exc),
                     ),
                     "view": None,
+                    **action_panel,
                 },
                 status_code=_status_code_for_error(exc),
             )
 
+        action_panel = await _action_panel_context(
+            request,
+            svc,
+            return_to="/",
+            tracked_total=len(view.repo_cards),
+        )
         return _render(
             request,
             "dashboard.html",
@@ -125,6 +138,7 @@ def create_app(
                     flash=_flash_from_query(request),
                 ),
                 "view": view,
+                **action_panel,
             },
         )
 
@@ -134,6 +148,12 @@ def create_app(
         svc: Annotated[GitPulseService, Depends(_get_service)],
     ) -> Response:
         cards, error = await _load_repositories(svc)
+        action_panel = await _action_panel_context(
+            request,
+            svc,
+            return_to="/repositories",
+            tracked_total=len(cards),
+        )
         return _render(
             request,
             "repositories.html",
@@ -152,6 +172,7 @@ def create_app(
                 ),
                 "cards": cards,
                 "path_value": "",
+                **action_panel,
             },
             status_code=_status_code_for_error(error),
         )
@@ -204,6 +225,12 @@ def create_app(
             )
 
         if error:
+            action_panel = await _action_panel_context(
+                request,
+                svc,
+                return_to="/repositories",
+                tracked_total=len(cards),
+            )
             return _render(
                 request,
                 "repositories.html",
@@ -221,6 +248,7 @@ def create_app(
                     ),
                     "cards": cards,
                     "path_value": str(form.get("path", "")),
+                    **action_panel,
                 },
                 status_code=_status_code_for_error(error_exc, default=400),
             )
@@ -240,6 +268,26 @@ def create_app(
             success_message="Repository rescanned.",
             redirect_to=f"/repositories/{repo_id}",
         )
+
+    @app.post("/repositories/{repo_id}/import", response_class=HTMLResponse)
+    async def repositories_import(
+        repo_id: str,
+        request: Request,
+        svc: Annotated[GitPulseService, Depends(_get_service)],
+    ) -> Response:
+        form = await request.form()
+        days = _parse_positive_int(form.get("days"), fallback=30)
+
+        try:
+            result = await svc.import_repo(repo_id, days=days)
+        except GitPulseAPIError as exc:
+            return _redirect_with_flash(
+                f"/repositories/{repo_id}",
+                exc.message,
+                level="error",
+            )
+
+        return _redirect_with_flash(f"/repositories/{repo_id}", result.summary)
 
     @app.post("/repositories/{repo_id}/toggle", response_class=HTMLResponse)
     async def repositories_toggle(
@@ -275,6 +323,7 @@ def create_app(
         request: Request,
         svc: Annotated[GitPulseService, Depends(_get_service)],
     ) -> Response:
+        import_days = await _load_import_days(svc)
         try:
             view = await svc.repo_detail(repo_id)
         except GitPulseAPIError as exc:
@@ -295,6 +344,7 @@ def create_app(
                     "view": None,
                     "include_patterns_value": "",
                     "exclude_patterns_value": "",
+                    "repo_import_days": import_days,
                 },
                 status_code=_status_code_for_error(exc, default=502),
             )
@@ -315,6 +365,7 @@ def create_app(
                 "view": view,
                 "include_patterns_value": "\n".join(view.include_patterns),
                 "exclude_patterns_value": "\n".join(view.exclude_patterns),
+                "repo_import_days": import_days,
             },
         )
 
@@ -336,6 +387,7 @@ def create_app(
             )
         except GitPulseAPIError as exc:
             view, load_error = await _load_repo_detail(svc, repo_id)
+            import_days = await _load_import_days(svc)
             combined_error = (
                 exc.message if load_error is None else f"{exc.message} {load_error.message}"
             )
@@ -356,6 +408,7 @@ def create_app(
                     "view": view,
                     "include_patterns_value": "\n".join(include_patterns),
                     "exclude_patterns_value": "\n".join(exclude_patterns),
+                    "repo_import_days": import_days,
                 },
                 status_code=_status_code_for_error(exc, default=400),
             )
@@ -516,6 +569,51 @@ def create_app(
 
         return _redirect_with_flash("/settings", "Settings saved to the active config file.")
 
+    @app.post("/actions/import", response_class=HTMLResponse)
+    async def action_import(
+        request: Request,
+        svc: Annotated[GitPulseService, Depends(_get_service)],
+    ) -> Response:
+        form = await request.form()
+        days = _parse_positive_int(form.get("days"), fallback=30)
+        return await _run_action_panel(
+            request,
+            svc,
+            action=lambda: svc.run_import(days=days),
+            return_to=str(form.get("return_to", "/")) or "/",
+            import_days=days,
+        )
+
+    @app.post("/actions/rescan", response_class=HTMLResponse)
+    async def action_rescan(
+        request: Request,
+        svc: Annotated[GitPulseService, Depends(_get_service)],
+    ) -> Response:
+        form = await request.form()
+        days = _parse_positive_int(form.get("days"), fallback=30)
+        return await _run_action_panel(
+            request,
+            svc,
+            action=svc.run_rescan,
+            return_to=str(form.get("return_to", "/")) or "/",
+            import_days=days,
+        )
+
+    @app.post("/actions/rebuild", response_class=HTMLResponse)
+    async def action_rebuild(
+        request: Request,
+        svc: Annotated[GitPulseService, Depends(_get_service)],
+    ) -> Response:
+        form = await request.form()
+        days = _parse_positive_int(form.get("days"), fallback=30)
+        return await _run_action_panel(
+            request,
+            svc,
+            action=svc.run_rebuild,
+            return_to=str(form.get("return_to", "/")) or "/",
+            import_days=days,
+        )
+
     return app
 
 
@@ -590,6 +688,81 @@ async def _load_settings(
         return None, exc
 
 
+async def _load_import_days(svc: GitPulseService) -> int:
+    data, _ = await _load_settings(svc)
+    if data is None:
+        return 30
+    return max(data.config.monitoring.import_days, 1)
+
+
+async def _action_panel_context(
+    request: Request,
+    svc: GitPulseService,
+    *,
+    return_to: str,
+    tracked_total: int | None = None,
+    result: ActionResult | None = None,
+    error: GitPulseAPIError | None = None,
+    import_days: int | None = None,
+) -> dict[str, Any]:
+    resolved_total = tracked_total
+    panel_error = error
+    if resolved_total is None:
+        cards, repo_error = await _load_repositories(svc)
+        resolved_total = len(cards)
+        if panel_error is None:
+            panel_error = repo_error
+
+    resolved_days = import_days if import_days is not None else await _load_import_days(svc)
+
+    return {
+        "action_return_to": return_to,
+        "action_tracked_total": resolved_total,
+        "action_has_repositories": resolved_total > 0,
+        "action_import_days": resolved_days,
+        "action_result": result,
+        "action_error": error.message if error else None,
+        "action_backend_status": _backend_status(request, panel_error),
+    }
+
+
+async def _run_action_panel(
+    request: Request,
+    svc: GitPulseService,
+    *,
+    action: Any,
+    return_to: str,
+    import_days: int,
+) -> Response:
+    result: ActionResult | None = None
+    error: GitPulseAPIError | None = None
+    try:
+        result = await action()
+    except GitPulseAPIError as exc:
+        error = exc
+
+    action_panel = await _action_panel_context(
+        request,
+        svc,
+        return_to=return_to,
+        result=result,
+        error=error,
+        import_days=import_days,
+    )
+
+    if _is_htmx(request):
+        return _render(
+            request,
+            "partials/action_center.html",
+            action_panel,
+            status_code=200 if error is None else _status_code_for_error(error, default=400),
+        )
+
+    if error is not None:
+        return _redirect_with_flash(return_to, error.message, level="error")
+    return _redirect_with_flash(return_to, result.summary if result else "Action completed.")
+
+
 def _page_meta(
     *,
     active_nav: str,
@@ -647,6 +820,14 @@ def _redirect_with_flash(path: str, message: str, *, level: str = "success") -> 
 
 def _split_lines(value: str) -> list[str]:
     return [line.strip() for line in value.splitlines() if line.strip()]
+
+
+def _parse_positive_int(value: Any, *, fallback: int) -> int:
+    try:
+        parsed = int(str(value or "").strip())
+    except ValueError:
+        return fallback
+    return parsed if parsed > 0 else fallback
 
 
 def _join_lines(value: list[str]) -> str:

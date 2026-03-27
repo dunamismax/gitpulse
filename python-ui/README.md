@@ -6,7 +6,7 @@ This directory is the first frontend rewrite lane. It keeps the Go backend and J
 
 ## Current checkpoint
 
-Implemented in this pass:
+Implemented in this checkpoint:
 
 - server-rendered dashboard, repositories, repository detail, sessions, achievements, and settings pages
 - typed HTTP client for the Go JSON API
@@ -14,6 +14,8 @@ Implemented in this pass:
 - vendored local Alpine.js and htmx assets, with no CDN dependency at runtime
 - actionable backend-unavailable and transport-error guidance tied to the configured Go API base URL
 - repository freshness signals from existing Go API fields, including snapshot timing, repo update timing, and recent push visibility on repo detail
+- first-run empty-state guidance across dashboard, repositories, repository detail, sessions, achievements, and settings
+- explicit import, rescan, and rebuild runbook controls with inline long-running feedback and Go-backed completion summaries
 - pytest coverage for page, action, and transport-error flows
 
 ## Run locally
@@ -33,6 +35,8 @@ uv run gitpulse-ui
 ```
 
 Open <http://127.0.0.1:8001>.
+
+> This checkpoint still runs as a separate FastAPI process. `gitpulse serve` continues to serve the React build from `web/dist` until the repo chooses and verifies a Python cutover mechanism.
 
 ## Configuration
 

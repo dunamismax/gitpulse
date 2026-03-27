@@ -397,6 +397,11 @@ label {
   border-color: rgba(34, 197, 94, 0.35);
 }
 
+.notice-warning {
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fde68a;
+}
+
 .notice-error {
   border-color: rgba(248, 113, 113, 0.35);
   color: #fecaca;
@@ -404,6 +409,73 @@ label {
 
 .inline-notice {
   margin-bottom: 1rem;
+}
+
+.action-center,
+.action-form,
+.empty-guide {
+  display: grid;
+  gap: 1rem;
+}
+
+.action-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.action-form {
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(11, 18, 32, 0.45);
+}
+
+.action-form h4 {
+  margin: 0;
+}
+
+.action-progress {
+  display: none;
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.92rem;
+}
+
+.htmx-indicator {
+  display: none;
+}
+
+.htmx-request.htmx-indicator,
+.htmx-request .htmx-indicator {
+  display: block;
+}
+
+.action-lines,
+.step-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.action-lines-tight {
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+}
+
+.action-result p,
+.action-warning p {
+  margin: 0.35rem 0 0;
+}
+
+.compact-guide {
+  background: rgba(11, 18, 32, 0.45);
+}
+
+.detail-head-actions {
+  align-items: center;
 }
 
 .file-pill {
@@ -436,7 +508,8 @@ th {
   .stats-grid.four-up,
   .repo-grid,
   .card-grid.three-up,
-  .card-grid.four-up {
+  .card-grid.four-up,
+  .action-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -452,7 +525,8 @@ th {
   .card-grid.four-up,
   .stats-grid.compact,
   .meta-grid.compact-meta,
-  .heatmap-grid {
+  .heatmap-grid,
+  .action-grid {
     grid-template-columns: 1fr;
   }
 

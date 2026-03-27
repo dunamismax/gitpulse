@@ -65,6 +65,10 @@ func (s *Server) registerRoutes() {
 	mux.HandleFunc("POST /api/repositories/{id}/toggle", s.handleAPIRepoToggle)
 	mux.HandleFunc("POST /api/repositories/{id}/remove", s.handleAPIRepoRemove)
 	mux.HandleFunc("POST /api/repositories/{id}/patterns", s.handleAPIRepoPatterns)
+	mux.HandleFunc("POST /api/repositories/{id}/import", s.handleAPIRepoImport)
+	mux.HandleFunc("POST /api/actions/import", s.handleAPIImportAll)
+	mux.HandleFunc("POST /api/actions/rescan", s.handleAPIRescanAll)
+	mux.HandleFunc("POST /api/actions/rebuild", s.handleAPIRebuildAnalytics)
 	mux.HandleFunc("POST /api/settings", s.handleAPISettingsSave)
 
 	// SPA static assets from the Vite build output.

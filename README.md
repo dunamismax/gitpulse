@@ -4,9 +4,9 @@
 
 **Local-first git activity analytics for developers who want honest signals without uploading source code.**
 
-GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, a shipping Bun/TypeScript/React dashboard, and an in-progress FastAPI + Jinja2 + htmx Python UI rewrite lane under `python-ui/`.
+GitPulse keeps live work, commit history, and push activity as separate ledgers. The current codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, a shipping Bun/TypeScript/React dashboard, and an active FastAPI + Jinja2 + htmx Python UI transition lane under `python-ui/`.
 
-> **Status:** Active and usable today as a Go CLI plus local web dashboard. The React SPA still ships today, and the Python UI rewrite lane now has a hardened companion checkpoint with vendored local browser assets, clearer backend-outage handling, and repo freshness/push visibility from the existing Go API. Broader operator-surface parity, a background watcher, and packaged desktop releases are still ahead. See [BUILD.md](BUILD.md) for the execution ledger and next steps.
+> **Status:** Active and usable today as a Go CLI plus local web dashboard. The React SPA still ships from `gitpulse serve` today, and the Python UI companion now covers the main operator pages, first-run empty states, and explicit import/rescan/rebuild feedback against the existing Go API. The Python lane is materially closer to default-ready, but it still requires its own FastAPI process and therefore is not yet the default served frontend. Broader watcher/background decisions and packaged desktop releases are still ahead. See [BUILD.md](BUILD.md) for the execution ledger and next steps.
 
 ## Why GitPulse?
 
@@ -49,6 +49,7 @@ GitPulse keeps live work, commit history, and push activity as separate ledgers.
 - `gitpulse doctor` for environment and configuration diagnostics
 - React SPA dashboard, repositories, repository detail, sessions, achievements, and settings pages
 - Python UI dashboard, repositories, repository detail, sessions, achievements, and settings pages under `python-ui/`
+- Python UI first-run guidance plus explicit import, rescan, and rebuild runbook controls backed by the Go API
 - Go-served JSON API endpoints backing both browser UI lanes
 - React and Python settings pages write the current configurable UI surface back to the active TOML config file
 - SQLite schema/query code for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings
@@ -101,7 +102,7 @@ Then open <http://127.0.0.1:7467>.
 
 The Go server serves the built SPA from `web/dist`. Build the SPA before starting `gitpulse serve`.
 
-### Run the Python UI rewrite checkpoint
+### Run the Python UI transition checkpoint
 
 Start the Go backend first so the JSON API is available:
 
@@ -118,6 +119,8 @@ uv run gitpulse-ui
 ```
 
 Open <http://127.0.0.1:8001>.
+
+The Python UI now includes first-run guidance plus explicit import, rescan, and rebuild controls, but it still runs as a separate FastAPI process rather than replacing the Go-served React SPA by default.
 
 ### Frontend development
 

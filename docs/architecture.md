@@ -1,6 +1,6 @@
 # GitPulse Architecture
 
-GitPulse is a local-first Go application with SQLite persistence and plain SQL in the Go runtime. The backend remains the source of truth. The browser surface is in transition from the shipping React SPA under `web/` to a server-rendered Python UI under `python-ui/`.
+GitPulse is a local-first Go application with SQLite persistence and plain SQL in the Go runtime. The backend remains the source of truth. The browser surface is in transition from the shipping React SPA under `web/` to a server-rendered Python UI under `python-ui/`, but `gitpulse serve` still serves the React build while the Python UI runs as a separate FastAPI process.
 
 ## Active stack
 
@@ -62,7 +62,7 @@ React SPA with Vite build, TanStack Router routes, TanStack Query data fetching,
 
 ### `python-ui`
 
-FastAPI application that renders Jinja2 templates, serves vendored local Alpine.js and htmx assets, and forwards reads and writes to the existing Go JSON API. This is the active frontend rewrite lane.
+FastAPI application that renders Jinja2 templates, serves vendored local Alpine.js and htmx assets, forwards reads and writes to the existing Go JSON API, and now exposes first-run operator guidance plus explicit import/rescan/rebuild runbook controls. This is the active frontend rewrite lane, but not yet the default served entrypoint.
 
 ### `internal/config`
 
@@ -106,9 +106,9 @@ Sessionization logic over activity points.
 2. `internal/git` discovers git roots and probes repo metadata.
 3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, achievements, and settings.
 4. `internal/runtime` rebuilds derived analytics from raw events.
-5. `internal/web` exposes JSON endpoints and serves the built React SPA from `web/dist`.
+5. `internal/web` exposes JSON endpoints, including manual operator action endpoints for import/rescan/rebuild, and still serves the built React SPA from `web/dist`.
 6. The React SPA fetches the JSON API directly.
-7. The Python UI calls the same JSON API through HTTPX and renders server-side templates.
+7. The Python UI calls the same JSON API through HTTPX, renders server-side templates, and turns those manual action endpoints into server-rendered runbook controls with inline feedback.
 
 ## Persistence model
 
@@ -138,5 +138,6 @@ Schema sources:
 - Keep data relational and local-first.
 - Keep plain SQL unless backend complexity later earns `sqlc`.
 - The Python UI should reach parity by consuming the existing Go API, not by re-implementing backend logic.
+- The remaining frontend cutover problem is serving topology, not operator-page parity: the repo still needs a verified plan for how `gitpulse serve` should hand off to or co-serve the Python UI.
 - Keep repo-controlled strings treated as untrusted input.
 - Document new runtime or release surfaces only when code for them exists.

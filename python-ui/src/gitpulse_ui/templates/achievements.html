@@ -19,7 +19,20 @@
         {% endfor %}
       </section>
     {% else %}
-      <p class="empty-state">No achievements unlocked yet. Keep coding.</p>
+      <section class="panel empty-guide compact-guide">
+        <div class="panel-head">
+          <div>
+            <h3>No achievements yet</h3>
+            <p class="panel-copy">That usually means GitPulse has not been given enough local history to derive milestones, not that anything is broken.</p>
+          </div>
+          <span class="chip">Fresh run</span>
+        </div>
+        <ol class="step-list">
+          <li>Import recent history so the first repository and first commit milestones can unlock.</li>
+          <li>Rescan and rebuild analytics so sessions, streaks, and score settle into place.</li>
+          <li>Check settings if authored commits are missing because author emails are not configured.</li>
+        </ol>
+      </section>
     {% endif %}
   {% endif %}
 {% endblock %}

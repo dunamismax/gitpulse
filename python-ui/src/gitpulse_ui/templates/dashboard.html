@@ -1,7 +1,28 @@
 {% extends 'base.html' %}
 
 {% block content %}
+  {% include 'partials/action_center.html' %}
+
   {% if view %}
+    {% set is_fresh_run = not view.repo_cards %}
+
+    {% if is_fresh_run %}
+      <section class="panel empty-guide">
+        <div class="panel-head">
+          <div>
+            <h3>First Run Guide</h3>
+            <p class="panel-copy">A brand-new database is expected to look quiet. GitPulse only shows what you have explicitly imported or scanned.</p>
+          </div>
+          <span class="chip">Empty state</span>
+        </div>
+        <ol class="step-list">
+          <li>Add a repository or parent folder so GitPulse has local roots to inspect.</li>
+          <li>Import recent history to backfill commits and push visibility.</li>
+          <li>Rescan and rebuild so sessions, rollups, and score reflect current local truth.</li>
+        </ol>
+      </section>
+    {% endif %}
+
     <section class="stats-grid six-up">
       <article class="stat-card"><span class="label">Live Lines</span><strong>{{ view.summary.live_lines }}</strong></article>
       <article class="stat-card"><span class="label">Staged Lines</span><strong>{{ view.summary.staged_lines }}</strong></article>
@@ -17,11 +38,15 @@
           <h3>30 Day Trend</h3>
           <span class="chip">Changed lines + score</span>
         </div>
-        <div class="trend-bars">
-          {% for point in view.trend_points %}
-            <span title="{{ point.day }}: score {{ point.score }}" style="height: {{ [point.score, 4] | max }}px"></span>
-          {% endfor %}
-        </div>
+        {% if view.trend_points %}
+          <div class="trend-bars">
+            {% for point in view.trend_points %}
+              <span title="{{ point.day }}: score {{ point.score }}" style="height: {{ [point.score, 4] | max }}px"></span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No trend data yet. Import history and rebuild analytics to seed the chart.</p>
+        {% endif %}
       </article>
 
       <article class="panel">
@@ -29,11 +54,15 @@
           <h3>12 Week Heatmap</h3>
           <span class="chip">Consistency</span>
         </div>
-        <div class="heatmap-grid">
-          {% for point in view.heatmap_days %}
-            <span class="heat-cell {{ heatmap_class(point.score) }}" title="{{ point.day }}: score {{ point.score }}"></span>
-          {% endfor %}
-        </div>
+        {% if view.heatmap_days %}
+          <div class="heatmap-grid">
+            {% for point in view.heatmap_days %}
+              <span class="heat-cell {{ heatmap_class(point.score) }}" title="{{ point.day }}: score {{ point.score }}"></span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No heatmap yet. Rebuild analytics after importing history to populate consistency data.</p>
+        {% endif %}
       </article>
     </section>
 
@@ -59,7 +88,7 @@
             {% endfor %}
           </div>
         {% else %}
-          <p class="empty-state">No recent activity.</p>
+          <p class="empty-state">No recent activity yet. Run a rescan after making local changes to record new working-tree state.</p>
         {% endif %}
       </article>
 
@@ -81,7 +110,7 @@
             {% endfor %}
           </div>
         {% else %}
-          <p class="empty-state">No goals configured.</p>
+          <p class="empty-state">No goals configured. Set daily targets on the settings page if you want score progress to anchor to something specific.</p>
         {% endif %}
       </article>
     </section>
@@ -102,7 +131,7 @@
           {% endfor %}
         </div>
       {% else %}
-        <p class="empty-state">No repositories tracked yet.</p>
+        <p class="empty-state">No repositories tracked yet. Add one on the repositories page, then come back once import and rescan have populated the dashboard.</p>
       {% endif %}
     </section>
   {% endif %}

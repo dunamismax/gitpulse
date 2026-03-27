@@ -331,3 +331,12 @@ type RebuildReport struct {
 	AchievementsWritten int           `json:"achievements_written"`
 	Elapsed             time.Duration `json:"elapsed"`
 }
+
+// OperatorActionResult describes the outcome of a manual operator-triggered task.
+type OperatorActionResult struct {
+	Action   string   `json:"action"`
+	Title    string   `json:"title"`
+	Summary  string   `json:"summary"`
+	Lines    []string `json:"lines"`
+	Warnings []string `json:"warnings,omitempty"`
+}
