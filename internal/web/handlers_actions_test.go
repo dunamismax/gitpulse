@@ -40,9 +40,6 @@ func TestHandleAPISettingsSavePersistsConfig(t *testing.T) {
 			ImportDays:         30,
 			SessionGapMinutes:  15,
 			RepoDiscoveryDepth: 5,
-			WatcherDebounceMs:  700,
-			IdlePollSeconds:    20,
-			LivePollSeconds:    2,
 		},
 		UI: config.UISettings{
 			Timezone:           "UTC",

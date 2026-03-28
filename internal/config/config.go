@@ -24,14 +24,11 @@ type GoalSettings struct {
 	FocusMinutesPerDay int `json:"focus_minutes_per_day" mapstructure:"focus_minutes_per_day" toml:"focus_minutes_per_day"`
 }
 
-// MonitoringSettings controls polling and import behavior.
+// MonitoringSettings controls manual ingest and analytics behavior.
 type MonitoringSettings struct {
 	ImportDays         int   `json:"import_days" mapstructure:"import_days" toml:"import_days"`
 	SessionGapMinutes  int64 `json:"session_gap_minutes" mapstructure:"session_gap_minutes" toml:"session_gap_minutes"`
 	RepoDiscoveryDepth int   `json:"repo_discovery_depth" mapstructure:"repo_discovery_depth" toml:"repo_discovery_depth"`
-	WatcherDebounceMs  int   `json:"watcher_debounce_ms" mapstructure:"watcher_debounce_ms" toml:"watcher_debounce_ms"`
-	IdlePollSeconds    int   `json:"idle_poll_seconds" mapstructure:"idle_poll_seconds" toml:"idle_poll_seconds"`
-	LivePollSeconds    int   `json:"live_poll_seconds" mapstructure:"live_poll_seconds" toml:"live_poll_seconds"`
 }
 
 // UISettings controls display preferences.
@@ -173,9 +170,6 @@ func Load(cfgFile string) (*AppConfig, error) {
 	v.SetDefault("monitoring.import_days", 30)
 	v.SetDefault("monitoring.session_gap_minutes", 15)
 	v.SetDefault("monitoring.repo_discovery_depth", 5)
-	v.SetDefault("monitoring.watcher_debounce_ms", 700)
-	v.SetDefault("monitoring.idle_poll_seconds", 20)
-	v.SetDefault("monitoring.live_poll_seconds", 2)
 	v.SetDefault("ui.timezone", "UTC")
 	v.SetDefault("ui.day_boundary_minutes", 0)
 	v.SetDefault("server.host", "127.0.0.1")

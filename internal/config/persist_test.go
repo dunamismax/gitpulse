@@ -38,9 +38,6 @@ func TestSaveRoundTrip(t *testing.T) {
 			ImportDays:         45,
 			SessionGapMinutes:  20,
 			RepoDiscoveryDepth: 7,
-			WatcherDebounceMs:  500,
-			IdlePollSeconds:    30,
-			LivePollSeconds:    3,
 		},
 		UI: UISettings{
 			Timezone:           "America/New_York",

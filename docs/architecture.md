@@ -50,6 +50,18 @@ Storage doctrine for this repo:
 
 `gitpulse serve` starts the Go HTTP server, launches the Python UI as a managed subprocess on an internal port, and reverse-proxies non-API browser requests to it. The Go server handles `/api/*` directly while forwarding all other paths to the Python UI.
 
+## Current ingestion model
+
+GitPulse is manual-first today. No background watcher or poller runs inside the Go runtime. The supported operator loop is:
+
+1. add repositories or parent folders
+2. import recent history
+3. rescan working trees
+4. rebuild analytics from stored local events
+5. inspect the dashboard or JSON API
+
+The Python UI exposes that same manual loop through explicit runbook controls backed by the Go API.
+
 ## Package map
 
 ### `cmd/gitpulse`
@@ -99,11 +111,12 @@ Sessionization logic over activity points.
 ## Data flow
 
 1. A repo or folder is added through the CLI or the browser UI.
-2. `internal/git` discovers git roots and probes repo metadata.
+2. `internal/git` discovers git roots, probes repo metadata, and seeds initial history for new repositories.
 3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, achievements, and settings.
-4. `internal/runtime` rebuilds derived analytics from raw events.
-5. `internal/web` exposes JSON endpoints, including manual operator action endpoints for import/rescan/rebuild, and reverse-proxies browser requests to the Python UI.
-6. The Python UI calls the Go JSON API through HTTPX, renders server-side templates, and turns those manual action endpoints into server-rendered runbook controls with inline feedback.
+4. The operator explicitly runs import, rescan, and rebuild actions when fresh history or live state needs to be pulled in.
+5. `internal/runtime` rebuilds derived analytics from raw events.
+6. `internal/web` exposes JSON endpoints, including manual operator action endpoints for import/rescan/rebuild, and reverse-proxies browser requests to the Python UI.
+7. The Python UI calls the Go JSON API through HTTPX, renders server-side templates, and turns those manual action endpoints into server-rendered runbook controls with inline feedback.
 
 ## Persistence model
 

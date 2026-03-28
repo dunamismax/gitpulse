@@ -6,7 +6,7 @@
 
 GitPulse keeps live work, commit history, and push activity as separate ledgers. The codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a FastAPI + Jinja2 + htmx Python UI served through the Go runtime.
 
-> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` launches the Python UI automatically and reverse-proxies browser requests to it while keeping the Go JSON API as the source of truth. Broader watcher/background decisions and packaged desktop releases are still ahead. See [BUILD.md](BUILD.md) for the execution ledger and next steps.
+> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` launches the Python UI automatically and reverse-proxies browser requests to it while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. Background watchers or pollers and packaged desktop releases are not shipped yet. See [docs/operator-workflow.md](docs/operator-workflow.md) for the current operator flow.
 
 ## Why GitPulse?
 
@@ -121,6 +121,17 @@ go run ./cmd/gitpulse rebuild-rollups
 go run ./cmd/gitpulse doctor
 ```
 
+## Current operator workflow
+
+GitPulse is manual-first today. It does not run a background watcher or poller. New data appears when you explicitly:
+
+- add a repository or parent folder
+- import recent history
+- rescan working trees
+- rebuild analytics from stored events
+
+See [docs/operator-workflow.md](docs/operator-workflow.md) for the supported day-to-day loop and what each step updates.
+
 ## Configuration Paths
 
 Reported by `gitpulse doctor` and discovered by the Go runtime:
@@ -149,14 +160,15 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── internal/web/              # net/http handlers, JSON API routes, and UI proxy
 ├── migrations/                # SQLite migration files
 ├── docs/architecture.md       # Current architecture notes
-├── BUILD.md                   # Execution manual and verification log
+├── docs/operator-workflow.md  # Current manual-first operator workflow
 └── ROADMAP.md                 # Product roadmap
 ```
 
 ## Verification
 
 - `go test ./...`
-- `go build ./cmd/gitpulse`
+- `go build ./...`
+- `go vet ./...`
 - `go run ./cmd/gitpulse --help`
 - `cd python-ui && uv sync && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest`
 

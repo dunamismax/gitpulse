@@ -129,7 +129,7 @@ func closeTestBody(t *testing.T, body io.Closer) {
 // rebuild-rollups → dashboard API flow against a seeded temporary git
 // repository.
 //
-// This is the "Workstream 1" smoke path from BUILD.md: prove that a fresh
+// This test proves the documented manual operator loop: a fresh
 // operator can add repos, import history, rescan, rebuild analytics, and
 // inspect results without undocumented handholding.
 func TestSmokeOperatorLoop(t *testing.T) {

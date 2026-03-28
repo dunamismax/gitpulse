@@ -1,6 +1,6 @@
 # GitPulse Roadmap
 
-This is the product roadmap, not the execution ledger. For the current repo state and verification history, read [BUILD.md](BUILD.md).
+This is the product roadmap. For the current operator loop and day-to-day run instructions, read [README.md](README.md) and [docs/operator-workflow.md](docs/operator-workflow.md).
 
 ## Vision
 
@@ -15,6 +15,7 @@ The repository currently centers on:
 - Go runtime and CLI
 - SQLite persistence with plain SQL
 - a server-rendered Python operator UI launched by `gitpulse serve` and proxied through the Go runtime
+- a manual-first ingestion flow built around add, import, rescan, and rebuild
 
 Near-term roadmap decisions:
 
@@ -27,7 +28,7 @@ Near-term roadmap decisions:
 
 **Status:** In progress
 
-Goal: make the current Go runtime comfortable to run locally every day.
+Goal: make the current manual-first Go runtime comfortable to run locally every day.
 
 Targets:
 
@@ -41,7 +42,7 @@ Still needed:
 
 - live local smoke verification across the main CLI flow on a real workspace
 - more focused integration tests where they earn their keep
-- watcher/background monitoring loop
+- settle whether background monitoring belongs at all after the manual-first loop is fully proven
 - GitHub push verification parity where it is still worth keeping
 
 ## Milestone 2 — hardening and product usability

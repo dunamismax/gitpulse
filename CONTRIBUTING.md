@@ -1,6 +1,6 @@
 # Contributing to GitPulse
 
-GitPulse is an active Go application with a Python operator UI served through the Go runtime. Read [BUILD.md](BUILD.md) first, then [docs/architecture.md](docs/architecture.md).
+GitPulse is an active Go application with a Python operator UI served through the Go runtime. Read [README.md](README.md), [docs/operator-workflow.md](docs/operator-workflow.md), and [docs/architecture.md](docs/architecture.md).
 
 ## Development setup
 
@@ -80,7 +80,7 @@ If your change touches runtime or database behavior, prefer adding a focused int
 Update docs in the same change when behavior shifts:
 
 - `README.md` for user-facing behavior
-- `BUILD.md` for execution truth and verification
+- `docs/operator-workflow.md` for the current manual operator loop and verification
 - `docs/architecture.md` for active structure
 - `gitpulse.example.toml` for config surface changes
 

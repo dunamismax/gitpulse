@@ -4,6 +4,8 @@ FastAPI + Jinja2 operator surface for the GitPulse Go runtime.
 
 The Python UI is now the default browser frontend for GitPulse. `gitpulse serve` launches this app on an internal loopback port and reverse-proxies browser requests to it while the Go runtime continues to own the JSON API, persistence, and analytics logic.
 
+GitPulse is manual-first today. The UI exposes explicit import, rescan, and rebuild controls instead of pretending a background watcher is already shipping.
+
 ## What this UI provides
 
 - server-rendered dashboard, repositories, repository detail, sessions, achievements, and settings pages

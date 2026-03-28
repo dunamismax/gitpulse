@@ -29,12 +29,11 @@ commits_per_day = 3
 focus_minutes_per_day = 90
 
 [monitoring]
+# GitPulse is manual-first today. These settings control explicit imports,
+# session rebuilding, and repo discovery depth.
 import_days = 30
 session_gap_minutes = 15
 repo_discovery_depth = 5
-watcher_debounce_ms = 700
-idle_poll_seconds = 20
-live_poll_seconds = 2
 
 [ui]
 timezone = "UTC"

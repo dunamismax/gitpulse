@@ -23,6 +23,6 @@ What exists instead:
 Treat them as new work and update these files together:
 
 - `README.md`
-- `BUILD.md`
+- `docs/operator-workflow.md`
 - `docs/architecture.md`
 - `.github/workflows/ci.yml`
