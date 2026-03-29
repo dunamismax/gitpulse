@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -125,13 +126,12 @@ func closeTestBody(t *testing.T, body io.Closer) {
 	}
 }
 
-// TestSmokeOperatorLoop exercises the full add → import → rescan →
-// rebuild-rollups → dashboard API flow against a seeded temporary git
-// repository.
+// TestSmokeOperatorLoop exercises the documented manual-first operator loop
+// through the public JSON API: add → import → rescan → rebuild → inspect.
 //
-// This test proves the documented manual operator loop: a fresh
-// operator can add repos, import history, rescan, rebuild analytics, and
-// inspect results without undocumented handholding.
+// This verifies the now-canonical product shape: adding a repo only registers
+// it, rescans only refresh live state, and rebuilds stay explicit before
+// derived analytics appear.
 func TestSmokeOperatorLoop(t *testing.T) {
 	if testing.Short() {
 		t.Skip("smoke test requires git; skipping in short mode")
@@ -139,35 +139,43 @@ func TestSmokeOperatorLoop(t *testing.T) {
 
 	ctx := context.Background()
 	repoDir := seedRepo(t)
-
-	// ---------------------------------------------------------------
-	// 1. Boot runtime with a fresh temp database.
-	// ---------------------------------------------------------------
 	rt, _ := newTestRuntime(t)
+	srv := web.New(rt, "", nil)
 
 	// ---------------------------------------------------------------
-	// 2. Add the seeded repo.
+	// 1. Add the seeded repo through the public API.
 	// ---------------------------------------------------------------
-	added, err := rt.AddTarget(ctx, repoDir)
-	if err != nil {
-		t.Fatalf("AddTarget: %v", err)
+	resp := performJSONRequest(t, srv, http.MethodPost, "/api/repositories/add", map[string]any{
+		"path": repoDir,
+	})
+	defer closeTestBody(t, resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/repositories/add status = %d, want 200", resp.StatusCode)
 	}
-	if len(added) != 1 {
-		t.Fatalf("AddTarget returned %d repos, want 1", len(added))
+
+	var addPayload struct {
+		OK    bool                `json:"ok"`
+		Repos []models.Repository `json:"repos"`
 	}
-	repo := added[0]
-	if repo.State != models.StateActive {
-		t.Fatalf("repo state = %q, want %q", repo.State, models.StateActive)
+	if err := json.NewDecoder(resp.Body).Decode(&addPayload); err != nil {
+		t.Fatalf("decode add response: %v", err)
 	}
+	if !addPayload.OK {
+		t.Fatal("add response not ok")
+	}
+	if len(addPayload.Repos) != 1 {
+		t.Fatalf("added repos = %d, want 1", len(addPayload.Repos))
+	}
+	if addPayload.Repos[0].State != models.StateActive {
+		t.Fatalf("repo state = %q, want %q", addPayload.Repos[0].State, models.StateActive)
+	}
+	repo := addPayload.Repos[0]
 	if repo.Name == "" {
 		t.Fatal("repo name is empty")
 	}
-
 	t.Logf("Added repo: %s (id=%s)", repo.Name, repo.ID)
 
-	// ---------------------------------------------------------------
-	// 3. Verify repo appears in ListRepos.
-	// ---------------------------------------------------------------
+	// Add now only registers the repo. No commits or rollups should exist yet.
 	repos, err := rt.ListRepos(ctx)
 	if err != nil {
 		t.Fatalf("ListRepos: %v", err)
@@ -176,35 +184,79 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatalf("ListRepos returned %d repos, want 1", len(repos))
 	}
 
-	// ---------------------------------------------------------------
-	// 4. Verify commits were imported (AddTarget auto-imports).
-	// ---------------------------------------------------------------
 	commits, err := db.ListCommits(ctx, rt.DB(), &repo.ID, 100)
 	if err != nil {
-		t.Fatalf("ListCommits: %v", err)
+		t.Fatalf("ListCommits after add: %v", err)
 	}
-	if len(commits) < 4 {
-		t.Fatalf("expected >= 4 commits, got %d", len(commits))
+	if len(commits) != 0 {
+		t.Fatalf("commits after add = %d, want 0", len(commits))
 	}
-	t.Logf("Commits imported: %d", len(commits))
 
-	// ---------------------------------------------------------------
-	// 5. Explicit import (should be idempotent — no new rows).
-	// ---------------------------------------------------------------
-	n, err := rt.ImportRepoHistory(ctx, repo.ID, 30)
+	allRollups, err := db.AllRollupsForScope(ctx, rt.DB(), "all")
 	if err != nil {
-		t.Fatalf("ImportRepoHistory: %v", err)
+		t.Fatalf("AllRollupsForScope after add: %v", err)
 	}
-	t.Logf("Re-import inserted %d new commits (expected 0)", n)
-
-	// ---------------------------------------------------------------
-	// 6. Rescan all repositories.
-	// ---------------------------------------------------------------
-	if err := rt.RescanAll(ctx); err != nil {
-		t.Fatalf("RescanAll: %v", err)
+	if len(allRollups) != 0 {
+		t.Fatalf("rollups after add = %d, want 0", len(allRollups))
 	}
 
-	// Verify a snapshot was written.
+	// ---------------------------------------------------------------
+	// 2. Import history explicitly.
+	// ---------------------------------------------------------------
+	importResp := performJSONRequest(t, srv, http.MethodPost, "/api/actions/import", map[string]any{
+		"days": 30,
+	})
+	defer closeTestBody(t, importResp.Body)
+	if importResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/actions/import status = %d, want 200", importResp.StatusCode)
+	}
+
+	var importResult models.OperatorActionResult
+	if err := json.NewDecoder(importResp.Body).Decode(&importResult); err != nil {
+		t.Fatalf("decode import response: %v", err)
+	}
+	if importResult.Action != "import_all" {
+		t.Fatalf("import action = %q, want %q", importResult.Action, "import_all")
+	}
+
+	commitsAfterImport, err := db.ListCommits(ctx, rt.DB(), &repo.ID, 100)
+	if err != nil {
+		t.Fatalf("ListCommits after import: %v", err)
+	}
+	if len(commitsAfterImport) < 4 {
+		t.Fatalf("commits after import = %d, want >= 4", len(commitsAfterImport))
+	}
+	t.Logf("Commits imported: %d", len(commitsAfterImport))
+
+	allRollups, err = db.AllRollupsForScope(ctx, rt.DB(), "all")
+	if err != nil {
+		t.Fatalf("AllRollupsForScope after import: %v", err)
+	}
+	if len(allRollups) != 0 {
+		t.Fatalf("rollups after import = %d, want 0 until rebuild", len(allRollups))
+	}
+
+	// ---------------------------------------------------------------
+	// 3. Make a live working-tree change and rescan explicitly.
+	// ---------------------------------------------------------------
+	if err := os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("# Test Repo\n\nThis changed after import.\n"), 0o644); err != nil {
+		t.Fatalf("mutate README.md: %v", err)
+	}
+
+	rescanResp := performJSONRequest(t, srv, http.MethodPost, "/api/actions/rescan", nil)
+	defer closeTestBody(t, rescanResp.Body)
+	if rescanResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/actions/rescan status = %d, want 200", rescanResp.StatusCode)
+	}
+
+	var rescanResult models.OperatorActionResult
+	if err := json.NewDecoder(rescanResp.Body).Decode(&rescanResult); err != nil {
+		t.Fatalf("decode rescan response: %v", err)
+	}
+	if rescanResult.Action != "rescan_all" {
+		t.Fatalf("rescan action = %q, want %q", rescanResult.Action, "rescan_all")
+	}
+
 	snap, err := db.LatestSnapshot(ctx, rt.DB(), repo.ID)
 	if err != nil {
 		t.Fatalf("LatestSnapshot: %v", err)
@@ -212,28 +264,52 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	if snap == nil {
 		t.Fatal("no snapshot after rescan")
 	}
-	t.Logf("Latest snapshot: branch=%v, head=%v", ptrStr(snap.Branch), ptrStr(snap.HeadSHA))
-
-	// ---------------------------------------------------------------
-	// 7. Rebuild analytics.
-	// ---------------------------------------------------------------
-	report, err := rt.RebuildAnalytics(ctx)
-	if err != nil {
-		t.Fatalf("RebuildAnalytics: %v", err)
+	if snap.LiveAdditions+snap.LiveDeletions == 0 {
+		t.Fatalf("snapshot live delta = %d, want non-zero after working-tree change", snap.LiveAdditions+snap.LiveDeletions)
 	}
-	t.Logf("Rebuild: sessions=%d, rollups=%d, achievements=%d, elapsed=%s",
-		report.SessionsWritten, report.RollupsWritten, report.AchievementsWritten, report.Elapsed)
+	t.Logf("Latest snapshot: branch=%v, head=%v, live_delta=%d", ptrStr(snap.Branch), ptrStr(snap.HeadSHA), snap.LiveAdditions+snap.LiveDeletions)
 
-	// There should be at least one rollup for the "all" scope.
-	allRollups, err := db.AllRollupsForScope(ctx, rt.DB(), "all")
+	commitsAfterRescan, err := db.ListCommits(ctx, rt.DB(), &repo.ID, 100)
 	if err != nil {
-		t.Fatalf("AllRollupsForScope: %v", err)
+		t.Fatalf("ListCommits after rescan: %v", err)
+	}
+	if len(commitsAfterRescan) != len(commitsAfterImport) {
+		t.Fatalf("commits changed during rescan: %d -> %d", len(commitsAfterImport), len(commitsAfterRescan))
+	}
+
+	allRollups, err = db.AllRollupsForScope(ctx, rt.DB(), "all")
+	if err != nil {
+		t.Fatalf("AllRollupsForScope after rescan: %v", err)
+	}
+	if len(allRollups) != 0 {
+		t.Fatalf("rollups after rescan = %d, want 0 until rebuild", len(allRollups))
+	}
+
+	// ---------------------------------------------------------------
+	// 4. Rebuild analytics explicitly.
+	// ---------------------------------------------------------------
+	rebuildResp := performJSONRequest(t, srv, http.MethodPost, "/api/actions/rebuild", nil)
+	defer closeTestBody(t, rebuildResp.Body)
+	if rebuildResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/actions/rebuild status = %d, want 200", rebuildResp.StatusCode)
+	}
+
+	var rebuildResult models.OperatorActionResult
+	if err := json.NewDecoder(rebuildResp.Body).Decode(&rebuildResult); err != nil {
+		t.Fatalf("decode rebuild response: %v", err)
+	}
+	if rebuildResult.Action != "rebuild_analytics" {
+		t.Fatalf("rebuild action = %q, want %q", rebuildResult.Action, "rebuild_analytics")
+	}
+
+	allRollups, err = db.AllRollupsForScope(ctx, rt.DB(), "all")
+	if err != nil {
+		t.Fatalf("AllRollupsForScope after rebuild: %v", err)
 	}
 	if len(allRollups) == 0 {
 		t.Fatal("no rollups for scope 'all' after rebuild")
 	}
 
-	// Verify committed additions are non-zero somewhere.
 	var totalCommittedAdd int
 	for _, r := range allRollups {
 		totalCommittedAdd += r.CommittedAdditions
@@ -243,7 +319,6 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	}
 	t.Logf("Rollup days: %d, total committed additions: %d", len(allRollups), totalCommittedAdd)
 
-	// Verify per-repo rollups exist.
 	repoRollups, err := db.AllRollupsForScope(ctx, rt.DB(), repo.ID.String())
 	if err != nil {
 		t.Fatalf("AllRollupsForScope(repo): %v", err)
@@ -252,9 +327,6 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatal("no per-repo rollups after rebuild")
 	}
 
-	// ---------------------------------------------------------------
-	// 8. Verify achievements exist.
-	// ---------------------------------------------------------------
 	achs, err := db.ListAchievements(ctx, rt.DB())
 	if err != nil {
 		t.Fatalf("ListAchievements: %v", err)
@@ -267,7 +339,7 @@ func TestSmokeOperatorLoop(t *testing.T) {
 	}
 
 	// ---------------------------------------------------------------
-	// 9. Verify DashboardView returns populated data.
+	// 5. Inspect the resulting API and view models.
 	// ---------------------------------------------------------------
 	dash, err := rt.DashboardView(ctx)
 	if err != nil {
@@ -277,18 +349,12 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatalf("DashboardView repo cards = %d, want 1", len(dash.RepoCards))
 	}
 
-	// ---------------------------------------------------------------
-	// 10. Verify SessionsSummary returns data.
-	// ---------------------------------------------------------------
 	sessSummary, err := rt.SessionsSummary(ctx)
 	if err != nil {
 		t.Fatalf("SessionsSummary: %v", err)
 	}
 	t.Logf("Sessions: %d total, %d total minutes", len(sessSummary.Sessions), sessSummary.TotalMinutes)
 
-	// ---------------------------------------------------------------
-	// 11. Verify RepoDetail returns data.
-	// ---------------------------------------------------------------
 	detail, err := rt.RepoDetail(ctx, repo.ID.String())
 	if err != nil {
 		t.Fatalf("RepoDetail: %v", err)
@@ -300,71 +366,79 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatal("RepoDetail has no recent commits")
 	}
 
-	// ---------------------------------------------------------------
-	// 12. Verify AchievementsView returns data.
-	// ---------------------------------------------------------------
 	achList, streaks, score, err := rt.AchievementsView(ctx)
 	if err != nil {
 		t.Fatalf("AchievementsView: %v", err)
 	}
 	t.Logf("AchievementsView: %d achievements, streak=%d, score=%d", len(achList), streaks.CurrentDays, score)
 
-	// ---------------------------------------------------------------
-	// 13. Stand up HTTP server and hit /api/dashboard.
-	// ---------------------------------------------------------------
-	srv := web.New(rt, "", nil)
-
-	resp := performRequest(t, srv, http.MethodGet, "/api/dashboard")
-	defer closeTestBody(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("GET /api/dashboard status = %d, want 200", resp.StatusCode)
+	dashboardResp := performRequest(t, srv, http.MethodGet, "/api/dashboard")
+	defer closeTestBody(t, dashboardResp.Body)
+	if dashboardResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/dashboard status = %d, want 200", dashboardResp.StatusCode)
 	}
 
 	var dashJSON models.DashboardView
-	if err := json.NewDecoder(resp.Body).Decode(&dashJSON); err != nil {
+	if err := json.NewDecoder(dashboardResp.Body).Decode(&dashJSON); err != nil {
 		t.Fatalf("decode dashboard JSON: %v", err)
 	}
 	if len(dashJSON.RepoCards) != 1 {
 		t.Fatalf("dashboard JSON repo cards = %d, want 1", len(dashJSON.RepoCards))
 	}
-	t.Logf("API /api/dashboard: repo_cards=%d, commits_today=%d, streak=%d",
-		len(dashJSON.RepoCards), dashJSON.Summary.CommitsToday, dashJSON.Summary.StreakDays)
+	t.Logf("API /api/dashboard: repo_cards=%d, commits_today=%d, streak=%d", len(dashJSON.RepoCards), dashJSON.Summary.CommitsToday, dashJSON.Summary.StreakDays)
 
-	// Verify /api/repositories returns data.
-	resp2 := performRequest(t, srv, http.MethodGet, "/api/repositories")
-	defer closeTestBody(t, resp2.Body)
-	if resp2.StatusCode != http.StatusOK {
-		t.Fatalf("GET /api/repositories status = %d", resp2.StatusCode)
+	reposResp := performRequest(t, srv, http.MethodGet, "/api/repositories")
+	defer closeTestBody(t, reposResp.Body)
+	if reposResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/repositories status = %d", reposResp.StatusCode)
 	}
 
-	// Verify /api/sessions returns data.
-	resp3 := performRequest(t, srv, http.MethodGet, "/api/sessions")
-	defer closeTestBody(t, resp3.Body)
-	if resp3.StatusCode != http.StatusOK {
-		t.Fatalf("GET /api/sessions status = %d", resp3.StatusCode)
+	sessionsResp := performRequest(t, srv, http.MethodGet, "/api/sessions")
+	defer closeTestBody(t, sessionsResp.Body)
+	if sessionsResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/sessions status = %d", sessionsResp.StatusCode)
 	}
 
-	// Verify /api/achievements returns data.
-	resp4 := performRequest(t, srv, http.MethodGet, "/api/achievements")
-	defer closeTestBody(t, resp4.Body)
-	if resp4.StatusCode != http.StatusOK {
-		t.Fatalf("GET /api/achievements status = %d", resp4.StatusCode)
+	achievementsResp := performRequest(t, srv, http.MethodGet, "/api/achievements")
+	defer closeTestBody(t, achievementsResp.Body)
+	if achievementsResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/achievements status = %d", achievementsResp.StatusCode)
 	}
 
-	// Verify /api/repositories/{id} returns detail.
-	resp5 := performRequest(t, srv, http.MethodGet, "/api/repositories/"+repo.ID.String())
-	defer closeTestBody(t, resp5.Body)
-	if resp5.StatusCode != http.StatusOK {
-		t.Fatalf("GET /api/repositories/{id} status = %d", resp5.StatusCode)
+	detailResp := performRequest(t, srv, http.MethodGet, "/api/repositories/"+repo.ID.String())
+	defer closeTestBody(t, detailResp.Body)
+	if detailResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/repositories/{id} status = %d", detailResp.StatusCode)
 	}
 
-	t.Log("✓ Full operator smoke loop passed")
+	t.Log("✓ Full manual-first operator smoke loop passed")
 }
 
 func performRequest(t *testing.T, handler http.Handler, method string, path string) *http.Response {
 	t.Helper()
 
 	req := httptest.NewRequest(method, path, nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	return recorder.Result()
+}
+
+func performJSONRequest(t *testing.T, handler http.Handler, method string, path string, payload any) *http.Response {
+	t.Helper()
+
+	var body io.Reader
+	if payload != nil {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("marshal payload: %v", err)
+		}
+		body = bytes.NewReader(data)
+	}
+
+	req := httptest.NewRequest(method, path, body)
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 	return recorder.Result()
@@ -387,16 +461,18 @@ func TestSmokeImportIdempotency(t *testing.T) {
 	}
 	repoID := added[0].ID
 
+	if _, err := rt.ImportRepoHistory(ctx, repoID, 30); err != nil {
+		t.Fatalf("ImportRepoHistory 1: %v", err)
+	}
+
 	commits1, err := db.ListCommits(ctx, rt.DB(), &repoID, 100)
 	if err != nil {
 		t.Fatalf("ListCommits: %v", err)
 	}
 	count1 := len(commits1)
 
-	// Import again.
-	_, err = rt.ImportRepoHistory(ctx, repoID, 30)
-	if err != nil {
-		t.Fatalf("ImportRepoHistory: %v", err)
+	if _, err := rt.ImportRepoHistory(ctx, repoID, 30); err != nil {
+		t.Fatalf("ImportRepoHistory 2: %v", err)
 	}
 
 	commits2, err := db.ListCommits(ctx, rt.DB(), &repoID, 100)
@@ -412,7 +488,7 @@ func TestSmokeImportIdempotency(t *testing.T) {
 }
 
 // TestSmokeRebuildDeterminism verifies that rebuilding analytics twice
-// produces the same result.
+// produces the same result once raw history and snapshots exist.
 func TestSmokeRebuildDeterminism(t *testing.T) {
 	if testing.Short() {
 		t.Skip("smoke test requires git; skipping in short mode")
@@ -422,9 +498,17 @@ func TestSmokeRebuildDeterminism(t *testing.T) {
 	repoDir := seedRepo(t)
 	rt, _ := newTestRuntime(t)
 
-	_, err := rt.AddTarget(ctx, repoDir)
+	added, err := rt.AddTarget(ctx, repoDir)
 	if err != nil {
 		t.Fatalf("AddTarget: %v", err)
+	}
+	repoID := added[0].ID
+
+	if _, err := rt.ImportRepoHistory(ctx, repoID, 30); err != nil {
+		t.Fatalf("ImportRepoHistory: %v", err)
+	}
+	if err := rt.RefreshRepository(ctx, repoID, true); err != nil {
+		t.Fatalf("RefreshRepository: %v", err)
 	}
 
 	report1, err := rt.RebuildAnalytics(ctx)
@@ -443,8 +527,7 @@ func TestSmokeRebuildDeterminism(t *testing.T) {
 	if report1.AchievementsWritten != report2.AchievementsWritten {
 		t.Fatalf("achievements differ: %d vs %d", report1.AchievementsWritten, report2.AchievementsWritten)
 	}
-	t.Logf("✓ Rebuild determinism: rollups=%d, achievements=%d (stable across 2 runs)",
-		report1.RollupsWritten, report1.AchievementsWritten)
+	t.Logf("✓ Rebuild determinism: rollups=%d, achievements=%d (stable across 2 runs)", report1.RollupsWritten, report1.AchievementsWritten)
 }
 
 // ptrStr dereferences a *string for logging; returns "<nil>" if nil.

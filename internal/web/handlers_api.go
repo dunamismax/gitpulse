@@ -308,6 +308,7 @@ func (s *Server) handleAPIRescanAll(w http.ResponseWriter, r *http.Request) {
 		Lines: []string{
 			fmt.Sprintf("Active monitored repositories: %d", processed),
 			"Live working-tree state refreshed from local git data.",
+			"Rebuild analytics separately when you want sessions, streaks, and score updated.",
 		},
 		Warnings: warnings,
 	})

@@ -198,6 +198,7 @@ def test_repositories_page_renders_add_form_and_card() -> None:
     assert "example-repo" in response.text
     assert "All Repositories" in response.text
     assert "Operator Runbook" in response.text
+    assert "Add only registers repositories" in response.text
     assert "Import Recent History" in response.text
 
 

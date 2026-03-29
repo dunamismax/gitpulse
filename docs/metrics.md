@@ -31,7 +31,7 @@ Interpretation:
 Definition:
 
 - Additions/deletions from commits authored by configured identities
-- Imported from recent git history and refreshed from ongoing repo activity
+- Imported from explicit git history backfills
 - Merge commits are stored but excluded from score and daily totals by default
 
 Identity handling:
@@ -73,7 +73,7 @@ Definition:
 Definition:
 
 - Contiguous activity windows separated by 15+ minutes of inactivity by default
-- Activity includes refreshes with meaningful changes, commits, pushes, imports, and rescans
+- Activity includes manual rescans with meaningful changes, imported commits, and detected pushes
 
 ## Streaks
 

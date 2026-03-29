@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -64,6 +65,27 @@ func loadRuntime(cfgFile string) (*runtime.Runtime, *config.AppConfig, error) {
 	}
 
 	return rt, cfg, nil
+}
+
+func resolveDoctorPaths(cfgFile string) (*config.AppPaths, error) {
+	paths, err := config.DiscoverPaths()
+	if err != nil {
+		return nil, err
+	}
+	if paths == nil {
+		paths = &config.AppPaths{}
+	}
+
+	resolved, err := config.ResolveConfigFile(cfgFile)
+	if err != nil {
+		return nil, err
+	}
+	if resolved != "" {
+		paths.ConfigFile = resolved
+		paths.ConfigDir = filepath.Dir(resolved)
+	}
+
+	return paths, nil
 }
 
 // serveCmd starts the web server.
@@ -306,7 +328,7 @@ func doctorCmd(cfgFile *string) *cobra.Command {
 			}
 
 			// Config paths.
-			paths, err := config.DiscoverPaths()
+			paths, err := resolveDoctorPaths(*cfgFile)
 			if err != nil {
 				fmt.Printf("config paths: error: %v\n", err)
 			} else {

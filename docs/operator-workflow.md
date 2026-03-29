@@ -27,7 +27,7 @@ Open <http://127.0.0.1:7467>. The Go server launches the Python UI and proxies b
 go run ./cmd/gitpulse add /path/to/code
 ```
 
-This registers local git roots and seeds initial history for newly discovered repositories.
+This only registers local git roots so the rest of the runbook can act on them explicitly.
 
 ### 3. Import recent history
 
@@ -43,7 +43,7 @@ Use this when you want a consistent backfill window across tracked repositories 
 go run ./cmd/gitpulse rescan --all
 ```
 
-This refreshes live git status, ahead/behind state, and working-tree change totals.
+This refreshes live git status, ahead/behind state, and working-tree change totals. It does not import commits or rebuild analytics for you.
 
 ### 5. Rebuild analytics
 

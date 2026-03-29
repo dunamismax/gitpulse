@@ -91,8 +91,9 @@ func (rt *Runtime) FindRepo(ctx context.Context, selector string) (*models.Repos
 	return db.FindRepository(ctx, rt.db, selector)
 }
 
-// AddTarget discovers repositories at path, registers them, imports initial
-// history, and rebuilds analytics.
+// AddTarget discovers repositories at path and registers them for manual-first
+// follow-up actions. History import, rescans, and analytics rebuilds stay
+// explicit operator steps.
 func (rt *Runtime) AddTarget(ctx context.Context, path string) ([]models.Repository, error) {
 	cfg := rt.Config()
 
@@ -159,23 +160,15 @@ func (rt *Runtime) AddTarget(ctx context.Context, path string) ([]models.Reposit
 			continue
 		}
 
-		if _, err := rt.ImportRepoHistory(ctx, saved.ID, cfg.Monitoring.ImportDays); err != nil {
-			// Non-fatal: continue even if import fails.
-			_ = err
-		}
-
 		added = append(added, *saved)
-	}
-
-	if err := rt.rebuildAnalyticsInternal(ctx); err != nil {
-		return added, fmt.Errorf("rebuild analytics: %w", err)
 	}
 
 	return added, nil
 }
 
-// RefreshRepository snapshots a repository, detects pushes, inserts activity,
-// imports recent commits, and rebuilds analytics.
+// RefreshRepository snapshots a repository, detects pushes, and records live
+// file activity. Commit imports and analytics rebuilds remain explicit operator
+// actions.
 func (rt *Runtime) RefreshRepository(ctx context.Context, repoID uuid.UUID, includeSizeScan bool) error {
 	repo, err := db.GetRepository(ctx, rt.db, repoID)
 	if err != nil || repo == nil {
@@ -249,12 +242,7 @@ func (rt *Runtime) RefreshRepository(ctx context.Context, repoID uuid.UUID, incl
 	}
 	_ = db.InsertSnapshot(ctx, rt.db, dbSnap)
 
-	// Import recent history.
-	if _, err := rt.ImportRepoHistory(ctx, repoID, 2); err != nil {
-		_ = err // Non-fatal.
-	}
-
-	return rt.rebuildAnalyticsInternal(ctx)
+	return nil
 }
 
 // RescanAll refreshes all active monitored repositories.

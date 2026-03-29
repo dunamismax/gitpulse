@@ -98,7 +98,7 @@ Shared data structures passed between runtime, DB, JSON API, and the Python UI.
 
 ### `internal/runtime`
 
-Application orchestration: add repo, refresh, import history, rebuild analytics, and assemble view models.
+Application orchestration: register repos, refresh live state, import history, rebuild analytics, and assemble view models.
 
 ### `internal/sessions`
 
@@ -111,10 +111,10 @@ Sessionization logic over activity points.
 ## Data flow
 
 1. A repo or folder is added through the CLI or the browser UI.
-2. `internal/git` discovers git roots, probes repo metadata, and seeds initial history for new repositories.
+2. `internal/git` discovers git roots and probes repo metadata so GitPulse can register new repositories without doing hidden imports or rebuilds.
 3. `internal/db` persists tracked targets, repositories, snapshots, commits, push events, file activity, sessions, rollups, achievements, and settings.
 4. The operator explicitly runs import, rescan, and rebuild actions when fresh history or live state needs to be pulled in.
-5. `internal/runtime` rebuilds derived analytics from raw events.
+5. `internal/runtime` rebuilds derived analytics from raw events only when rebuild is requested.
 6. `internal/web` exposes JSON endpoints, including manual operator action endpoints for import/rescan/rebuild, and reverse-proxies browser requests to the Python UI.
 7. The Python UI calls the Go JSON API through HTTPX, renders server-side templates, and turns those manual action endpoints into server-rendered runbook controls with inline feedback.
 

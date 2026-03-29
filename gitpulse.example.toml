@@ -30,7 +30,8 @@ focus_minutes_per_day = 90
 
 [monitoring]
 # GitPulse is manual-first today. These settings control explicit imports,
-# session rebuilding, and repo discovery depth.
+# rebuild sessionization, and repo discovery depth. Rescans do not import
+# history or rebuild analytics for you.
 import_days = 30
 session_gap_minutes = 15
 repo_discovery_depth = 5

@@ -105,16 +105,16 @@ For standalone development, the Python UI runs on port 8001 and calls the Go API
 ### Common commands
 
 ```bash
-# Add a single repo or discover repos under a folder
+# Register a single repo or discover repos under a folder
 go run ./cmd/gitpulse add /path/to/code
 
-# Refresh tracked repositories
-go run ./cmd/gitpulse rescan --all
-
-# Import recent commit history
+# Import recent commit history explicitly
 go run ./cmd/gitpulse import --all --days 30
 
-# Rebuild derived analytics
+# Refresh live git state explicitly
+go run ./cmd/gitpulse rescan --all
+
+# Rebuild derived analytics explicitly
 go run ./cmd/gitpulse rebuild-rollups
 
 # Check config and environment
@@ -125,10 +125,10 @@ go run ./cmd/gitpulse doctor
 
 GitPulse is manual-first today. It does not run a background watcher or poller. New data appears when you explicitly:
 
-- add a repository or parent folder
-- import recent history
-- rescan working trees
-- rebuild analytics from stored events
+- add a repository or parent folder so GitPulse can register local roots
+- import recent history when you want commit backfill
+- rescan working trees when you want fresh live git state
+- rebuild analytics from stored events when you want sessions, streaks, and score updated
 
 See [docs/operator-workflow.md](docs/operator-workflow.md) for the supported day-to-day loop and what each step updates.
 
