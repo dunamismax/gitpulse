@@ -154,13 +154,18 @@ func reserveLoopbackPort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer listener.Close()
-
 	addr, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
+		if closeErr := listener.Close(); closeErr != nil {
+			return 0, fmt.Errorf("close loopback listener: %w", closeErr)
+		}
 		return 0, fmt.Errorf("unexpected listener address type %T", listener.Addr())
 	}
-	return addr.Port, nil
+	port := addr.Port
+	if err := listener.Close(); err != nil {
+		return 0, fmt.Errorf("close loopback listener: %w", err)
+	}
+	return port, nil
 }
 
 func locatePythonUIProjectDir() (string, error) {

@@ -28,7 +28,7 @@ func TestServerRoutesProxyBrowserRequestsAndKeepAPIInGo(t *testing.T) {
 	srv := New(rt, "", uiHandler)
 
 	uiResp := performRequest(t, srv, http.MethodGet, "/")
-	defer uiResp.Body.Close()
+	defer func() { _ = uiResp.Body.Close() }()
 	if uiResp.StatusCode != http.StatusTeapot {
 		t.Fatalf("GET / status = %d, want %d", uiResp.StatusCode, http.StatusTeapot)
 	}
@@ -37,7 +37,7 @@ func TestServerRoutesProxyBrowserRequestsAndKeepAPIInGo(t *testing.T) {
 	}
 
 	apiResp := performRequest(t, srv, http.MethodGet, "/api/dashboard")
-	defer apiResp.Body.Close()
+	defer func() { _ = apiResp.Body.Close() }()
 	if apiResp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/dashboard status = %d, want %d", apiResp.StatusCode, http.StatusOK)
 	}
@@ -63,7 +63,7 @@ func TestServerRoutesProxyNonAPIFormPosts(t *testing.T) {
 	}))
 
 	resp := performRequest(t, srv, http.MethodPost, "/repositories/add")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("POST /repositories/add status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
