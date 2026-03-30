@@ -4,13 +4,13 @@ Start with `README.md`, `docs/operator-workflow.md`, and `docs/architecture.md`.
 
 ## Repo state
 
-GitPulse is a Go-first local analytics tool for repository activity with a Python operator UI.
+GitPulse is a Go-first local analytics tool for repository activity with a shipped Astro + Vue operator frontend served directly by the Go runtime.
 
 Active implementation path:
 
 - `go.mod`
 - `cmd/gitpulse/`
-- `python-ui/`
+- `frontend/`
 - `internal/config/`
 - `internal/db/`
 - `internal/filter/`
@@ -22,6 +22,10 @@ Active implementation path:
 - `internal/web/`
 - `migrations/`
 
+Legacy migration reference still present:
+
+- `python-ui/`
+
 New backend work goes into Go. The active storage layer is SQLite via `database/sql` and `modernc.org/sqlite` with plain SQL.
 
 ## Current product shape
@@ -32,8 +36,8 @@ What exists today:
 - SQLite schema + plain SQL query layer
 - Git subprocess integration for repo discovery, snapshots, and history import
 - rebuildable sessions, rollups, streaks, scoring, and achievements logic
-- `net/http` server with JSON API routes and proxying to the Python operator UI
-- FastAPI + Jinja2 + htmx operator UI under `python-ui/`
+- `net/http` server with JSON API routes plus direct serving of the built Astro frontend
+- Bun workspace under `frontend/` with shared TypeScript contracts, Astro + Vue web app, and OpenTUI foundation shell
 - a manual-first operator loop: add, import, rescan, rebuild, inspect
 
 What is not complete yet:
@@ -42,11 +46,13 @@ What is not complete yet:
 - background watcher or poller support
 - packaged desktop release workflow
 - fuzz coverage for git parsing
+- the real TUI implementation and `gitpulse tui` entrypoint
+- final repo cleanup to remove `python-ui/` entirely
 
 ## Working rules
 
 - Keep `README.md`, `docs/operator-workflow.md`, and `docs/architecture.md` aligned with code.
-- Prefer the narrowest truthful verification first: `go test ./...`, then `go build ./...`, then Python UI checks, then a focused CLI smoke command.
+- Prefer the narrowest truthful verification first: `go test ./...`, then `go build ./...`, then `go vet ./...`, then `cd frontend && bun run check && bun run --filter @gitpulse/web build`, then a focused CLI smoke command.
 - For database work, keep SQL explicit in `internal/db/`; no ORM theater and no incidental move of persistence into the UI lane.
 - Do not document packaging or release behavior that the repo does not implement.
 - Do not imply automatic background tracking while the product remains manual-first.

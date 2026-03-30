@@ -5,21 +5,29 @@ GitPulse is manual-first today. It does not ship a background watcher, poller, o
 ## Current operating truth
 
 - Go owns persistence, analytics, and the JSON API
-- the Python UI is the default browser surface
+- the shipped browser surface is the Astro + Vue frontend under `frontend/web/`
 - SQLite is the local-first data store
 - the supported ingestion loop is add, import, rescan, rebuild, inspect
 - analytics are rebuilt from stored local events
 - packaged desktop releases are not implemented in this repo
+- `python-ui/` is legacy reference only and is no longer on the request path
 
 ## Daily operator loop
 
-### 1. Start the local dashboard
+### 1. Build and start the local dashboard
+
+When running from source, build the web frontend first:
 
 ```bash
+cd frontend
+bun install
+bun run --filter @gitpulse/web build
+cd ..
+
 go run ./cmd/gitpulse serve
 ```
 
-Open <http://127.0.0.1:7467>. The Go server launches the Python UI and proxies browser requests to it.
+Open <http://127.0.0.1:7467>. The Go server serves the built frontend and handles `/api/*` directly.
 
 ### 2. Add a repository or parent folder
 
@@ -63,6 +71,7 @@ Use the dashboard, repository pages, sessions, achievements, settings, or the Go
 - no packaged desktop release flow exists in-tree
 - real-workspace smoke runs are still worth doing manually from time to time
 - fuzz coverage for git parsing is still missing
+- the TUI lane has not been implemented beyond the foundation shell
 
 ## Verification
 
@@ -72,5 +81,5 @@ Run the smallest truthful checks first, then broaden as needed:
 go test ./...
 go build ./...
 go vet ./...
-cd python-ui && uv sync && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
+cd frontend && bun run check && bun run --filter @gitpulse/web build
 ```

@@ -1,28 +1,9 @@
 ---
-import type { AchievementsView } from "@gitpulse/shared";
-
-import BackendStatus from "../components/BackendStatus.astro";
+import AchievementsPage from "../components/AchievementsPage.vue";
 import AppLayout from "../layouts/AppLayout.astro";
-import {
-  apiBaseUrlFromEnv,
-  backendStatusFromError,
-  createServerClient,
-} from "../lib/server";
+import { apiBaseUrlFromEnv } from "../lib/server";
 
 const apiBaseUrl = apiBaseUrlFromEnv(import.meta.env);
-const client = createServerClient(apiBaseUrl);
-
-let data: AchievementsView | null = null;
-let pageError: string | null = null;
-let backendStatus = null;
-
-try {
-  data = await client.achievements();
-} catch (error) {
-  pageError =
-    error instanceof Error ? error.message : "Could not load achievements.";
-  backendStatus = backendStatusFromError(error, apiBaseUrl);
-}
 ---
 
 <AppLayout
@@ -32,52 +13,5 @@ try {
   heading="Consistency, not gimmicks"
   description="Score is separate from raw stats and the badge set stays intentionally grounded."
 >
-  {backendStatus && <BackendStatus status={backendStatus} />}
-  {pageError && !backendStatus && (
-    <section class="notice notice-error">
-      <div>
-        <strong>Achievements unavailable</strong>
-        <p>{pageError}</p>
-      </div>
-    </section>
-  )}
-
-  {data && (
-    <>
-      <section class="stats-grid three-up">
-        <article class="stat-card"><span class="label">Current Streak</span><strong>{data.streaks.current_days} days</strong></article>
-        <article class="stat-card"><span class="label">Best Streak</span><strong>{data.streaks.best_days} days</strong></article>
-        <article class="stat-card"><span class="label">Today's Score</span><strong>{data.today_score}</strong></article>
-      </section>
-
-      {
-        data.achievements.length ? (
-          <section class="card-grid three-up">
-            {data.achievements.map((achievement) => (
-              <article class="panel achievement-card">
-                <h3>{achievement.kind}</h3>
-                <p>{achievement.reason}</p>
-                <small>{achievement.day ? `Unlocked on ${achievement.day}` : "Unlocked recently"}</small>
-              </article>
-            ))}
-          </section>
-        ) : (
-          <section class="panel empty-guide compact-guide">
-            <div class="panel-head">
-              <div>
-                <h3>No achievements yet</h3>
-                <p class="panel-copy">That usually means GitPulse has not been given enough local history to derive milestones, not that anything is broken.</p>
-              </div>
-              <span class="chip">Fresh run</span>
-            </div>
-            <ol class="step-list">
-              <li>Import recent history so the first repository and first commit milestones can unlock.</li>
-              <li>Rescan and rebuild analytics so sessions, streaks, and score settle into place.</li>
-              <li>Check settings if authored commits are missing because author emails are not configured.</li>
-            </ol>
-          </section>
-        )
-      }
-    </>
-  )}
+  <AchievementsPage client:load apiBaseUrl={apiBaseUrl} />
 </AppLayout>

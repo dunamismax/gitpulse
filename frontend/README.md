@@ -1,30 +1,44 @@
 # GitPulse frontend workspace
 
-Phase 3 web migration is now in progress for the GitPulse frontend workspace.
+The GitPulse frontend workspace is now the shipped browser lane for the product.
 
 Current truth:
 
-- `python-ui/` is still the shipped browser surface
+- `gitpulse serve` now serves the built Astro + Vue frontend from `frontend/web/dist`
 - Go remains the only backend and system of record
-- this workspace now holds the shared TypeScript contract plus the in-progress Astro web app and future OpenTUI lane
+- `frontend/shared` owns the shared TypeScript contracts and API client for both frontend lanes
+- `frontend/tui` is still only a foundation shell. The real terminal console has not been built yet.
+- `python-ui/` is still in-tree only as a temporary migration reference and is no longer on the runtime path
 
 Workspace packages:
 
 - `shared/`: shared API client, contract types, formatting helpers, route maps, screen maps, and operator action metadata
-- `web/`: real Astro + Vue SSR operator app wired to the live Go backend; `gitpulse serve` cutover is still pending
+- `web/`: shipped Astro + Vue browser frontend consumed by `gitpulse serve`
 - `tui/`: minimal Bun foundation shell wired to the live Go backend
 
-Local dev:
+Local setup:
 
 ```bash
 cd frontend
 bun install
+bun run --filter @gitpulse/web build
+```
 
-# browser app (direct Astro dev/preview)
+Local development:
+
+```bash
+# from the repo root, start the Go runtime on the normal API origin
+go run ./cmd/gitpulse serve
+
+# in another shell, start the Astro dev server
+cd frontend
 bun run --filter @gitpulse/web dev
+
+# optional: preview the built browser app directly
+bun run --filter @gitpulse/web preview
 
 # terminal foundation shell
 bun run --filter @gitpulse/tui dev
 ```
 
-Both packages default to `http://127.0.0.1:7467` and can be pointed elsewhere with `GITPULSE_API_BASE_URL`.
+The browser frontend defaults to same-origin in shipped mode and uses the Astro dev proxy for `/api` during local development. If needed, you can still override the backend origin at build time with `GITPULSE_API_BASE_URL`.

@@ -1,14 +1,14 @@
 # GitPulse Frontend Parity Matrix
 
-Purpose: minimum Phase 0 inventory to bound the frontend migration in [BUILD.md](../BUILD.md) before Astro + Vue or OpenTUI work starts.
+Purpose: minimum Phase 0 inventory used to bound the frontend migration in [BUILD.md](../BUILD.md) before Astro + Vue or OpenTUI work started.
 
 Current truth as of 2026-03-30:
 
-- the shipped browser surface is still `python-ui/`
+- the browser cutover to `frontend/web/` is complete
 - Go remains the only backend and system of record
-- the migration target is still dual frontend: `frontend/web` first, then `frontend/tui`
-- Phase 2 foundation now exists under `frontend/`, including the shared TypeScript contract and shared route and screen maps in `frontend/shared/src/surfaces.ts`
-- this document is an inventory and contract boundary, not a claim that the migration is complete
+- the migration target is still dual frontend: shipped `frontend/web` first, then `frontend/tui`
+- Phase 2 foundation exists under `frontend/`, including the shared TypeScript contract and shared route and screen maps in `frontend/shared/src/surfaces.ts`
+- this document is now historical migration inventory and contract boundary, not a claim that `python-ui/` remains the shipped browser surface
 
 ## Target frontend workspace
 
@@ -29,7 +29,7 @@ Ownership boundary:
 
 ## Page and workflow parity
 
-| Surface | Current browser route | Current Python UI files | Go read endpoints | Go action endpoints | Phase 1 contract notes |
+| Surface | Legacy browser route | Legacy Python UI files | Go read endpoints | Go action endpoints | Phase 1 contract notes |
 | --- | --- | --- | --- | --- | --- |
 | Dashboard | `/` | `dashboard.html`, `partials/action_center.html`, `partials/repository_card.html` | `GET /api/dashboard` | `POST /api/actions/import`, `POST /api/actions/rescan`, `POST /api/actions/rebuild` | Dashboard contract must expose summary, trends, activity feed, and repository cards without template-specific shaping |
 | Repositories list | `/repositories` | `repositories.html`, `partials/repository_section.html`, `partials/repository_card.html` | `GET /api/repositories` | `POST /api/repositories/add`, `POST /api/repositories/{id}/refresh`, `POST /api/repositories/{id}/toggle`, `POST /api/repositories/{id}/remove` | Repository list should be an explicit collection payload, not a bare array |
@@ -67,4 +67,4 @@ This inventory exists because the pre-migration API had a few risks called out i
 - some action endpoints returned ad hoc `{ "ok": true }` payloads
 - achievements and settings were assembled as handler-local maps instead of named contracts
 
-Phase 1 hardens those endpoints into explicit Go response structs so later frontend work can target stable contracts instead of Python-UI-shaped assumptions.
+Phase 1 hardened those endpoints into explicit Go response structs so later frontend work could target stable contracts instead of Python-UI-shaped assumptions.

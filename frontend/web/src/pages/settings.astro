@@ -1,29 +1,9 @@
 ---
-import type { SettingsView } from "@gitpulse/shared";
-
-import BackendStatus from "../components/BackendStatus.astro";
-import SettingsForm from "../components/SettingsForm.vue";
+import SettingsPage from "../components/SettingsPage.vue";
 import AppLayout from "../layouts/AppLayout.astro";
-import {
-  apiBaseUrlFromEnv,
-  backendStatusFromError,
-  createServerClient,
-} from "../lib/server";
+import { apiBaseUrlFromEnv } from "../lib/server";
 
 const apiBaseUrl = apiBaseUrlFromEnv(import.meta.env);
-const client = createServerClient(apiBaseUrl);
-
-let settings: SettingsView | null = null;
-let pageError: string | null = null;
-let backendStatus = null;
-
-try {
-  settings = await client.settings();
-} catch (error) {
-  pageError =
-    error instanceof Error ? error.message : "Could not load settings.";
-  backendStatus = backendStatusFromError(error, apiBaseUrl);
-}
 ---
 
 <AppLayout
@@ -33,15 +13,5 @@ try {
   heading="Identity, goals, and boundaries"
   description="Configured author emails shape commit and push history totals. Live working-tree activity always counts locally."
 >
-  {backendStatus && <BackendStatus status={backendStatus} />}
-  {pageError && !backendStatus && (
-    <section class="notice notice-error">
-      <div>
-        <strong>Settings unavailable</strong>
-        <p>{pageError}</p>
-      </div>
-    </section>
-  )}
-
-  {settings && <SettingsForm client:load apiBaseUrl={apiBaseUrl} settings={settings} />}
+  <SettingsPage client:load apiBaseUrl={apiBaseUrl} />
 </AppLayout>

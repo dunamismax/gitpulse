@@ -110,24 +110,17 @@ func serveCmd(cfgFile *string) *cobra.Command {
 				host = cfg.Server.Host
 			}
 
-			uiProjectDir, err := locatePythonUIProjectDir()
+			webDistDir, err := locateFrontendWebDistDir()
 			if err != nil {
 				return err
 			}
 
-			managedUI, err := startManagedPythonUI(uiProjectDir, apiBaseURLForServeHost(host, port))
+			uiHandler, err := web.NewStaticUIHandler(webDistDir)
 			if err != nil {
-				return fmt.Errorf("start python UI: %w", err)
+				return fmt.Errorf("load frontend web build: %w", err)
 			}
-			defer func() {
-				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				if err := managedUI.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
-					slog.Warn("python UI shutdown", "err", err)
-				}
-			}()
 
-			srv := web.New(rt, *cfgFile, managedUI.Handler())
+			srv := web.New(rt, *cfgFile, uiHandler)
 			addr := fmt.Sprintf("%s:%d", host, port)
 			httpServer := &http.Server{Addr: addr, Handler: srv}
 
@@ -140,6 +133,7 @@ func serveCmd(cfgFile *string) *cobra.Command {
 				errCh <- httpServer.ListenAndServe()
 			}()
 
+			slog.Info("frontend web build ready", "dist_dir", webDistDir, "origin", apiBaseURLForServeHost(host, port))
 			fmt.Printf("GitPulse running at http://%s\n", addr)
 
 			select {

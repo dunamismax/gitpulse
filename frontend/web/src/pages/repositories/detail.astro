@@ -1,0 +1,17 @@
+---
+import RepositoryDetailPage from "../../components/RepositoryDetailPage.vue";
+import AppLayout from "../../layouts/AppLayout.astro";
+import { apiBaseUrlFromEnv } from "../../lib/server";
+
+const apiBaseUrl = apiBaseUrlFromEnv(import.meta.env);
+---
+
+<AppLayout
+  title="Repository Detail"
+  activeNav="repositories"
+  eyebrow="Repository Detail"
+  heading="Repository detail"
+  description="Repository-specific filters, health, sessions, pushes, and imported history."
+>
+  <RepositoryDetailPage client:load apiBaseUrl={apiBaseUrl} />
+</AppLayout>

@@ -1,34 +1,9 @@
 ---
-import type { RepoCard, SettingsView } from "@gitpulse/shared";
-
-import ActionCenter from "../../components/ActionCenter.vue";
-import BackendStatus from "../../components/BackendStatus.astro";
-import RepositoryListManager from "../../components/RepositoryListManager.vue";
+import RepositoriesPage from "../../components/RepositoriesPage.vue";
 import AppLayout from "../../layouts/AppLayout.astro";
-import {
-  apiBaseUrlFromEnv,
-  backendStatusFromError,
-  createServerClient,
-} from "../../lib/server";
+import { apiBaseUrlFromEnv } from "../../lib/server";
 
 const apiBaseUrl = apiBaseUrlFromEnv(import.meta.env);
-const client = createServerClient(apiBaseUrl);
-
-let repositories: RepoCard[] = [];
-let settings: SettingsView | null = null;
-let pageError: string | null = null;
-let backendStatus = null;
-
-try {
-  [repositories, settings] = await Promise.all([
-    client.repositories(),
-    client.settings(),
-  ]);
-} catch (error) {
-  pageError =
-    error instanceof Error ? error.message : "Could not load repositories.";
-  backendStatus = backendStatusFromError(error, apiBaseUrl);
-}
 ---
 
 <AppLayout
@@ -38,29 +13,5 @@ try {
   heading="Repositories"
   description="Add a single repo or a parent folder. Nested repos are discovered and tracked individually."
 >
-  {backendStatus && <BackendStatus status={backendStatus} />}
-  {pageError && !backendStatus && (
-    <section class="notice notice-error">
-      <div>
-        <strong>Repository view unavailable</strong>
-        <p>{pageError}</p>
-      </div>
-    </section>
-  )}
-
-  {!pageError && (
-    <>
-      <ActionCenter
-        client:load
-        apiBaseUrl={apiBaseUrl}
-        importDays={settings?.config.monitoring.import_days ?? 30}
-        trackedTotal={repositories.length}
-      />
-      <RepositoryListManager
-        client:load
-        apiBaseUrl={apiBaseUrl}
-        initialCards={repositories}
-      />
-    </>
-  )}
+  <RepositoriesPage client:load apiBaseUrl={apiBaseUrl} />
 </AppLayout>

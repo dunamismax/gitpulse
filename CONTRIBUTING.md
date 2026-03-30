@@ -1,14 +1,13 @@
 # Contributing to GitPulse
 
-GitPulse is an active Go application with a Python operator UI served through the Go runtime. Read [README.md](README.md), [docs/operator-workflow.md](docs/operator-workflow.md), and [docs/architecture.md](docs/architecture.md).
+GitPulse is an active Go application with a shipped Astro + Vue operator frontend served through the Go runtime. Read [README.md](README.md), [docs/operator-workflow.md](docs/operator-workflow.md), and [docs/architecture.md](docs/architecture.md).
 
 ## Development setup
 
 ### Prerequisites
 
 - Go 1.26.1
-- Python 3.14+
-- `uv`
+- Bun 1.3+
 - Git 2.30+
 
 ### First build
@@ -16,9 +15,10 @@ GitPulse is an active Go application with a Python operator UI served through th
 ```bash
 git clone https://github.com/dunamismax/gitpulse.git
 cd gitpulse
+cd frontend && bun install && bun run --filter @gitpulse/web build
+cd ..
 go test ./...
 go build ./cmd/gitpulse
-cd python-ui && uv sync
 ```
 
 ### Minimal local config
@@ -36,12 +36,14 @@ See [gitpulse.example.toml](gitpulse.example.toml) for the full config surface.
 
 ## Architecture rules
 
-GitPulse uses a Go-first backend with a FastAPI + Jinja2 + htmx operator UI.
+GitPulse uses a Go-first backend with a Bun workspace frontend.
 
 | Path | Owns |
 |------|------|
-| `cmd/gitpulse` | CLI command wiring and managed Python UI launch |
-| `python-ui` | FastAPI templates, htmx flows, static assets, and Python-side UI tests |
+| `cmd/gitpulse` | CLI command wiring and frontend build discovery |
+| `frontend/shared` | shared TypeScript contracts, API client, route maps, and formatters |
+| `frontend/web` | Astro + Vue browser frontend |
+| `frontend/tui` | OpenTUI foundation shell and future terminal console |
 | `internal/config` | config loading and platform paths |
 | `internal/db` | SQLite connection, schema, migrations, and plain SQL queries |
 | `internal/filter` | include/exclude matching |
@@ -50,12 +52,13 @@ GitPulse uses a Go-first backend with a FastAPI + Jinja2 + htmx operator UI.
 | `internal/models` | shared data and API/view structs |
 | `internal/runtime` | orchestration and view assembly |
 | `internal/sessions` | sessionization |
-| `internal/web` | HTTP handlers, JSON API, and UI proxying |
+| `internal/web` | HTTP handlers, JSON API, and static frontend serving |
+| `python-ui` | legacy migration reference, not active product runtime |
 
 Rules:
 
 - New backend implementation work goes in Go.
-- The Python UI owns the browser surface, but not persistence or analytics logic.
+- The shipped browser surface lives in `frontend/web`, but persistence and analytics stay Go-owned.
 - Keep persistence relational, local, and Go-owned.
 - Keep plain SQL explicit in `internal/db`.
 - Keep repo-controlled strings treated as untrusted input.
@@ -68,9 +71,10 @@ Run the narrowest useful checks first:
 
 ```bash
 go test ./...
-go build ./cmd/gitpulse
+go build ./...
+go vet ./...
 go run ./cmd/gitpulse --help
-cd python-ui && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
+cd frontend && bun run check && bun run --filter @gitpulse/web build
 ```
 
 If your change touches runtime or database behavior, prefer adding a focused integration test against a temporary SQLite file.

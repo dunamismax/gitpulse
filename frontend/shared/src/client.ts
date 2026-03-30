@@ -245,7 +245,16 @@ export function normalizeBaseUrl(baseUrl: string): string {
 export function defaultApiBaseUrl(env?: {
   GITPULSE_API_BASE_URL?: string | undefined;
 }): string {
-  return env?.GITPULSE_API_BASE_URL?.trim() || "http://127.0.0.1:7467";
+  const configured = env?.GITPULSE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return "http://127.0.0.1:7467";
 }
 
 export function buildTransportMessage(baseUrl: string, prefix: string): string {

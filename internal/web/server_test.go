@@ -15,7 +15,7 @@ import (
 	"github.com/dunamismax/gitpulse/internal/runtime"
 )
 
-func TestServerRoutesProxyBrowserRequestsAndKeepAPIInGo(t *testing.T) {
+func TestServerRoutesSendBrowserRequestsToUIHandlerAndKeepAPIInGo(t *testing.T) {
 	rt := newTestRuntime(t)
 	defer rt.Close()
 
@@ -23,7 +23,7 @@ func TestServerRoutesProxyBrowserRequestsAndKeepAPIInGo(t *testing.T) {
 	uiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		uiHit = true
 		w.WriteHeader(http.StatusTeapot)
-		_, _ = w.Write([]byte("python-ui:" + r.URL.Path))
+		_, _ = w.Write([]byte("ui:" + r.URL.Path))
 	})
 
 	srv := New(rt, "", uiHandler)
@@ -34,7 +34,7 @@ func TestServerRoutesProxyBrowserRequestsAndKeepAPIInGo(t *testing.T) {
 		t.Fatalf("GET / status = %d, want %d", uiResp.StatusCode, http.StatusTeapot)
 	}
 	if !uiHit {
-		t.Fatal("expected browser request to be forwarded to the UI handler")
+		t.Fatal("expected browser request to be handled by the UI handler")
 	}
 
 	apiResp := performRequest(t, srv, http.MethodGet, "/api/dashboard")
@@ -52,7 +52,7 @@ func TestServerRoutesProxyBrowserRequestsAndKeepAPIInGo(t *testing.T) {
 	}
 }
 
-func TestServerRoutesProxyNonAPIFormPosts(t *testing.T) {
+func TestServerRoutesSendNonAPIRequestsToUIHandler(t *testing.T) {
 	rt := newTestRuntime(t)
 	defer rt.Close()
 

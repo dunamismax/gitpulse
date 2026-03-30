@@ -14,14 +14,17 @@ The repository currently centers on:
 
 - Go runtime and CLI
 - SQLite persistence with plain SQL
-- a server-rendered Python operator UI launched by `gitpulse serve` and proxied through the Go runtime
+- a shipped Astro + Vue operator frontend served by `gitpulse serve`
+- a Bun workspace with shared frontend contracts and a still-foundational TUI lane
 - a manual-first ingestion flow built around add, import, rescan, and rebuild
 
 Near-term roadmap decisions:
 
-- stabilize the Go CLI + Python operator UI daily loop
+- stabilize the Go CLI + Astro web daily loop
 - prove the local add/import/rescan/rebuild happy path end to end
 - harden the SQLite-backed runtime instead of adding extra infrastructure
+- complete the TUI lane only if it earns its keep
+- remove legacy `python-ui/` code once the remaining repo cleanup is done
 - treat packaging as optional follow-on work, not a current product surface
 
 ## Milestone 1 — operator-ready Go runtime
@@ -34,7 +37,7 @@ Targets:
 
 - CLI commands: `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, `doctor`
 - SQLite-backed event and rollup model
-- dashboard, repositories, sessions, achievements, and settings pages through the Python UI
+- dashboard, repositories, sessions, achievements, and settings pages through the Astro + Vue frontend
 - rebuilt sessions, streaks, score, and achievements logic
 - operator-facing docs and reproducible local setup
 
@@ -55,7 +58,7 @@ Possible scope:
 
 - more focused runtime and database tests
 - better error handling and diagnostics
-- explicit migration/version handling beyond the bootstrap schema
+- explicit migration and version handling beyond the bootstrap schema
 - data lifecycle controls
 - incremental rebuild strategy if full rebuilds become painful
 - packaging only if it earns its keep
