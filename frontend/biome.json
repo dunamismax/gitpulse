@@ -16,7 +16,10 @@
       "**/*.tsx",
       "**/*.astro",
       "**/*.vue",
-      "package.json"
+      "package.json",
+      "!**/.astro",
+      "!**/dist",
+      "!**/node_modules"
     ]
   },
   "overrides": [

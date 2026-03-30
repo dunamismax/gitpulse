@@ -2,7 +2,7 @@
 
 GitPulse is a local-first Go application with SQLite persistence and plain SQL in the Go runtime. The Go backend remains the source of truth. The browser surface is a server-rendered Python UI under `python-ui/` served through the Go runtime via reverse proxy.
 
-The frontend migration plan is tracked in `BUILD.md`. Today the browser UI is still Python, but the Go API now carries explicit frontend response contracts so the current Python UI and future Bun frontends can consume the same backend-owned shapes. Phase 2 foundation work now lives under `frontend/`: a Bun workspace, shared TypeScript contract layer, shared route and screen maps, and minimal web and terminal dev shells wired to the live Go backend.
+The frontend migration plan is tracked in `BUILD.md`. Today the browser UI is still Python, but the Go API now carries explicit frontend response contracts so the current Python UI and future Bun frontends can consume the same backend-owned shapes. Phase 3 web work now lives under `frontend/`: a Bun workspace, shared TypeScript contract layer, shared route and screen maps, a real Astro + Vue SSR browser app under `frontend/web/`, and the still-foundational terminal lane under `frontend/tui`.
 
 ## Active stack
 

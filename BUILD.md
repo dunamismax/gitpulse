@@ -35,8 +35,8 @@ This repo should **not** go web-only unless the TUI later proves redundant, and 
 
 - [x] Phase 0 is complete. `docs/frontend-parity-matrix.md` inventories the current browser surface and the migration boundary.
 - [x] Phase 1 is complete. The Go API now exposes explicit frontend-facing contracts with focused contract tests.
-- [x] Phase 2 is complete. `frontend/` now contains the Bun workspace, shared TypeScript contract layer, shared route and screen maps, and minimal web and terminal foundation shells.
-- [ ] Phase 3 has not started. `frontend/web/` now exists as a foundation shell, but `gitpulse serve` still launches and proxies `python-ui/`.
+- [x] Phase 2 is complete. `frontend/` now contains the Bun workspace, shared TypeScript contract layer, shared route and screen maps, and the lane structure for both the web and terminal frontends.
+- [ ] Phase 3 is in progress. `frontend/web/` now implements the migration-critical browser routes and explicit operator actions in Astro + Vue against the live Go API, but `gitpulse serve` still launches and proxies `python-ui/`.
 - [ ] Phase 4 has not started. `frontend/tui/` now exists as a foundation shell, but there is still no `gitpulse tui` entrypoint or real operator console.
 - [ ] Phase 5 has not started. `python-ui/` is still present and repo docs plus verification still describe the Python UI lane.
 
@@ -149,16 +149,16 @@ Exit criteria:
 
 Status notes:
 
-- `frontend/web/` exists only as a Phase 2 foundation shell for shared contract and live-backend boot verification.
-- `gitpulse serve` still launches the managed Python UI and reverse-proxies non-API browser traffic to it.
-- The shipped browser surface remains FastAPI + Jinja2 + htmx + Alpine.js under `python-ui/`.
+- `frontend/web/` now ships a real Astro + Vue SSR operator app for dashboard, repositories, repo detail, sessions, achievements, settings, and explicit operator actions against the live Go API.
+- First-run guidance, backend error handling, and manual action feedback now exist in the Astro web app as part of the migration-critical browser flow.
+- `gitpulse serve` still launches the managed Python UI and reverse-proxies non-API browser traffic to it, so the shipped browser surface remains FastAPI + Jinja2 + htmx + Alpine.js under `python-ui/`.
 
 Deliverables:
 
-- [ ] build the web app in `frontend/web`
-- [ ] reach feature parity for the current browser surface: dashboard, repositories, repo detail, sessions, achievements, settings, and explicit operator actions
-- [ ] keep the product server-first. Astro owns pages; Vue owns interactive islands only where needed.
-- [ ] preserve first-run guidance and manual action feedback in the new web frontend
+- [x] build the web app in `frontend/web`
+- [x] reach feature parity for the current browser surface: dashboard, repositories, repo detail, sessions, achievements, settings, and explicit operator actions
+- [x] keep the product server-first. Astro owns pages; Vue owns interactive islands only where needed.
+- [x] preserve first-run guidance and manual action feedback in the new web frontend
 - [ ] make Go serve the built frontend assets in non-dev paths
 
 Exit criteria:

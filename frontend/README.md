@@ -1,17 +1,17 @@
 # GitPulse frontend workspace
 
-Phase 2 foundation for the GitPulse frontend migration.
+Phase 3 web migration is now in progress for the GitPulse frontend workspace.
 
 Current truth:
 
 - `python-ui/` is still the shipped browser surface
 - Go remains the only backend and system of record
-- this workspace exists to keep the TypeScript contract, route maps, and local dev wiring shared before Phase 3 or Phase 4 UI work
+- this workspace now holds the shared TypeScript contract plus the in-progress Astro web app and future OpenTUI lane
 
 Workspace packages:
 
 - `shared/`: shared API client, contract types, formatting helpers, route maps, screen maps, and operator action metadata
-- `web/`: minimal Astro + Vue foundation shell wired to the live Go backend
+- `web/`: real Astro + Vue SSR operator app wired to the live Go backend; `gitpulse serve` cutover is still pending
 - `tui/`: minimal Bun foundation shell wired to the live Go backend
 
 Local dev:
@@ -20,7 +20,7 @@ Local dev:
 cd frontend
 bun install
 
-# browser foundation shell
+# browser app (direct Astro dev/preview)
 bun run --filter @gitpulse/web dev
 
 # terminal foundation shell
