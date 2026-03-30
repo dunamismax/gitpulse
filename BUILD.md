@@ -1,6 +1,6 @@
 # GitPulse BUILD
 
-Purpose: phased frontend migration plan from the current Python browser UI to GitPulse's next frontend shape.
+Purpose: status-tracked frontend migration plan from today's Python browser UI to GitPulse's next frontend shape.
 
 ## Frontend decision
 
@@ -30,6 +30,15 @@ This repo should **not** go web-only unless the TUI later proves redundant, and 
 - `python-ui/` is FastAPI + Jinja2 + htmx + Alpine.js.
 - The supported operator loop is still manual-first: **add -> import -> rescan -> rebuild -> inspect**.
 - Background watchers, pollers, desktop packaging, and plugin runtime work are not current product truth.
+
+## Status snapshot
+
+- [x] Phase 0 is complete. `docs/frontend-parity-matrix.md` inventories the current browser surface and the migration boundary.
+- [x] Phase 1 is complete. The Go API now exposes explicit frontend-facing contracts with focused contract tests.
+- [ ] Phase 2 has not started. There is no `frontend/` workspace, Bun workspace, or shared TypeScript client in the repo yet.
+- [ ] Phase 3 has not started. `gitpulse serve` still launches and proxies `python-ui/`.
+- [ ] Phase 4 has not started. There is no `gitpulse tui` entrypoint and no `frontend/tui/` tree.
+- [ ] Phase 5 has not started. `python-ui/` is still present and repo docs plus verification still describe the Python UI lane.
 
 ## Target state
 
@@ -71,111 +80,146 @@ Target behavior:
 - Desktop packaging stays out of scope for this migration.
 - Keep same-origin behavior boring. The Go runtime remains the single local app boundary.
 
-## Phase plan
+## Phase plan and status
 
-### Phase 0 - Lock the contract before replacing UI
+### [x] Phase 0 - Lock the contract before replacing UI
 
-Deliverables:
+Status notes:
 
-- inventory current Python UI routes, pages, actions, and API dependencies
-- write a page and workflow parity matrix for: dashboard, repositories, repo detail, sessions, achievements, settings, and operator actions
-- define the target `frontend/` workspace layout and ownership boundaries
-- identify API/view-model gaps that are currently Python-UI-shaped
-
-Exit criteria:
-
-- parity scope is explicit before new UI work starts
-- Go API gaps are listed as backend tasks, not hidden frontend surprises
-- future subagents can work from a bounded checklist
-
-### Phase 1 - Harden the Go frontend contract
+- `docs/frontend-parity-matrix.md` now inventories current routes, templates, read endpoints, action endpoints, and contract notes.
+- The parity inventory names the current browser surfaces: dashboard, repositories, repo detail, sessions, achievements, settings, and operator actions.
 
 Deliverables:
 
-- make the Go API and action endpoints explicit enough for both frontends
-- normalize response shapes so they are frontend-facing rather than template-shaped
-- add focused tests for dashboard, repositories, actions, sessions, achievements, and settings endpoints
-- keep all orchestration, validation, and persistence in Go
+- [x] inventory current Python UI routes, pages, actions, and API dependencies
+- [x] write a page and workflow parity matrix for: dashboard, repositories, repo detail, sessions, achievements, settings, and operator actions
+- [x] define the target `frontend/` workspace layout and ownership boundaries
+- [x] identify API and view-model gaps that were still Python-UI-shaped before contract hardening
 
 Exit criteria:
 
-- new frontends can consume a stable contract without Python-specific glue
-- manual operator actions are represented cleanly in the API
-- backend tests cover the migration-critical surfaces
+- [x] parity scope is explicit before new UI work starts
+- [x] Go API gaps are listed as backend tasks instead of hidden frontend surprises
+- [x] future subagents can work from a bounded checklist
 
-### Phase 2 - Create the shared TypeScript foundation
+### [x] Phase 1 - Harden the Go frontend contract
+
+Status notes:
+
+- `internal/models/contracts.go` defines explicit response types for dashboard, repositories, repo detail, sessions, achievements, settings, and shared operator action payloads.
+- `internal/web/server.go` exposes the full migration-critical read and action route set.
+- `internal/web/handlers_api_contract_test.go` and `internal/runtime/smoke_test.go` cover the migration-critical API surfaces.
 
 Deliverables:
 
-- create a Bun workspace under `frontend/`
-- add `frontend/shared` for API client code, shared types, formatting helpers, and common domain utilities
-- define route and screen maps for web and TUI against the same domain model
-- wire local dev against the live Go backend
+- [x] make the Go API and action endpoints explicit enough for both frontends
+- [x] normalize response shapes so they are frontend-facing rather than template-shaped
+- [x] add focused tests for dashboard, repositories, actions, sessions, achievements, and settings endpoints
+- [x] keep all orchestration, validation, and persistence in Go
 
 Exit criteria:
 
-- one shared TS contract exists for both frontends
-- both frontend lanes can boot against the current Go runtime
-- no frontend-specific type drift is required to talk to Go
+- [x] new frontends can consume a stable contract without Python-specific glue
+- [x] manual operator actions are represented cleanly in the API
+- [x] backend tests cover the migration-critical surfaces
 
-### Phase 3 - Replace the browser UI with Astro + Vue
+### [ ] Phase 2 - Create the shared TypeScript foundation
+
+Status notes:
+
+- No `frontend/` directory exists yet.
+- No Bun workspace files, shared TypeScript API client, or frontend route and screen maps are checked in yet.
 
 Deliverables:
 
-- build the web app in `frontend/web`
-- reach feature parity for the current browser surface: dashboard, repositories, repo detail, sessions, achievements, settings, and explicit operator actions
-- keep the product server-first. Astro owns pages; Vue owns interactive islands only where needed.
-- preserve first-run guidance and manual action feedback
-- make Go serve the built frontend assets in non-dev paths
+- [ ] create a Bun workspace under `frontend/`
+- [ ] add `frontend/shared` for API client code, shared types, formatting helpers, and common domain utilities
+- [ ] define route and screen maps for web and TUI against the same domain model
+  - Current state: `docs/frontend-parity-matrix.md` inventories the existing Python UI surface, but it does not define future Astro or OpenTUI route and screen maps.
+- [ ] wire local dev against the live Go backend
 
 Exit criteria:
 
-- `gitpulse serve` works end to end without `python-ui/` in the request path
-- the browser surface no longer needs FastAPI, Jinja2, htmx, or Alpine.js
-- the shipped browser workflow still matches the manual-first operating model
+- [ ] one shared TypeScript contract exists for both frontends
+- [ ] both frontend lanes can boot against the current Go runtime
+- [ ] no frontend-specific type drift is required to talk to Go
 
-### Phase 4 - Add the OpenTUI operator console
+### [ ] Phase 3 - Replace the browser UI with Astro + Vue
+
+Status notes:
+
+- There is no `frontend/web/` app in the repo yet.
+- `gitpulse serve` still launches the managed Python UI and reverse-proxies non-API browser traffic to it.
+- The shipped browser surface remains FastAPI + Jinja2 + htmx + Alpine.js under `python-ui/`.
 
 Deliverables:
 
-- add `frontend/tui`
-- introduce a dedicated terminal entrypoint, preferably `gitpulse tui`
-- implement the operator-critical workflow first: repository list/detail, action center, sessions summary, achievements summary, settings basics, and clear error states
-- optimize for keyboard flow, visibility, and speed rather than page-for-page web mimicry
+- [ ] build the web app in `frontend/web`
+- [ ] reach feature parity for the current browser surface: dashboard, repositories, repo detail, sessions, achievements, settings, and explicit operator actions
+- [ ] keep the product server-first. Astro owns pages; Vue owns interactive islands only where needed.
+- [ ] preserve first-run guidance and manual action feedback in the new web frontend
+- [ ] make Go serve the built frontend assets in non-dev paths
 
 Exit criteria:
 
-- a developer can run the daily GitPulse loop comfortably from the TUI
-- the TUI is materially better than chaining CLI commands for inspection and control
-- the CLI still exists as the low-level fallback
+- [ ] `gitpulse serve` works end to end without `python-ui/` in the request path
+- [ ] the browser surface no longer needs FastAPI, Jinja2, htmx, or Alpine.js
+- [ ] the shipped browser workflow still matches the manual-first operating model
 
-### Phase 5 - Remove Python UI and tighten the repo
+### [ ] Phase 4 - Add the OpenTUI operator console
+
+Status notes:
+
+- There is no `frontend/tui/` tree yet.
+- The Cobra CLI does not expose a `tui` subcommand yet.
+- No terminal UI implementation exists beyond the current CLI command set.
 
 Deliverables:
 
-- remove `python-ui/` and managed Python UI launch/proxy code once web cutover is complete
-- remove Python UI docs and verification steps from repo docs and CI
-- update README and architecture/operator docs to reflect the active Go + Bun frontend shape
-- keep desktop packaging out of scope unless the repo implements it separately
+- [ ] add `frontend/tui`
+- [ ] introduce a dedicated terminal entrypoint, preferably `gitpulse tui`
+- [ ] implement the operator-critical workflow first: repository list and detail, action center, sessions summary, achievements summary, settings basics, and clear error states
+- [ ] optimize for keyboard flow, visibility, and speed rather than page-for-page web mimicry
 
 Exit criteria:
 
-- no Python runtime dependency remains for shipped GitPulse frontend behavior
-- docs and CI describe only the active Go + Bun lanes
-- stale Python-browser wording is gone from current-state docs
+- [ ] a developer can run the daily GitPulse loop comfortably from the TUI
+- [ ] the TUI is materially better than chaining CLI commands for inspection and control
+- [ ] the CLI still exists as the low-level fallback
+
+### [ ] Phase 5 - Remove Python UI and tighten the repo
+
+Status notes:
+
+- `python-ui/` is still in-tree and still launched by `gitpulse serve`.
+- README, architecture docs, and verification commands still describe the active Python UI path because that is still current truth.
+- Desktop packaging remains out of scope for the migration itself.
+
+Deliverables:
+
+- [ ] remove `python-ui/` and managed Python UI launch and proxy code once web cutover is complete
+- [ ] remove Python UI docs and verification steps from repo docs and CI
+- [ ] update README and architecture and operator docs to reflect the active Go + Bun frontend shape
+- [x] keep desktop packaging out of scope unless the repo implements it separately
+
+Exit criteria:
+
+- [ ] no Python runtime dependency remains for shipped GitPulse frontend behavior
+- [ ] docs and CI describe only the active Go + Bun lanes
+- [ ] stale Python-browser wording is gone from current-state docs
 
 ## Recommended execution order
 
-1. **Phase 0** - write the parity matrix first
-2. **Phase 1** - stabilize the Go API and action contract
-3. **Phase 2** - create the shared TS foundation
-4. **Phase 3** - replace the browser UI and cut over `gitpulse serve`
-5. **Phase 4** - add the OpenTUI operator console
-6. **Phase 5** - remove Python UI and clean the repo
+- [x] **Phase 0** - write the parity matrix first
+- [x] **Phase 1** - stabilize the Go API and action contract
+- [ ] **Phase 2** - create the shared TypeScript foundation
+- [ ] **Phase 3** - replace the browser UI and cut over `gitpulse serve`
+- [ ] **Phase 4** - add the OpenTUI operator console
+- [ ] **Phase 5** - remove Python UI and clean the repo
 
 ### Ordering rules
 
-- Do **not** start the TUI before the backend contract and shared TS layer exist.
+- Do **not** start the TUI before the backend contract and shared TypeScript layer exist.
 - Do **not** remove Python before the Astro + Vue browser surface is clearly at parity.
 - Ship the web replacement before the TUI because the browser dashboard already exists in production truth.
 
@@ -191,14 +235,14 @@ Exit criteria:
 
 This migration is done when all of the following are true:
 
-- Go is still the only backend and source of truth.
-- SQLite and plain SQL remain the active storage path.
-- `gitpulse serve` serves the shipped web frontend without launching a Python subprocess.
-- The web frontend covers the current browser product surface.
-- The TUI covers the operator-critical daily workflow well enough to justify its existence.
-- The CLI remains functional for explicit control paths.
-- Repo docs describe the new frontend reality without claiming unshipped automation or packaging.
-- CI and verification cover the active Go + Bun lanes only.
+- [x] Go is still the only backend and source of truth.
+- [x] SQLite and plain SQL remain the active storage path.
+- [ ] `gitpulse serve` serves the shipped web frontend without launching a Python subprocess.
+- [ ] The web frontend covers the current browser product surface.
+- [ ] The TUI covers the operator-critical daily workflow well enough to justify its existence.
+- [x] The CLI remains functional for explicit control paths.
+- [ ] Repo docs describe the new frontend reality without claiming unshipped automation or packaging.
+- [ ] CI and verification cover the active Go + Bun lanes only.
 
 ## Minimum verification for future implementation phases
 
