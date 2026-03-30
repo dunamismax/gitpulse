@@ -1,0 +1,8 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "types": ["astro/client", "bun-types"],
+    "baseUrl": "."
+  },
+  "include": ["src/**/*.ts", "src/**/*.astro", "src/**/*.vue", "test/**/*.ts"]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@gitpulse/tui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "bun test",
+    "check": "bun run typecheck && bun test"
+  },
+  "dependencies": {
+    "@gitpulse/shared": "workspace:*"
+  }
+}

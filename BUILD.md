@@ -35,9 +35,9 @@ This repo should **not** go web-only unless the TUI later proves redundant, and 
 
 - [x] Phase 0 is complete. `docs/frontend-parity-matrix.md` inventories the current browser surface and the migration boundary.
 - [x] Phase 1 is complete. The Go API now exposes explicit frontend-facing contracts with focused contract tests.
-- [ ] Phase 2 has not started. There is no `frontend/` workspace, Bun workspace, or shared TypeScript client in the repo yet.
-- [ ] Phase 3 has not started. `gitpulse serve` still launches and proxies `python-ui/`.
-- [ ] Phase 4 has not started. There is no `gitpulse tui` entrypoint and no `frontend/tui/` tree.
+- [x] Phase 2 is complete. `frontend/` now contains the Bun workspace, shared TypeScript contract layer, shared route and screen maps, and minimal web and terminal foundation shells.
+- [ ] Phase 3 has not started. `frontend/web/` now exists as a foundation shell, but `gitpulse serve` still launches and proxies `python-ui/`.
+- [ ] Phase 4 has not started. `frontend/tui/` now exists as a foundation shell, but there is still no `gitpulse tui` entrypoint or real operator console.
 - [ ] Phase 5 has not started. `python-ui/` is still present and repo docs plus verification still describe the Python UI lane.
 
 ## Target state
@@ -123,32 +123,33 @@ Exit criteria:
 - [x] manual operator actions are represented cleanly in the API
 - [x] backend tests cover the migration-critical surfaces
 
-### [ ] Phase 2 - Create the shared TypeScript foundation
+### [x] Phase 2 - Create the shared TypeScript foundation
 
 Status notes:
 
-- No `frontend/` directory exists yet.
-- No Bun workspace files, shared TypeScript API client, or frontend route and screen maps are checked in yet.
+- `frontend/` is now a Bun workspace with shared tooling and narrow verification scripts.
+- `frontend/shared` now owns the shared TypeScript API client, contract types, formatting helpers, operator action metadata, and shared route and screen maps.
+- `frontend/web` and `frontend/tui` exist as foundation shells only. They boot against the live Go backend, but they are not Phase 3 or Phase 4 feature work.
 
 Deliverables:
 
-- [ ] create a Bun workspace under `frontend/`
-- [ ] add `frontend/shared` for API client code, shared types, formatting helpers, and common domain utilities
-- [ ] define route and screen maps for web and TUI against the same domain model
-  - Current state: `docs/frontend-parity-matrix.md` inventories the existing Python UI surface, but it does not define future Astro or OpenTUI route and screen maps.
-- [ ] wire local dev against the live Go backend
+- [x] create a Bun workspace under `frontend/`
+- [x] add `frontend/shared` for API client code, shared types, formatting helpers, and common domain utilities
+- [x] define route and screen maps for web and TUI against the same domain model
+  - Current state: `docs/frontend-parity-matrix.md` still inventories the existing Python UI surface, while `frontend/shared/src/surfaces.ts` now defines the shared future Astro and TUI surface map.
+- [x] wire local dev against the live Go backend
 
 Exit criteria:
 
-- [ ] one shared TypeScript contract exists for both frontends
-- [ ] both frontend lanes can boot against the current Go runtime
-- [ ] no frontend-specific type drift is required to talk to Go
+- [x] one shared TypeScript contract exists for both frontends
+- [x] both frontend lanes can boot against the current Go runtime
+- [x] no frontend-specific type drift is required to talk to Go
 
 ### [ ] Phase 3 - Replace the browser UI with Astro + Vue
 
 Status notes:
 
-- There is no `frontend/web/` app in the repo yet.
+- `frontend/web/` exists only as a Phase 2 foundation shell for shared contract and live-backend boot verification.
 - `gitpulse serve` still launches the managed Python UI and reverse-proxies non-API browser traffic to it.
 - The shipped browser surface remains FastAPI + Jinja2 + htmx + Alpine.js under `python-ui/`.
 
@@ -170,7 +171,7 @@ Exit criteria:
 
 Status notes:
 
-- There is no `frontend/tui/` tree yet.
+- `frontend/tui/` exists only as a Phase 2 foundation shell for shared contract and live-backend boot verification.
 - The Cobra CLI does not expose a `tui` subcommand yet.
 - No terminal UI implementation exists beyond the current CLI command set.
 
@@ -212,7 +213,7 @@ Exit criteria:
 
 - [x] **Phase 0** - write the parity matrix first
 - [x] **Phase 1** - stabilize the Go API and action contract
-- [ ] **Phase 2** - create the shared TypeScript foundation
+- [x] **Phase 2** - create the shared TypeScript foundation
 - [ ] **Phase 3** - replace the browser UI and cut over `gitpulse serve`
 - [ ] **Phase 4** - add the OpenTUI operator console
 - [ ] **Phase 5** - remove Python UI and clean the repo

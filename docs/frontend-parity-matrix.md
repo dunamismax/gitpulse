@@ -7,6 +7,7 @@ Current truth as of 2026-03-30:
 - the shipped browser surface is still `python-ui/`
 - Go remains the only backend and system of record
 - the migration target is still dual frontend: `frontend/web` first, then `frontend/tui`
+- Phase 2 foundation now exists under `frontend/`, including the shared TypeScript contract and shared route and screen maps in `frontend/shared/src/surfaces.ts`
 - this document is an inventory and contract boundary, not a claim that the migration is complete
 
 ## Target frontend workspace

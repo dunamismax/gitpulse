@@ -1,0 +1,182 @@
+---
+import {
+  createGitPulseClient,
+  type DashboardView,
+  defaultApiBaseUrl,
+  formatMinutes,
+  GitPulseClientError,
+  type SettingsView,
+  type SurfaceKey,
+  tuiScreens,
+  webRoutes,
+} from "@gitpulse/shared";
+import BackendStatusCard from "../components/BackendStatusCard.vue";
+
+const apiBaseUrl = defaultApiBaseUrl(import.meta.env);
+const client = createGitPulseClient({ baseUrl: apiBaseUrl });
+
+let dashboard: DashboardView | null = null;
+let settings: SettingsView | null = null;
+let backendError: string | null = null;
+
+try {
+  [dashboard, settings] = await Promise.all([
+    client.dashboard(),
+    client.settings(),
+  ]);
+} catch (error) {
+  if (error instanceof GitPulseClientError) {
+    backendError = error.message;
+  } else {
+    throw error;
+  }
+}
+
+const routeEntries = Object.entries(webRoutes) as [
+  SurfaceKey,
+  (typeof webRoutes)[SurfaceKey],
+][];
+const screenEntries = Object.entries(tuiScreens) as [
+  SurfaceKey,
+  (typeof tuiScreens)[SurfaceKey],
+][];
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GitPulse web foundation</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, sans-serif;
+        background: #020617;
+        color: #e2e8f0;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, #0f172a, #020617 65%);
+      }
+
+      main {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 3rem 1.5rem 4rem;
+        display: grid;
+        gap: 1.5rem;
+      }
+
+      .hero {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .hero p {
+        margin: 0;
+        color: #cbd5e1;
+        line-height: 1.6;
+      }
+
+      .grid {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+      }
+
+      section {
+        padding: 1.5rem;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 1rem;
+        background: rgba(15, 23, 42, 0.65);
+      }
+
+      h1, h2 {
+        margin: 0;
+      }
+
+      ul {
+        margin: 1rem 0 0;
+        padding-left: 1.1rem;
+      }
+
+      li + li {
+        margin-top: 0.65rem;
+      }
+
+      code {
+        color: #7dd3fc;
+      }
+
+      .meta {
+        color: #94a3b8;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <p class="meta">GitPulse Phase 2</p>
+        <h1>Shared TypeScript contract in place. Shipped browser UI still stays Python for now.</h1>
+        <p>
+          This Astro + Vue shell exists only to prove the new web lane can boot against the live Go
+          backend before Phase 3 parity work starts. The API contract, route map, and TUI screen map
+          all come from <code>@gitpulse/shared</code>.
+        </p>
+        <p>
+          Current backend settings come from <code>{settings?.paths.config_file || "default config path"}</code>
+          with import days set to <strong>{settings?.config.monitoring.import_days ?? 30}</strong>.
+        </p>
+      </header>
+
+      {
+        backendError ? (
+          <section>
+            <h2>Backend status</h2>
+            <p>{backendError}</p>
+          </section>
+        ) : (
+          <BackendStatusCard
+            client:load
+            apiBaseUrl={apiBaseUrl}
+            repoCount={dashboard?.repo_cards.length ?? 0}
+            score={dashboard?.summary.today_score ?? 0}
+            activeMinutes={formatMinutes(dashboard?.summary.active_session_minutes ?? 0)}
+            routeCount={routeEntries.length}
+          />
+        )
+      }
+
+      <div class="grid">
+        <section>
+          <h2>Web route map</h2>
+          <ul>
+            {routeEntries.map(([key, route]) => (
+              <li>
+                <strong>{route.label}</strong> <code>{route.path}</code><br />
+                <span>{route.description}</span><br />
+                <span class="meta">{key} · {route.reads.join(", ")}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section>
+          <h2>TUI screen map</h2>
+          <ul>
+            {screenEntries.map(([key, screen]) => (
+              <li>
+                <strong>{screen.label}</strong> <code>{screen.screenId}</code><br />
+                <span>{screen.description}</span><br />
+                <span class="meta">{key} · hotkey {screen.hotkey}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>
