@@ -27,7 +27,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 // writeError writes a JSON error response.
 func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+	writeJSON(w, status, models.ErrorResponse{Error: msg})
+}
+
+func writeAction(w http.ResponseWriter, status int, payload models.ActionPayload) {
+	writeJSON(w, status, models.ActionResponse{Data: payload})
 }
 
 // --- GET endpoints ---
@@ -39,7 +43,7 @@ func (s *Server) handleAPIDashboard(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, view)
+	writeJSON(w, http.StatusOK, models.DashboardResponse{Data: *view})
 }
 
 func (s *Server) handleAPIRepositories(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +53,11 @@ func (s *Server) handleAPIRepositories(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, cards)
+	writeJSON(w, http.StatusOK, models.RepositoriesResponse{
+		Data: models.RepositoriesPayload{
+			Repositories: cards,
+		},
+	})
 }
 
 func (s *Server) handleAPIRepoDetail(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +68,7 @@ func (s *Server) handleAPIRepoDetail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "repository not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, view)
+	writeJSON(w, http.StatusOK, models.RepoDetailResponse{Data: *view})
 }
 
 func (s *Server) handleAPISessions(w http.ResponseWriter, r *http.Request) {
@@ -70,21 +78,17 @@ func (s *Server) handleAPISessions(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, summary)
+	writeJSON(w, http.StatusOK, models.SessionsResponse{Data: *summary})
 }
 
 func (s *Server) handleAPIAchievements(w http.ResponseWriter, r *http.Request) {
-	achs, streaks, score, err := s.rt.AchievementsView(r.Context())
+	view, err := s.rt.AchievementsView(r.Context())
 	if err != nil {
 		slog.Error("api achievements", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"achievements": achs,
-		"streaks":      streaks,
-		"today_score":  score,
-	})
+	writeJSON(w, http.StatusOK, models.AchievementsResponse{Data: *view})
 }
 
 func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
@@ -97,9 +101,11 @@ func (s *Server) handleAPISettings(w http.ResponseWriter, r *http.Request) {
 		paths.ConfigDir = filepath.Dir(resolved)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"config": s.rt.Config(),
-		"paths":  paths,
+	writeJSON(w, http.StatusOK, models.SettingsResponse{
+		Data: models.SettingsView{
+			Config: *s.rt.Config(),
+			Paths:  *paths,
+		},
 	})
 }
 
@@ -125,7 +131,20 @@ func (s *Server) handleAPIRepoAdd(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to add repository: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "repos": repos})
+	result := models.OperatorActionResult{
+		Action:  "add_target",
+		Title:   "Target registration finished",
+		Summary: fmt.Sprintf("Registered %d repositor%s from %s.", len(repos), pluralizeRepository(len(repos)), path),
+		Lines: []string{
+			fmt.Sprintf("Repositories registered: %d", len(repos)),
+			fmt.Sprintf("Root path: %s", path),
+			"Import, rescan, and rebuild remain explicit follow-up steps.",
+		},
+	}
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result:       result,
+		Repositories: repos,
+	})
 }
 
 func (s *Server) handleAPIRepoRefresh(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +158,26 @@ func (s *Server) handleAPIRepoRefresh(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "refresh failed: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	detail, _ := s.rt.RepoDetail(r.Context(), id.String())
+	result := models.OperatorActionResult{
+		Action:  "refresh_repo",
+		Title:   "Repository refresh finished",
+		Summary: fmt.Sprintf("Refreshed live git state for %s.", id),
+		Lines: []string{
+			"Live working-tree state refreshed from local git data.",
+			"Import and rebuild remain explicit follow-up actions.",
+		},
+	}
+	if detail != nil {
+		result.Summary = fmt.Sprintf("Refreshed live git state for %s.", detail.Card.Repo.Name)
+	}
+
+	payload := models.ActionPayload{Result: result}
+	if detail != nil {
+		card := detail.Card
+		payload.RepositoryCard = &card
+	}
+	writeAction(w, http.StatusOK, payload)
 }
 
 func (s *Server) handleAPIRepoToggle(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +191,23 @@ func (s *Server) handleAPIRepoToggle(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "toggle failed")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	repo, _ := db.GetRepository(r.Context(), s.rt.DB(), id)
+	result := models.OperatorActionResult{
+		Action:  "toggle_repo",
+		Title:   "Repository monitoring updated",
+		Summary: fmt.Sprintf("Updated monitoring state for repository %s.", id),
+	}
+	if repo != nil {
+		result.Summary = fmt.Sprintf("Updated monitoring state for %s.", repo.Name)
+		result.Lines = []string{
+			fmt.Sprintf("State: %s", repo.State),
+			fmt.Sprintf("Monitored: %t", repo.IsMonitored),
+		}
+	}
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result:     result,
+		Repository: repo,
+	})
 }
 
 func (s *Server) handleAPIRepoRemove(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +221,23 @@ func (s *Server) handleAPIRepoRemove(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "remove failed")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	repo, _ := db.GetRepository(r.Context(), s.rt.DB(), id)
+	result := models.OperatorActionResult{
+		Action:  "remove_repo",
+		Title:   "Repository removed",
+		Summary: fmt.Sprintf("Removed repository %s from the active operator set.", id),
+	}
+	if repo != nil {
+		result.Summary = fmt.Sprintf("Removed %s from the active operator set.", repo.Name)
+		result.Lines = []string{
+			fmt.Sprintf("State: %s", repo.State),
+			"History and snapshots remain in the local database until rebuilt or inspected.",
+		}
+	}
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result:     result,
+		Repository: repo,
+	})
 }
 
 func (s *Server) handleAPIRepoPatterns(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +261,23 @@ func (s *Server) handleAPIRepoPatterns(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	repo, _ := db.GetRepository(r.Context(), s.rt.DB(), id)
+	result := models.OperatorActionResult{
+		Action:  "save_repo_patterns",
+		Title:   "Repository patterns saved",
+		Summary: fmt.Sprintf("Saved include and exclude patterns for repository %s.", id),
+		Lines: []string{
+			fmt.Sprintf("Include patterns: %d", len(body.Include)),
+			fmt.Sprintf("Exclude patterns: %d", len(body.Exclude)),
+		},
+	}
+	if repo != nil {
+		result.Summary = fmt.Sprintf("Saved include and exclude patterns for %s.", repo.Name)
+	}
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result:     result,
+		Repository: repo,
+	})
 }
 
 func (s *Server) handleAPIRepoImport(w http.ResponseWriter, r *http.Request) {
@@ -222,15 +308,18 @@ func (s *Server) handleAPIRepoImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, models.OperatorActionResult{
-		Action:  "import_repo",
-		Title:   "Repository import finished",
-		Summary: fmt.Sprintf("Imported %d commit%s for %s in %s.", imported, pluralize(imported), repo.Name, time.Since(start).Round(time.Millisecond)),
-		Lines: []string{
-			fmt.Sprintf("Repository: %s", repo.Name),
-			fmt.Sprintf("Commits imported: %d", imported),
-			fmt.Sprintf("Window: last %d day%s", days, pluralize(days)),
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result: models.OperatorActionResult{
+			Action:  "import_repo",
+			Title:   "Repository import finished",
+			Summary: fmt.Sprintf("Imported %d commit%s for %s in %s.", imported, pluralize(imported), repo.Name, time.Since(start).Round(time.Millisecond)),
+			Lines: []string{
+				fmt.Sprintf("Repository: %s", repo.Name),
+				fmt.Sprintf("Commits imported: %d", imported),
+				fmt.Sprintf("Window: last %d day%s", days, pluralize(days)),
+			},
 		},
+		Repository: repo,
 	})
 }
 
@@ -266,16 +355,18 @@ func (s *Server) handleAPIImportAll(w http.ResponseWriter, r *http.Request) {
 		importedTotal += imported
 	}
 
-	writeJSON(w, http.StatusOK, models.OperatorActionResult{
-		Action:  "import_all",
-		Title:   "History import finished",
-		Summary: fmt.Sprintf("Imported %d commit%s across %d repositor%s in %s.", importedTotal, pluralize(importedTotal), processed, pluralizeRepository(processed), time.Since(start).Round(time.Millisecond)),
-		Lines: []string{
-			fmt.Sprintf("Repositories processed: %d", processed),
-			fmt.Sprintf("Commits imported: %d", importedTotal),
-			fmt.Sprintf("Window: last %d day%s", days, pluralize(days)),
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result: models.OperatorActionResult{
+			Action:  "import_all",
+			Title:   "History import finished",
+			Summary: fmt.Sprintf("Imported %d commit%s across %d repositor%s in %s.", importedTotal, pluralize(importedTotal), processed, pluralizeRepository(processed), time.Since(start).Round(time.Millisecond)),
+			Lines: []string{
+				fmt.Sprintf("Repositories processed: %d", processed),
+				fmt.Sprintf("Commits imported: %d", importedTotal),
+				fmt.Sprintf("Window: last %d day%s", days, pluralize(days)),
+			},
+			Warnings: warnings,
 		},
-		Warnings: warnings,
 	})
 }
 
@@ -301,16 +392,18 @@ func (s *Server) handleAPIRescanAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, models.OperatorActionResult{
-		Action:  "rescan_all",
-		Title:   "Repository rescan finished",
-		Summary: fmt.Sprintf("Rescanned %d active repositor%s in %s.", processed, pluralizeRepository(processed), time.Since(start).Round(time.Millisecond)),
-		Lines: []string{
-			fmt.Sprintf("Active monitored repositories: %d", processed),
-			"Live working-tree state refreshed from local git data.",
-			"Rebuild analytics separately when you want sessions, streaks, and score updated.",
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result: models.OperatorActionResult{
+			Action:  "rescan_all",
+			Title:   "Repository rescan finished",
+			Summary: fmt.Sprintf("Rescanned %d active repositor%s in %s.", processed, pluralizeRepository(processed), time.Since(start).Round(time.Millisecond)),
+			Lines: []string{
+				fmt.Sprintf("Active monitored repositories: %d", processed),
+				"Live working-tree state refreshed from local git data.",
+				"Rebuild analytics separately when you want sessions, streaks, and score updated.",
+			},
+			Warnings: warnings,
 		},
-		Warnings: warnings,
 	})
 }
 
@@ -322,14 +415,16 @@ func (s *Server) handleAPIRebuildAnalytics(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusOK, models.OperatorActionResult{
-		Action:  "rebuild_analytics",
-		Title:   "Analytics rebuild finished",
-		Summary: fmt.Sprintf("Rebuilt sessions, rollups, and achievements in %s.", report.Elapsed.Round(time.Millisecond)),
-		Lines: []string{
-			fmt.Sprintf("Sessions written: %d", report.SessionsWritten),
-			fmt.Sprintf("Rollups written: %d", report.RollupsWritten),
-			fmt.Sprintf("Achievements written: %d", report.AchievementsWritten),
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result: models.OperatorActionResult{
+			Action:  "rebuild_analytics",
+			Title:   "Analytics rebuild finished",
+			Summary: fmt.Sprintf("Rebuilt sessions, rollups, and achievements in %s.", report.Elapsed.Round(time.Millisecond)),
+			Lines: []string{
+				fmt.Sprintf("Sessions written: %d", report.SessionsWritten),
+				fmt.Sprintf("Rollups written: %d", report.RollupsWritten),
+				fmt.Sprintf("Achievements written: %d", report.AchievementsWritten),
+			},
 		},
 	})
 }
@@ -397,7 +492,29 @@ func (s *Server) handleAPISettingsSave(w http.ResponseWriter, r *http.Request) {
 	s.configFile = savedPath
 	s.rt.SetConfig(next)
 	slog.Info("settings saved via api", "config_file", savedPath)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	paths, _ := config.DiscoverPaths()
+	if paths == nil {
+		paths = &config.AppPaths{}
+	}
+	paths.ConfigFile = savedPath
+	paths.ConfigDir = filepath.Dir(savedPath)
+
+	writeAction(w, http.StatusOK, models.ActionPayload{
+		Result: models.OperatorActionResult{
+			Action:  "save_settings",
+			Title:   "Settings saved",
+			Summary: fmt.Sprintf("Saved GitPulse settings to %s.", savedPath),
+			Lines: []string{
+				fmt.Sprintf("Timezone: %s", next.UI.Timezone),
+				fmt.Sprintf("Import days: %d", next.Monitoring.ImportDays),
+				fmt.Sprintf("Session gap minutes: %d", next.Monitoring.SessionGapMinutes),
+			},
+		},
+		Settings: &models.SettingsView{
+			Config: *next,
+			Paths:  *paths,
+		},
+	})
 }
 
 func decodeImportDays(r *http.Request, fallback int) (int, bool) {

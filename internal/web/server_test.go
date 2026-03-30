@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/dunamismax/gitpulse/internal/config"
+	"github.com/dunamismax/gitpulse/internal/models"
 	"github.com/dunamismax/gitpulse/internal/runtime"
 )
 
@@ -42,12 +43,12 @@ func TestServerRoutesProxyBrowserRequestsAndKeepAPIInGo(t *testing.T) {
 		t.Fatalf("GET /api/dashboard status = %d, want %d", apiResp.StatusCode, http.StatusOK)
 	}
 
-	var dashboard map[string]any
+	var dashboard models.DashboardResponse
 	if err := json.NewDecoder(apiResp.Body).Decode(&dashboard); err != nil {
 		t.Fatalf("decode dashboard response: %v", err)
 	}
-	if _, ok := dashboard["summary"]; !ok {
-		t.Fatal("expected dashboard JSON payload from Go API to include summary")
+	if len(dashboard.Data.Summary.Goals) == 0 {
+		t.Fatal("expected dashboard JSON payload from Go API to include summary goals")
 	}
 }
 

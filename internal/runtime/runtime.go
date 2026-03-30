@@ -833,16 +833,16 @@ func (rt *Runtime) SessionsSummary(ctx context.Context) (*models.SessionSummary,
 	}, nil
 }
 
-// AchievementsView returns achievements, streak summary, and today's score.
-func (rt *Runtime) AchievementsView(ctx context.Context) ([]models.Achievement, models.StreakSummary, int, error) {
+// AchievementsView returns the frontend-facing achievements payload.
+func (rt *Runtime) AchievementsView(ctx context.Context) (*models.AchievementsView, error) {
 	achs, err := db.ListAchievements(ctx, rt.db)
 	if err != nil {
-		return nil, models.StreakSummary{}, 0, err
+		return nil, err
 	}
 
 	allRollups, err := db.AllRollupsForScope(ctx, rt.db, "all")
 	if err != nil {
-		return nil, models.StreakSummary{}, 0, err
+		return nil, err
 	}
 
 	streaks := metrics.ComputeStreaks(allRollups)
@@ -854,7 +854,11 @@ func (rt *Runtime) AchievementsView(ctx context.Context) ([]models.Achievement, 
 		score = todayRollup.Score
 	}
 
-	return achs, streaks, score, nil
+	return &models.AchievementsView{
+		Achievements: achs,
+		Streaks:      streaks,
+		TodayScore:   score,
+	}, nil
 }
 
 // ---------------------------------------------------------------------------

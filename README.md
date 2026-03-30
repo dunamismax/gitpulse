@@ -6,7 +6,7 @@
 
 GitPulse keeps live work, commit history, and push activity as separate ledgers. The codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a FastAPI + Jinja2 + htmx Python UI served through the Go runtime.
 
-> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` launches the Python UI automatically and reverse-proxies browser requests to it while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. Background watchers or pollers and packaged desktop releases are not shipped yet. See [docs/operator-workflow.md](docs/operator-workflow.md) for the current operator flow.
+> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` launches the Python UI automatically and reverse-proxies browser requests to it while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. Background watchers or pollers and packaged desktop releases are not shipped yet. The frontend migration plan lives in [BUILD.md](BUILD.md), and the current parity inventory lives in [docs/frontend-parity-matrix.md](docs/frontend-parity-matrix.md). See [docs/operator-workflow.md](docs/operator-workflow.md) for the current operator flow.
 
 ## Why GitPulse?
 
@@ -44,6 +44,7 @@ GitPulse keeps live work, commit history, and push activity as separate ledgers.
 - Python UI dashboard, repositories, repository detail, sessions, achievements, and settings pages
 - Python UI first-run guidance plus explicit import, rescan, and rebuild runbook controls backed by the Go API
 - Go-served JSON API endpoints backing the browser UI
+- explicit Go-owned frontend response contracts for dashboard, repositories, sessions, achievements, settings, and operator actions
 - Settings page writes the current configurable UI surface back to the active TOML config file
 - SQLite schema/query code for tracked targets, repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings
 - Sessionization, streak, score, and achievement logic in Go

@@ -153,23 +153,20 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatalf("POST /api/repositories/add status = %d, want 200", resp.StatusCode)
 	}
 
-	var addPayload struct {
-		OK    bool                `json:"ok"`
-		Repos []models.Repository `json:"repos"`
-	}
+	var addPayload models.ActionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&addPayload); err != nil {
 		t.Fatalf("decode add response: %v", err)
 	}
-	if !addPayload.OK {
-		t.Fatal("add response not ok")
+	if addPayload.Data.Result.Action != "add_target" {
+		t.Fatalf("add action = %q, want %q", addPayload.Data.Result.Action, "add_target")
 	}
-	if len(addPayload.Repos) != 1 {
-		t.Fatalf("added repos = %d, want 1", len(addPayload.Repos))
+	if len(addPayload.Data.Repositories) != 1 {
+		t.Fatalf("added repos = %d, want 1", len(addPayload.Data.Repositories))
 	}
-	if addPayload.Repos[0].State != models.StateActive {
-		t.Fatalf("repo state = %q, want %q", addPayload.Repos[0].State, models.StateActive)
+	if addPayload.Data.Repositories[0].State != models.StateActive {
+		t.Fatalf("repo state = %q, want %q", addPayload.Data.Repositories[0].State, models.StateActive)
 	}
-	repo := addPayload.Repos[0]
+	repo := addPayload.Data.Repositories[0]
 	if repo.Name == "" {
 		t.Fatal("repo name is empty")
 	}
@@ -211,12 +208,12 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatalf("POST /api/actions/import status = %d, want 200", importResp.StatusCode)
 	}
 
-	var importResult models.OperatorActionResult
+	var importResult models.ActionResponse
 	if err := json.NewDecoder(importResp.Body).Decode(&importResult); err != nil {
 		t.Fatalf("decode import response: %v", err)
 	}
-	if importResult.Action != "import_all" {
-		t.Fatalf("import action = %q, want %q", importResult.Action, "import_all")
+	if importResult.Data.Result.Action != "import_all" {
+		t.Fatalf("import action = %q, want %q", importResult.Data.Result.Action, "import_all")
 	}
 
 	commitsAfterImport, err := db.ListCommits(ctx, rt.DB(), &repo.ID, 100)
@@ -249,12 +246,12 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatalf("POST /api/actions/rescan status = %d, want 200", rescanResp.StatusCode)
 	}
 
-	var rescanResult models.OperatorActionResult
+	var rescanResult models.ActionResponse
 	if err := json.NewDecoder(rescanResp.Body).Decode(&rescanResult); err != nil {
 		t.Fatalf("decode rescan response: %v", err)
 	}
-	if rescanResult.Action != "rescan_all" {
-		t.Fatalf("rescan action = %q, want %q", rescanResult.Action, "rescan_all")
+	if rescanResult.Data.Result.Action != "rescan_all" {
+		t.Fatalf("rescan action = %q, want %q", rescanResult.Data.Result.Action, "rescan_all")
 	}
 
 	snap, err := db.LatestSnapshot(ctx, rt.DB(), repo.ID)
@@ -294,12 +291,12 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatalf("POST /api/actions/rebuild status = %d, want 200", rebuildResp.StatusCode)
 	}
 
-	var rebuildResult models.OperatorActionResult
+	var rebuildResult models.ActionResponse
 	if err := json.NewDecoder(rebuildResp.Body).Decode(&rebuildResult); err != nil {
 		t.Fatalf("decode rebuild response: %v", err)
 	}
-	if rebuildResult.Action != "rebuild_analytics" {
-		t.Fatalf("rebuild action = %q, want %q", rebuildResult.Action, "rebuild_analytics")
+	if rebuildResult.Data.Result.Action != "rebuild_analytics" {
+		t.Fatalf("rebuild action = %q, want %q", rebuildResult.Data.Result.Action, "rebuild_analytics")
 	}
 
 	allRollups, err = db.AllRollupsForScope(ctx, rt.DB(), "all")
@@ -366,11 +363,11 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatal("RepoDetail has no recent commits")
 	}
 
-	achList, streaks, score, err := rt.AchievementsView(ctx)
+	achView, err := rt.AchievementsView(ctx)
 	if err != nil {
 		t.Fatalf("AchievementsView: %v", err)
 	}
-	t.Logf("AchievementsView: %d achievements, streak=%d, score=%d", len(achList), streaks.CurrentDays, score)
+	t.Logf("AchievementsView: %d achievements, streak=%d, score=%d", len(achView.Achievements), achView.Streaks.CurrentDays, achView.TodayScore)
 
 	dashboardResp := performRequest(t, srv, http.MethodGet, "/api/dashboard")
 	defer closeTestBody(t, dashboardResp.Body)
@@ -378,14 +375,14 @@ func TestSmokeOperatorLoop(t *testing.T) {
 		t.Fatalf("GET /api/dashboard status = %d, want 200", dashboardResp.StatusCode)
 	}
 
-	var dashJSON models.DashboardView
+	var dashJSON models.DashboardResponse
 	if err := json.NewDecoder(dashboardResp.Body).Decode(&dashJSON); err != nil {
 		t.Fatalf("decode dashboard JSON: %v", err)
 	}
-	if len(dashJSON.RepoCards) != 1 {
-		t.Fatalf("dashboard JSON repo cards = %d, want 1", len(dashJSON.RepoCards))
+	if len(dashJSON.Data.RepoCards) != 1 {
+		t.Fatalf("dashboard JSON repo cards = %d, want 1", len(dashJSON.Data.RepoCards))
 	}
-	t.Logf("API /api/dashboard: repo_cards=%d, commits_today=%d, streak=%d", len(dashJSON.RepoCards), dashJSON.Summary.CommitsToday, dashJSON.Summary.StreakDays)
+	t.Logf("API /api/dashboard: repo_cards=%d, commits_today=%d, streak=%d", len(dashJSON.Data.RepoCards), dashJSON.Data.Summary.CommitsToday, dashJSON.Data.Summary.StreakDays)
 
 	reposResp := performRequest(t, srv, http.MethodGet, "/api/repositories")
 	defer closeTestBody(t, reposResp.Body)

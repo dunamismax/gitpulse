@@ -37,27 +37,28 @@ class GitPulseAPI:
         self._client = client
 
     async def dashboard(self) -> DashboardView:
-        data = await self._get_json("/api/dashboard")
+        data = _unwrap_data(await self._get_json("/api/dashboard"))
         return DashboardView.model_validate(data)
 
     async def repositories(self) -> list[RepositoryCard]:
-        data = await self._get_json("/api/repositories")
-        return [RepositoryCard.model_validate(item) for item in data]
+        data = _unwrap_data(await self._get_json("/api/repositories"))
+        items = data.get("repositories", data) if isinstance(data, dict) else data
+        return [RepositoryCard.model_validate(item) for item in items]
 
     async def repo_detail(self, repo_id: str) -> RepoDetailView:
-        data = await self._get_json(f"/api/repositories/{repo_id}")
+        data = _unwrap_data(await self._get_json(f"/api/repositories/{repo_id}"))
         return RepoDetailView.model_validate(data)
 
     async def sessions(self) -> SessionSummary:
-        data = await self._get_json("/api/sessions")
+        data = _unwrap_data(await self._get_json("/api/sessions"))
         return SessionSummary.model_validate(data)
 
     async def achievements(self) -> AchievementsResponse:
-        data = await self._get_json("/api/achievements")
+        data = _unwrap_data(await self._get_json("/api/achievements"))
         return AchievementsResponse.model_validate(data)
 
     async def settings(self) -> SettingsResponse:
-        data = await self._get_json("/api/settings")
+        data = _unwrap_data(await self._get_json("/api/settings"))
         return SettingsResponse.model_validate(data)
 
     async def add_target(self, path: str) -> None:
@@ -91,19 +92,21 @@ class GitPulseAPI:
         await self._post_json("/api/settings", payload.model_dump())
 
     async def import_repo(self, repo_id: str, *, days: int) -> ActionResult:
-        data = await self._post_json(f"/api/repositories/{repo_id}/import", {"days": days})
+        data = _unwrap_action_result(
+            await self._post_json(f"/api/repositories/{repo_id}/import", {"days": days})
+        )
         return ActionResult.model_validate(data)
 
     async def run_import(self, *, days: int) -> ActionResult:
-        data = await self._post_json("/api/actions/import", {"days": days})
+        data = _unwrap_action_result(await self._post_json("/api/actions/import", {"days": days}))
         return ActionResult.model_validate(data)
 
     async def run_rescan(self) -> ActionResult:
-        data = await self._post_json("/api/actions/rescan")
+        data = _unwrap_action_result(await self._post_json("/api/actions/rescan"))
         return ActionResult.model_validate(data)
 
     async def run_rebuild(self) -> ActionResult:
-        data = await self._post_json("/api/actions/rebuild")
+        data = _unwrap_action_result(await self._post_json("/api/actions/rebuild"))
         return ActionResult.model_validate(data)
 
     async def _get_json(self, path: str) -> Any:
@@ -188,6 +191,19 @@ def _extract_error_message(response: httpx.Response) -> str:
         if isinstance(error, str):
             return error
     return f"GitPulse backend error: {response.status_code} {response.reason_phrase}"
+
+
+def _unwrap_data(payload: Any) -> Any:
+    if isinstance(payload, dict) and "data" in payload:
+        return payload["data"]
+    return payload
+
+
+def _unwrap_action_result(payload: Any) -> Any:
+    data = _unwrap_data(payload)
+    if isinstance(data, dict) and "result" in data:
+        return data["result"]
+    return data
 
 
 def _build_transport_message(base_url: str, prefix: str) -> str:
