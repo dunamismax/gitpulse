@@ -4,9 +4,9 @@
 
 **Local-first git activity analytics for developers who want honest signals without uploading source code.**
 
-GitPulse keeps live work, commit history, and push activity as separate ledgers. The codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a shipped Astro + Vue browser frontend under `frontend/web/` served directly by the Go runtime.
+GitPulse keeps live work, commit history, and push activity as separate ledgers. The codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, a shipped Astro + Vue browser frontend under `frontend/web/` served directly by the Go runtime, and a source-run terminal preview under `frontend/tui/` launched by `gitpulse tui`.
 
-> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` now serves the built Astro + Vue frontend directly from Go while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. Background watchers or pollers and packaged desktop releases are not shipped yet. The remaining frontend migration work lives in [BUILD.md](BUILD.md), and the current operator flow lives in [docs/operator-workflow.md](docs/operator-workflow.md).
+> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` now serves the built Astro + Vue frontend directly from Go while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. `gitpulse tui` now provides a keyboard-driven terminal preview of that same operator loop, but Phase 4 is still in progress. Background watchers or pollers and packaged desktop releases are not shipped yet. The remaining frontend migration work lives in [BUILD.md](BUILD.md), and the current operator flow lives in [docs/operator-workflow.md](docs/operator-workflow.md).
 
 ## Why GitPulse?
 
@@ -35,12 +35,14 @@ GitPulse keeps live work, commit history, and push activity as separate ledgers.
 **Implemented commands and surfaces**
 
 - `gitpulse serve` to start the local dashboard server
+- `gitpulse tui` to launch the source-run terminal operator preview
 - `gitpulse add <path>` to register a repo or discover repos under a folder
 - `gitpulse rescan` to refresh repository snapshots
 - `gitpulse import` to import commit history
 - `gitpulse rebuild-rollups` to recompute sessions, rollups, and achievements
 - `gitpulse doctor` for environment and configuration diagnostics
 - browser dashboard, repositories, repository detail, sessions, achievements, and settings pages through the Astro + Vue frontend
+- terminal preview screens for dashboard, repositories, repository detail, sessions, achievements, and settings, plus manual import, rescan, rebuild, refresh, and toggle actions when Bun is available from source
 - first-run guidance plus explicit import, rescan, and rebuild runbook controls backed by the Go API
 - Go-served JSON API endpoints backing the browser UI
 - explicit Go-owned frontend response contracts for dashboard, repositories, sessions, achievements, settings, and operator actions
@@ -109,7 +111,19 @@ bun install
 bun run --filter @gitpulse/web dev
 ```
 
-The Astro dev server proxies `/api` to the Go runtime. For direct preview of the built app, run:
+The Astro dev server proxies `/api` to the Go runtime. For the current terminal preview, run:
+
+```bash
+go run ./cmd/gitpulse tui
+```
+
+You can also render one terminal screen once for smoke testing:
+
+```bash
+go run ./cmd/gitpulse tui --once --screen repositories
+```
+
+For direct preview of the built app, run:
 
 ```bash
 cd frontend
@@ -184,6 +198,7 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 - `go build ./...`
 - `go vet ./...`
 - `go run ./cmd/gitpulse --help`
+- `go run ./cmd/gitpulse tui --once --screen repositories`
 - `cd frontend && bun run check && bun run --filter @gitpulse/web build`
 
 ## License

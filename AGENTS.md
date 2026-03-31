@@ -28,12 +28,12 @@ New backend work goes into Go. The active storage layer is SQLite via `database/
 
 What exists today:
 
-- Cobra CLI entrypoint with `serve`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
+- Cobra CLI entrypoint with `serve`, `tui`, `add`, `rescan`, `import`, `rebuild-rollups`, and `doctor`
 - SQLite schema + plain SQL query layer
 - Git subprocess integration for repo discovery, snapshots, and history import
 - rebuildable sessions, rollups, streaks, scoring, and achievements logic
 - `net/http` server with JSON API routes plus direct serving of the built Astro frontend
-- Bun workspace under `frontend/` with shared TypeScript contracts, Astro + Vue web app, and OpenTUI foundation shell
+- Bun workspace under `frontend/` with shared TypeScript contracts, Astro + Vue web app, and a keyboard-driven terminal preview under `frontend/tui`
 - a manual-first operator loop: add, import, rescan, rebuild, inspect
 
 What is not complete yet:
@@ -42,7 +42,7 @@ What is not complete yet:
 - background watcher or poller support
 - packaged desktop release workflow
 - fuzz coverage for git parsing
-- the real TUI implementation and `gitpulse tui` entrypoint
+- deeper keyboard-flow polish, real-workspace validation, and OpenTUI-grade follow-through before the terminal lane can be called done
 
 ## Working rules
 

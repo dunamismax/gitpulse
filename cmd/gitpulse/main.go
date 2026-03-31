@@ -41,6 +41,7 @@ without uploading source code. All data stays local in a SQLite database.`,
 
 	root.AddCommand(
 		serveCmd(&cfgFile),
+		tuiCmd(&cfgFile),
 		addCmd(&cfgFile),
 		rescanCmd(&cfgFile),
 		importCmd(&cfgFile),

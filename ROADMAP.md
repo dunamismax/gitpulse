@@ -15,7 +15,7 @@ The repository currently centers on:
 - Go runtime and CLI
 - SQLite persistence with plain SQL
 - a shipped Astro + Vue operator frontend served by `gitpulse serve`
-- a Bun workspace with shared frontend contracts and a still-foundational TUI lane
+- a Bun workspace with shared frontend contracts and a source-run terminal preview that still needs Phase 4 polish
 - a manual-first ingestion flow built around add, import, rescan, and rebuild
 
 Near-term roadmap decisions:

@@ -37,7 +37,7 @@ This repo should **not** go web-only unless the TUI later proves redundant, and 
 - [x] Phase 1 is complete. The Go API now exposes explicit frontend-facing contracts with focused contract tests.
 - [x] Phase 2 is complete. `frontend/` now contains the Bun workspace, shared TypeScript contract layer, shared route and screen maps, and the lane structure for both the web and terminal frontends.
 - [x] Phase 3 is complete. `frontend/web/` now owns the shipped browser surface and `gitpulse serve` serves the built web frontend directly from Go.
-- [ ] Phase 4 has not started. `frontend/tui/` still exists only as a foundation shell, with no `gitpulse tui` entrypoint or real operator console.
+- [ ] Phase 4 is in progress. `gitpulse tui` now launches a keyboard-driven terminal preview backed by the live Go API, but the terminal lane still needs deeper keyboard polish and real-workspace validation before it is done.
 - [x] Phase 5 is complete. The managed Python runtime path, docs, CI lane, and legacy `python-ui/` reference directory are gone.
 
 ## Target state
@@ -45,7 +45,7 @@ This repo should **not** go web-only unless the TUI later proves redundant, and 
 GitPulse should converge on this shape:
 
 ```text
-cmd/gitpulse/               # Go CLI, serve command, future tui command
+cmd/gitpulse/               # Go CLI, serve command, tui launcher
 internal/...                # Go runtime, DB, API, analytics, orchestration
 frontend/
   shared/                   # shared TS API client, types, formatters, state helpers
@@ -57,7 +57,7 @@ Target behavior:
 
 - Go remains the only backend and owns persistence, analytics, config, and API contracts.
 - `gitpulse serve` serves the Astro build directly from Go in non-dev paths.
-- A new terminal entrypoint, preferably `gitpulse tui`, becomes the terminal operator console.
+- The terminal entrypoint `gitpulse tui` keeps growing into the terminal operator console.
 - Both frontends consume the same Go-owned API and shared TypeScript client and types.
 - Python is no longer a runtime or shipped frontend dependency.
 
@@ -171,15 +171,16 @@ Exit criteria:
 
 Status notes:
 
-- `frontend/tui/` exists only as a Phase 2 foundation shell for shared contract and live-backend boot verification.
-- The Cobra CLI does not expose a `tui` subcommand yet.
-- No terminal UI implementation exists beyond the current CLI command set.
+- `frontend/tui/` now contains a keyboard-driven source-run terminal preview that talks to the live Go API through the shared TypeScript client.
+- The Cobra CLI now exposes `gitpulse tui` to launch the terminal preview through Bun.
+- The preview covers dashboard, repositories, repository detail, sessions, achievements, settings, manual runbook actions, and explicit backend error states.
+- Phase 4 is still open because the terminal lane needs deeper keyboard polish, real-workspace validation, and a stronger case that it is materially better than chaining the CLI.
 
 Deliverables:
 
-- [ ] add `frontend/tui`
-- [ ] introduce a dedicated terminal entrypoint, preferably `gitpulse tui`
-- [ ] implement the operator-critical workflow first: repository list and detail, action center, sessions summary, achievements summary, settings basics, and clear error states
+- [x] add `frontend/tui`
+- [x] introduce a dedicated terminal entrypoint, preferably `gitpulse tui`
+- [x] implement the operator-critical workflow first: repository list and detail, action center, sessions summary, achievements summary, settings basics, and clear error states
 - [ ] optimize for keyboard flow, visibility, and speed rather than page-for-page web mimicry
 
 Exit criteria:

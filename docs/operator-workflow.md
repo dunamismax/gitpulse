@@ -1,6 +1,6 @@
 # GitPulse Operator Workflow
 
-GitPulse is manual-first today. It does not ship a background watcher, poller, or packaged desktop wrapper. The supported product is a Go CLI plus a local web dashboard served through `gitpulse serve`.
+GitPulse is manual-first today. It does not ship a background watcher, poller, or packaged desktop wrapper. The supported product is a Go CLI plus a local web dashboard served through `gitpulse serve`, with a source-run terminal preview available through `gitpulse tui`.
 
 ## Current operating truth
 
@@ -62,7 +62,7 @@ This recomputes sessions, rollups, streaks, score, and achievements from stored 
 
 ### 6. Inspect the results
 
-Use the dashboard, repository pages, sessions, achievements, settings, or the Go JSON API to confirm the new state.
+Use the dashboard, repository pages, sessions, achievements, settings, the terminal preview via `go run ./cmd/gitpulse tui`, or the Go JSON API to confirm the new state.
 
 ## What GitPulse does not do yet
 
@@ -70,7 +70,7 @@ Use the dashboard, repository pages, sessions, achievements, settings, or the Go
 - no packaged desktop release flow exists in-tree
 - real-workspace smoke runs are still worth doing manually from time to time
 - fuzz coverage for git parsing is still missing
-- the TUI lane has not been implemented beyond the foundation shell
+- the terminal lane now exists as a source-run preview, but Phase 4 still needs deeper keyboard polish and real-workspace validation before it is done
 
 ## Verification
 
@@ -80,5 +80,6 @@ Run the smallest truthful checks first, then broaden as needed:
 go test ./...
 go build ./...
 go vet ./...
+go run ./cmd/gitpulse tui --once --screen repositories
 cd frontend && bun run check && bun run --filter @gitpulse/web build
 ```

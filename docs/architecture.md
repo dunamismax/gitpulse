@@ -2,7 +2,7 @@
 
 GitPulse is a local-first Go application with SQLite persistence and plain SQL in the Go runtime. The Go backend remains the source of truth. The browser surface is now the Astro + Vue frontend under `frontend/web/`, built with Bun and served directly by the Go runtime.
 
-The frontend migration plan is tracked in `BUILD.md`. The browser cutover is complete. The Bun workspace under `frontend/` now contains the shared TypeScript contract layer, the shipped Astro + Vue web app under `frontend/web/`, and the still-foundational terminal lane under `frontend/tui`.
+The frontend migration plan is tracked in `BUILD.md`. The browser cutover is complete. The Bun workspace under `frontend/` now contains the shared TypeScript contract layer, the shipped Astro + Vue web app under `frontend/web/`, and an in-progress keyboard-driven terminal preview under `frontend/tui` launched by `gitpulse tui`.
 
 ## Active stack
 
@@ -26,7 +26,7 @@ Storage doctrine for this repo:
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
 │                            surfaces                              │
-│              CLI + Astro web frontend (`frontend/web`)           │
+│   CLI + Astro web frontend (`frontend/web`) + terminal preview   │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                     ┌────────────▼────────────┐
@@ -68,7 +68,7 @@ The Astro frontend exposes that same manual loop through explicit runbook contro
 
 ### `cmd/gitpulse`
 
-Cobra CLI entrypoint. Owns command wiring and built frontend discovery.
+Cobra CLI entrypoint. Owns command wiring, built web frontend discovery, and the `gitpulse tui` launcher for the source-run terminal preview.
 
 ### `frontend/shared`
 
@@ -80,7 +80,7 @@ Astro + Vue browser frontend. Built to static output, hydrated against the live 
 
 ### `frontend/tui`
 
-OpenTUI foundation shell. The real terminal operator console has not been implemented yet.
+Keyboard-driven terminal preview powered by Bun and the shared TypeScript GitPulse client. It can inspect dashboard, repositories, repository detail, sessions, achievements, and settings data from the live Go API, and it can trigger the manual import, rescan, rebuild, refresh, and toggle actions. Phase 4 is still in progress, so this lane remains a source-run preview rather than a finished terminal product surface.
 
 ### `internal/config`
 
@@ -127,6 +127,7 @@ Sessionization logic over activity points.
 5. `internal/runtime` rebuilds derived analytics from raw events only when rebuild is requested.
 6. `internal/web` exposes JSON endpoints, including manual operator action endpoints for import, rescan, and rebuild, and serves the built Astro page shells for browser routes.
 7. The Astro + Vue frontend fetches the Go JSON API directly on the same origin and renders the operator workflow in the browser.
+8. The terminal preview under `frontend/tui` fetches the same contracts through the shared TypeScript client and presents a keyboard-driven inspection and action loop in the terminal.
 
 ## Persistence model
 
