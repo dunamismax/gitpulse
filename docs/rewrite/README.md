@@ -15,7 +15,8 @@ Current product truth is still documented in `README.md`, `docs/architecture.md`
 
 - Phase 0 boundary docs are complete.
 - Phase 1 bootstrap is now verified under `apps/`, `packages/`, `db/migrations/`, `deploy/`, `scripts/`, and `docker-compose.yml`.
-- The shipped product is still the Go + SQLite runtime. The Bun, Elysia, PostgreSQL, Docker Compose, and Caddy lane is only a verified bootstrap right now, not parity or cutover.
-- `bun run verify:vnext`, `docker compose up -d`, and `bun run smoke:vnext` are now green for the vNext bootstrap, including PostgreSQL schema application through `scripts/migrate.ts` during API startup.
-- Early Phase 2 groundwork is now verified in `packages/core` with explicit PostgreSQL query modules, normalization helpers, and a real round-trip integration test against PostgreSQL.
+- The shipped product is still the Go + SQLite runtime. The Bun, Elysia, PostgreSQL, Docker Compose, and Caddy lane now has verified PostgreSQL-backed read routes for dashboard and repositories, but it is still far from parity or cutover.
+- `bun run verify:vnext`, real PostgreSQL-backed API integration tests, `docker compose up -d`, and `bun run smoke:vnext` are now green for the current vNext slice, including PostgreSQL schema application through `scripts/migrate.ts` during API startup plus empty dashboard and repositories responses through Caddy.
+- Early Phase 2 groundwork is now verified in `packages/core` with explicit PostgreSQL query modules, normalization helpers, and real PostgreSQL-backed integration tests for the store and rebuild path.
+- Phase 3 has now started with `apps/api/src/read-models.ts`, `GET /api/dashboard`, and `GET /api/repositories` backed by the PostgreSQL store and Zod contracts from `packages/contracts`.
 - If current code and these docs disagree about shipped behavior, the Go code wins until cutover.

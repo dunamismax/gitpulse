@@ -60,7 +60,7 @@ What must stay honest during the rewrite:
 - the shipped app today is still Go plus SQLite
 - no shipped PostgreSQL runtime exists here yet
 - the new root Bun workspace is only a bootstrap lane today, not the default product runtime
-- host-side vNext verification is green and the unshipped vNext bootstrap now passes a local Docker Compose smoke through Caddy
+- host-side vNext verification is green and the unshipped vNext stack now passes a local Docker Compose smoke through Caddy for web root, API health, dashboard, and repositories
 - the TUI exists, but it is not a required parity target for the rewrite
 
 ## Phase status board
@@ -240,6 +240,12 @@ Verified this pass:
 - [ ] Keep action execution server-side only.
 - [ ] Expose stable machine-readable action result payloads with user-facing summaries.
 
+Verified this pass:
+
+- `apps/api/src/read-models.ts` now threads the verified PostgreSQL store from `packages/core` into Elysia read-model services instead of only serving a health stub.
+- `GET /api/dashboard` and `GET /api/repositories` now return Zod-validated PostgreSQL-backed payloads from `packages/contracts`.
+- Real PostgreSQL-backed API coverage now exists in `apps/api/test/app.integration.test.ts`, and Compose smoke now verifies empty fresh-install responses for dashboard and repositories through Caddy.
+
 ### Exit criteria
 
 - [ ] Elysia can run the full manual operator loop without the Go runtime.
@@ -336,6 +342,8 @@ The rewrite is done only when all of these are true:
 
 ## Immediate next recommended work
 
-- [ ] Thread the verified PostgreSQL store from `packages/core` into `apps/api` services and route wiring.
+- [x] Thread the verified PostgreSQL store from `packages/core` into `apps/api` services and route wiring.
 - [ ] Implement the SQLite importer using the table rules in `docs/rewrite/sqlite-to-postgres.md`.
-- [ ] Start replacing the Go read routes with Elysia route groups beginning with `GET /api/dashboard` and `GET /api/repositories`.
+- [x] Start replacing the Go read routes with Elysia route groups beginning with `GET /api/dashboard` and `GET /api/repositories`.
+- [ ] Extend the read-route replacement to `GET /api/repositories/{id}`, `GET /api/sessions`, `GET /api/achievements`, and `GET /api/settings` with the same PostgreSQL-backed and Zod-validated path.
+- [ ] Start replacing the Go action routes with Elysia endpoints for add, import, rescan, rebuild, toggle, remove, and settings save.

@@ -40,4 +40,28 @@ if (apiPayload.status !== 'ok') {
   throw new Error('api health did not report ok status');
 }
 
+const dashboardResponse = await waitForOk(
+  `${apiBaseUrl}/dashboard`,
+  'api dashboard'
+);
+const dashboardPayload = await dashboardResponse.json();
+if (!Array.isArray(dashboardPayload?.data?.summary?.goals)) {
+  throw new Error('api dashboard did not return summary goals');
+}
+if (dashboardPayload.data.summary.goals.length !== 3) {
+  throw new Error('api dashboard did not return the default goal set');
+}
+if (!Array.isArray(dashboardPayload?.data?.repo_cards)) {
+  throw new Error('api dashboard did not return repo cards');
+}
+
+const repositoriesResponse = await waitForOk(
+  `${apiBaseUrl}/repositories`,
+  'api repositories'
+);
+const repositoriesPayload = await repositoriesResponse.json();
+if (!Array.isArray(repositoriesPayload?.data?.repositories)) {
+  throw new Error('api repositories did not return a repositories collection');
+}
+
 console.log(`Smoke passed for ${publicOrigin}`);
