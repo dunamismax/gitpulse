@@ -1,7 +1,71 @@
 import { describe, expect, test } from "bun:test";
 
+import type { RepoCard } from "@gitpulse/shared";
+
 import { parseCliArgs } from "../src/cli";
 import { type RenderState, renderApp } from "../src/render";
+
+function makeRepoCard(index: number): RepoCard {
+  const suffix = `${index}`;
+  return {
+    repo: {
+      id: `repo-${suffix}`,
+      target_id: null,
+      name: `gitpulse-${suffix}`,
+      root_path: `/tmp/gitpulse-${suffix}`,
+      remote_url: null,
+      default_branch: "main",
+      include_patterns: [],
+      exclude_patterns: [],
+      is_monitored: index % 2 === 1,
+      state: "active",
+      created_at: "2026-03-30T00:00:00Z",
+      updated_at: "2026-03-31T00:00:00Z",
+      last_error: null,
+    },
+    snapshot: {
+      id: `snapshot-${suffix}`,
+      repo_id: `repo-${suffix}`,
+      observed_at: "2026-03-31T00:00:00Z",
+      branch: "main",
+      is_detached: false,
+      head_sha: "abcdef1234567",
+      upstream_ref: "origin/main",
+      upstream_head_sha: "abcdef1234567",
+      ahead_count: index % 3,
+      behind_count: index % 2,
+      live_additions: 8 + index,
+      live_deletions: 2,
+      live_files: 3,
+      staged_additions: 2,
+      staged_deletions: 1,
+      staged_files: 1,
+      files_touched: 4,
+      repo_size_bytes: 2048,
+      language_breakdown: [],
+    },
+    health: "Healthy",
+    metrics: {
+      scope: `repo-${suffix}`,
+      day: "2026-03-31",
+      live_additions: 8 + index,
+      live_deletions: 2,
+      staged_additions: 2,
+      staged_deletions: 1,
+      committed_additions: 10,
+      committed_deletions: 2,
+      commits: index,
+      pushes: index % 2,
+      focus_minutes: 30 + index,
+      files_touched: 4,
+      languages_touched: 1,
+      score: 70 + index,
+    },
+    sparkline: [1, 3, 2],
+  };
+}
+
+const repositories = [makeRepoCard(1), makeRepoCard(2), makeRepoCard(3)];
 
 const baseState: RenderState = {
   apiBaseUrl: "http://127.0.0.1:7467",
@@ -28,100 +92,16 @@ const baseState: RenderState = {
       activity_feed: [
         {
           kind: "commit",
-          repo_name: "gitpulse",
+          repo_name: "gitpulse-1",
           timestamp: "2026-03-31T00:05:00Z",
           detail: "Imported 1 commit",
         },
       ],
       trend_points: [],
       heatmap_days: [],
-      repo_cards: [
-        {
-          repo: {
-            id: "repo-1",
-            target_id: null,
-            name: "gitpulse",
-            root_path: "/tmp/gitpulse",
-            remote_url: null,
-            default_branch: "main",
-            include_patterns: [],
-            exclude_patterns: [],
-            is_monitored: true,
-            state: "active",
-            created_at: "2026-03-30T00:00:00Z",
-            updated_at: "2026-03-31T00:00:00Z",
-            last_error: null,
-          },
-          snapshot: {
-            id: "snapshot-1",
-            repo_id: "repo-1",
-            observed_at: "2026-03-31T00:00:00Z",
-            branch: "main",
-            is_detached: false,
-            head_sha: "abcdef1234567",
-            upstream_ref: "origin/main",
-            upstream_head_sha: "abcdef1234567",
-            ahead_count: 0,
-            behind_count: 0,
-            live_additions: 8,
-            live_deletions: 2,
-            live_files: 3,
-            staged_additions: 2,
-            staged_deletions: 1,
-            staged_files: 1,
-            files_touched: 4,
-            repo_size_bytes: 2048,
-            language_breakdown: [],
-          },
-          health: "Healthy",
-          metrics: null,
-          sparkline: [1, 3, 2],
-        },
-      ],
+      repo_cards: repositories,
     },
-    repositories: [
-      {
-        repo: {
-          id: "repo-1",
-          target_id: null,
-          name: "gitpulse",
-          root_path: "/tmp/gitpulse",
-          remote_url: null,
-          default_branch: "main",
-          include_patterns: [],
-          exclude_patterns: [],
-          is_monitored: true,
-          state: "active",
-          created_at: "2026-03-30T00:00:00Z",
-          updated_at: "2026-03-31T00:00:00Z",
-          last_error: null,
-        },
-        snapshot: {
-          id: "snapshot-1",
-          repo_id: "repo-1",
-          observed_at: "2026-03-31T00:00:00Z",
-          branch: "main",
-          is_detached: false,
-          head_sha: "abcdef1234567",
-          upstream_ref: "origin/main",
-          upstream_head_sha: "abcdef1234567",
-          ahead_count: 0,
-          behind_count: 0,
-          live_additions: 8,
-          live_deletions: 2,
-          live_files: 3,
-          staged_additions: 2,
-          staged_deletions: 1,
-          staged_files: 1,
-          files_touched: 4,
-          repo_size_bytes: 2048,
-          language_breakdown: [],
-        },
-        health: "Healthy",
-        metrics: null,
-        sparkline: [1, 3, 2],
-      },
-    ],
+    repositories,
     sessions: {
       sessions: [
         {
@@ -200,47 +180,7 @@ const baseState: RenderState = {
       },
     },
     repoDetail: {
-      card: {
-        repo: {
-          id: "repo-1",
-          target_id: null,
-          name: "gitpulse",
-          root_path: "/tmp/gitpulse",
-          remote_url: null,
-          default_branch: "main",
-          include_patterns: [],
-          exclude_patterns: [],
-          is_monitored: true,
-          state: "active",
-          created_at: "2026-03-30T00:00:00Z",
-          updated_at: "2026-03-31T00:00:00Z",
-          last_error: null,
-        },
-        snapshot: {
-          id: "snapshot-1",
-          repo_id: "repo-1",
-          observed_at: "2026-03-31T00:00:00Z",
-          branch: "main",
-          is_detached: false,
-          head_sha: "abcdef1234567",
-          upstream_ref: "origin/main",
-          upstream_head_sha: "abcdef1234567",
-          ahead_count: 0,
-          behind_count: 0,
-          live_additions: 8,
-          live_deletions: 2,
-          live_files: 3,
-          staged_additions: 2,
-          staged_deletions: 1,
-          staged_files: 1,
-          files_touched: 4,
-          repo_size_bytes: 2048,
-          language_breakdown: [],
-        },
-        health: "Healthy",
-        metrics: null,
-        sparkline: [1, 3, 2],
-      },
+      card: repositories[0],
       include_patterns: ["src/**"],
       exclude_patterns: ["node_modules/**"],
       recent_commits: [
@@ -291,19 +231,55 @@ describe("tui preview", () => {
 
     expect(output).toContain("GitPulse TUI preview · Dashboard");
     expect(output).toContain("Score 77");
-    expect(output).toContain("gitpulse [active/Healthy]");
+    expect(output).toContain("gitpulse-1 [active/Healthy]");
     expect(output).toContain("Loaded GitPulse terminal preview.");
   });
 
-  test("renders repository detail guidance", () => {
+  test("renders the repositories screen with selected repo quick actions", () => {
+    const output = renderApp({
+      ...baseState,
+      screen: "repositories",
+      selectedRepoIndex: 1,
+    });
+
+    expect(output).toContain("selected 2/3");
+    expect(output).toContain("Selected repository");
+    expect(output).toContain("Quick actions: i import selected repo");
+    expect(output).toContain("> gitpulse-2 [active/Healthy] · main · live 12 · staged 3",
+    );
+  });
+
+  test("renders repository detail guidance and repo position", () => {
     const output = renderApp({
       ...baseState,
       screen: "repository_detail",
     });
 
-    expect(output).toContain("Repository · gitpulse");
+    expect(output).toContain("Repo detail keys: esc/h back · [ prev repo · ] next repo");
+    expect(output).toContain("Repository · gitpulse-1");
+    expect(output).toContain("Selection 1/3");
     expect(output).toContain("Ship the TUI preview");
     expect(output).toContain("cmd/gitpulse/main.go");
+  });
+
+  test("collapses long repository lists around the current selection", () => {
+    const manyRepositories = Array.from({ length: 14 }, (_, index) =>
+      makeRepoCard(index + 1),
+    );
+    const output = renderApp({
+      ...baseState,
+      data: {
+        ...baseState.data,
+        repositories: manyRepositories,
+      },
+      screen: "repositories",
+      selectedRepoIndex: 9,
+    });
+
+    expect(output).toContain("... 4 repository(s) above");
+    expect(output).toContain("> gitpulse-10 [active/Healthy] · main · live 20 · staged 3",
+    );
+    expect(output).not.toContain("... 1 repository(s) below");
   });
 
   test("parses repo selector into repository detail mode", () => {

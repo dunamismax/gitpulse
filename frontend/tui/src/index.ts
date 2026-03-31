@@ -128,12 +128,28 @@ class GitPulseTuiPreview {
           await this.openSelectedRepository();
         }
         return;
+      case "l":
+      case "\u001b[C":
+        if (this.#state.screen === "repositories") {
+          await this.openSelectedRepository();
+        }
+        return;
       case "\u001b":
       case "\u007f":
+      case "h":
+      case "\u001b[D":
         if (this.#state.screen === "repository_detail") {
-          this.#state.screen = "repositories";
-          this.setStatus("Returned to repositories.");
-          this.render();
+          this.backToRepositories();
+        }
+        return;
+      case "[":
+        if (this.#state.screen === "repository_detail") {
+          await this.openAdjacentRepository(-1);
+        }
+        return;
+      case "]":
+        if (this.#state.screen === "repository_detail") {
+          await this.openAdjacentRepository(1);
         }
         return;
       default:
@@ -167,7 +183,10 @@ class GitPulseTuiPreview {
       }
     }
 
-    if (this.#state.screen === "repository_detail") {
+    if (
+      this.#state.screen === "repositories" ||
+      this.#state.screen === "repository_detail"
+    ) {
       switch (key) {
         case "i":
           await this.runRepositoryAction(
@@ -204,6 +223,12 @@ class GitPulseTuiPreview {
       return;
     }
     this.setStatus(`Switched to ${tuiScreens[screen].label}.`);
+    this.render();
+  }
+
+  private backToRepositories(): void {
+    this.#state.screen = "repositories";
+    this.setStatus("Returned to repositories.");
     this.render();
   }
 
@@ -245,6 +270,29 @@ class GitPulseTuiPreview {
     });
   }
 
+  private async openAdjacentRepository(delta: number): Promise<void> {
+    const repositories = this.#state.data?.repositories ?? [];
+    if (repositories.length === 0) {
+      this.setStatus("No repository selected.");
+      this.render();
+      return;
+    }
+
+    const nextIndex = clampIndex(
+      this.#state.selectedRepoIndex + delta,
+      repositories.length,
+    );
+    if (nextIndex === this.#state.selectedRepoIndex) {
+      const edgeLabel = delta < 0 ? "first" : "last";
+      this.setStatus(`Already at the ${edgeLabel} tracked repository.`);
+      this.render();
+      return;
+    }
+
+    this.#state.selectedRepoIndex = nextIndex;
+    await this.openSelectedRepository();
+  }
+
   private async runGlobalAction(
     status: string,
     action: () => Promise<ActionPayload>,
@@ -272,7 +320,7 @@ class GitPulseTuiPreview {
       this.setActionStatus(payload);
       await this.loadData();
       const refreshedRepo = this.selectedRepository();
-      if (refreshedRepo) {
+      if (refreshedRepo && this.#state.screen === "repository_detail") {
         this.#state.data = {
           ...this.#state.data,
           repoDetail: await this.#client.repositoryDetail(

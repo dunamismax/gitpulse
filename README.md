@@ -43,6 +43,7 @@ GitPulse keeps live work, commit history, and push activity as separate ledgers.
 - `gitpulse doctor` for environment and configuration diagnostics
 - browser dashboard, repositories, repository detail, sessions, achievements, and settings pages through the Astro + Vue frontend
 - terminal preview screens for dashboard, repositories, repository detail, sessions, achievements, and settings, plus manual import, rescan, rebuild, refresh, and toggle actions when Bun is available from source
+- repositories screen quick actions for the selected repo, with adjacent repo-to-repo navigation from repository detail so operator work stays keyboard-first instead of bouncing through CLI selectors
 - first-run guidance plus explicit import, rescan, and rebuild runbook controls backed by the Go API
 - Go-served JSON API endpoints backing the browser UI
 - explicit Go-owned frontend response contracts for dashboard, repositories, sessions, achievements, settings, and operator actions

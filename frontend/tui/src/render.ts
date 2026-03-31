@@ -36,6 +36,7 @@ export interface RenderState {
 }
 
 const sectionDivider = "─".repeat(78);
+const repositoryWindowSize = 10;
 
 export function renderApp(state: RenderState): string {
   const lines = [
@@ -43,9 +44,9 @@ export function renderApp(state: RenderState): string {
     `API ${state.apiBaseUrl}`,
     "Keys: q quit · Ctrl-R reload · g then d/r/s/a/, switch screens",
     state.screen === "repositories"
-      ? "Repo keys: j/k or ↑/↓ move · enter detail"
+      ? "Repo keys: j/k or ↑/↓ move · enter/l detail · i import · r rescan · t toggle"
       : state.screen === "repository_detail"
-        ? "Repo detail keys: esc back · i import repo · r refresh repo · t toggle monitor"
+        ? "Repo detail keys: esc/h back · [ prev repo · ] next repo · i import · r rescan · t toggle"
         : state.screen === "dashboard"
           ? "Action keys: i import all · r rescan all · b rebuild analytics"
           : "",
@@ -98,7 +99,11 @@ function renderScreen(state: RenderState): string[] {
         state.selectedRepoIndex,
       );
     case "repository_detail":
-      return renderRepositoryDetail(state.data?.repoDetail);
+      return renderRepositoryDetail(
+        state.data?.repoDetail,
+        state.data?.repositories ?? [],
+        state.selectedRepoIndex,
+      );
     case "sessions":
       return renderSessions(state.data?.sessions);
     case "achievements":
@@ -174,15 +179,53 @@ function renderRepositories(
     0,
     Math.min(selectedRepoIndex, repositories.length - 1),
   );
-  for (const [index, repo] of repositories.entries()) {
+  const selected = repositories[clampedIndex];
+  const { start, end } = repositoryWindow(repositories.length, clampedIndex);
+
+  lines.push(
+    `  ${repositories.length} tracked · selected ${clampedIndex + 1}/${repositories.length}`,
+    sectionDivider,
+    "Selected repository",
+    `  ${renderRepoCard(selected)}`,
+    `  Path ${selected.repo.root_path}`,
+    `  Monitoring ${selected.repo.is_monitored ? "enabled" : "disabled"} · Default branch ${selected.repo.default_branch || "-"}`,
+  );
+
+  if (selected.metrics) {
+    lines.push(
+      `  Score ${selected.metrics.score} · Focus ${formatMinutes(selected.metrics.focus_minutes)} · Commits ${selected.metrics.commits} · Pushes ${selected.metrics.pushes}`,
+    );
+  }
+
+  lines.push(
+    "  Quick actions: i import selected repo · r rescan selected repo · t toggle monitoring · enter detail",
+    sectionDivider,
+    "Repository list",
+  );
+
+  if (start > 0) {
+    lines.push(`  ... ${start} repository(s) above`);
+  }
+
+  for (const [offset, repo] of repositories.slice(start, end).entries()) {
+    const index = start + offset;
     const marker = index === clampedIndex ? ">" : " ";
     lines.push(` ${marker} ${renderRepoCard(repo)}`);
   }
+
+  if (end < repositories.length) {
+    lines.push(`  ... ${repositories.length - end} repository(s) below`);
+  }
+
   lines.push(sectionDivider);
   return lines;
 }
 
-function renderRepositoryDetail(detail?: RepoDetailView): string[] {
+function renderRepositoryDetail(
+  detail?: RepoDetailView,
+  repositories: RepoCard[] = [],
+  selectedRepoIndex = 0,
+): string[] {
   if (!detail) {
     return [
       "Repository detail unavailable.",
@@ -192,20 +235,34 @@ function renderRepositoryDetail(detail?: RepoDetailView): string[] {
   }
 
   const snapshot = detail.card.snapshot;
+  const selectedPosition =
+    repositories.length > 0
+      ? `${Math.max(1, Math.min(selectedRepoIndex + 1, repositories.length))}/${repositories.length}`
+      : "1/1";
   const lines = [
     `Repository · ${detail.card.repo.name}`,
+    `  Selection ${selectedPosition} · Monitoring ${detail.card.repo.is_monitored ? "enabled" : "disabled"}`,
     `  State ${detail.card.repo.state} · Health ${detail.card.health}`,
     `  Path ${detail.card.repo.root_path}`,
     `  Remote ${detail.card.repo.remote_url ?? "-"}`,
     `  Branch ${snapshot?.branch ?? "-"} · Ahead ${snapshot?.ahead_count ?? 0} · Behind ${snapshot?.behind_count ?? 0}`,
     `  Live ${snapshot ? sumLines(snapshot.live_additions, snapshot.live_deletions) : 0} lines · Staged ${snapshot ? sumLines(snapshot.staged_additions, snapshot.staged_deletions) : 0} lines · Files ${snapshot?.files_touched ?? 0}`,
+  ];
+
+  if (detail.card.metrics) {
+    lines.push(
+      `  Score ${detail.card.metrics.score} · Focus ${formatMinutes(detail.card.metrics.focus_minutes)} · Commits ${detail.card.metrics.commits} · Pushes ${detail.card.metrics.pushes}`,
+    );
+  }
+
+  lines.push(
     sectionDivider,
     "Patterns",
     `  Include: ${renderList(detail.include_patterns)}`,
     `  Exclude: ${renderList(detail.exclude_patterns)}`,
     sectionDivider,
     "Recent commits",
-  ];
+  );
 
   if (detail.recent_commits.length === 0) {
     lines.push("  No commits imported yet.");
@@ -339,4 +396,24 @@ function renderList(values: string[]): string {
     return "-";
   }
   return values.join(", ");
+}
+
+function repositoryWindow(total: number, selectedIndex: number): {
+  start: number;
+  end: number;
+} {
+  if (total <= repositoryWindowSize) {
+    return { start: 0, end: total };
+  }
+
+  const halfWindow = Math.floor(repositoryWindowSize / 2);
+  let start = Math.max(0, selectedIndex - halfWindow);
+  let end = start + repositoryWindowSize;
+
+  if (end > total) {
+    end = total;
+    start = Math.max(0, end - repositoryWindowSize);
+  }
+
+  return { start, end };
 }

@@ -174,7 +174,8 @@ Status notes:
 - `frontend/tui/` now contains a keyboard-driven source-run terminal preview that talks to the live Go API through the shared TypeScript client.
 - The Cobra CLI now exposes `gitpulse tui` to launch the terminal preview through Bun.
 - The preview covers dashboard, repositories, repository detail, sessions, achievements, settings, manual runbook actions, and explicit backend error states.
-- Phase 4 is still open because the terminal lane needs deeper keyboard polish, real-workspace validation, and a stronger case that it is materially better than chaining the CLI.
+- The repositories screen now supports selected-repo quick actions, and repository detail can step across adjacent tracked repos without dropping back to the list or falling through to CLI selectors.
+- Phase 4 is still open because the terminal lane still needs broader real-workspace validation and a stronger case that it is materially better than chaining the CLI across a fuller operator session.
 
 Deliverables:
 

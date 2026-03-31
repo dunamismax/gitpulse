@@ -13,7 +13,7 @@ Workspace packages:
 
 - `shared/`: shared API client, contract types, formatting helpers, route maps, screen maps, and operator action metadata
 - `web/`: shipped Astro + Vue browser frontend consumed by `gitpulse serve`
-- `tui/`: keyboard-driven Bun terminal preview wired to the live Go backend and shared contracts
+- `tui/`: keyboard-driven Bun terminal preview wired to the live Go backend and shared contracts, with selected-repo quick actions from the repositories screen and adjacent repo navigation from repository detail
 
 Local setup:
 
