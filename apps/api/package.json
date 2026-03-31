@@ -1,0 +1,18 @@
+{
+  "name": "@gitpulse-vnext/api",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "bun build ./src/index.ts --outdir dist --target bun",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@gitpulse-vnext/config": "workspace:*",
+    "@gitpulse-vnext/contracts": "workspace:*",
+    "@gitpulse-vnext/core": "workspace:*",
+    "elysia": "^1.4.8"
+  }
+}

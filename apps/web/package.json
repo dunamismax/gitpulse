@@ -1,0 +1,17 @@
+{
+  "name": "@gitpulse-vnext/web",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 0.0.0.0 --port 4321",
+    "build": "astro build",
+    "start": "astro preview --host 0.0.0.0 --port 4321",
+    "typecheck": "astro check",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@gitpulse-vnext/contracts": "workspace:*",
+    "@gitpulse-vnext/core": "workspace:*",
+    "astro": "^5.13.6"
+  }
+}

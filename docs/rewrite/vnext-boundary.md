@@ -12,7 +12,7 @@ This document defines the Phase 0 rewrite boundary for the approved destination 
 - Docker Compose
 - Caddy
 
-These are target-state decisions for the rewrite. They are not claims that the implementation already exists in this repo.
+These are target-state decisions for the rewrite. The repo now contains a Phase 1 bootstrap that follows this boundary under `apps/`, `packages/`, `db/migrations/`, `deploy/`, and `docker-compose.yml`, but parity and cutover work are still ahead.
 
 ## Boundary Decisions
 

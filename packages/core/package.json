@@ -1,0 +1,12 @@
+{
+  "name": "@gitpulse-vnext/core",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "bun build ./src/index.ts --outdir dist --target bun"
+  }
+}

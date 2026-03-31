@@ -16,3 +16,11 @@ gitpulse-data
 /frontend/**/.vite
 /frontend/web/.astro
 /frontend/**/dist
+
+# vNext workspace
+/node_modules
+/apps/**/node_modules
+/packages/**/node_modules
+/apps/web/.astro
+/apps/**/dist
+/packages/**/dist

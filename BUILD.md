@@ -45,6 +45,7 @@ GitPulse ships today as a Go application with a real browser frontend already in
 - Astro plus Vue operator web UI under `frontend/web/`
 - TypeScript terminal preview under `frontend/tui/`
 - manual-first operator loop: add, import, rescan, rebuild, inspect
+- unshipped vNext bootstrap under `apps/`, `packages/`, `db/migrations/`, `deploy/`, and `docker-compose.yml`
 
 What the current implementation has already proven:
 
@@ -57,8 +58,9 @@ What the current implementation has already proven:
 What must stay honest during the rewrite:
 
 - the shipped app today is still Go plus SQLite
-- no PostgreSQL runtime exists here yet
-- the Bun workspace is currently a frontend lane, not the full repo runtime owner
+- no shipped PostgreSQL runtime exists here yet
+- the new root Bun workspace is only a bootstrap lane today, not the default product runtime
+- host-side vNext verification is green, but Docker Compose boot is still blocked by the Astro container build mismatch described below
 - the TUI exists, but it is not a required parity target for the rewrite
 
 ## Target state
@@ -162,29 +164,33 @@ These are not rewrite goals unless Stephen changes direction:
 
 ### Work checklist
 
-- [ ] Create a root Bun workspace for the whole app, not just the frontend.
-- [ ] Add `apps/api` for Elysia and `apps/web` for Astro and Vue.
-- [ ] Add `packages/contracts` for Zod schemas and inferred shared types.
-- [ ] Add `packages/core` for shared domain services, analytics logic, and git integration helpers.
-- [ ] Add `packages/config` for environment parsing and runtime config.
-- [ ] Add `packages/ui` only if shared UI components or composables actually earn it.
-- [ ] Add PostgreSQL migrations under `db/migrations/`.
-- [ ] Add `docker-compose.yml` for PostgreSQL, API, web, and Caddy.
-- [ ] Add `deploy/Caddyfile` and make same-origin routing the default.
-- [ ] Define root verification scripts for lint, typecheck, test, build, and smoke.
+- [x] Create a root Bun workspace for the whole app, not just the frontend.
+- [x] Add `apps/api` for Elysia and `apps/web` for Astro and Vue.
+- [x] Add `packages/contracts` for Zod schemas and inferred shared types.
+- [x] Add `packages/core` for shared domain services, analytics logic, and git integration helpers.
+- [x] Add `packages/config` for environment parsing and runtime config.
+- [x] Leave `packages/ui` out for now because shared UI is not earned yet.
+- [x] Add PostgreSQL migrations under `db/migrations/`.
+- [x] Add `docker-compose.yml` for PostgreSQL, API, web, and Caddy.
+- [x] Add `deploy/Caddyfile` and make same-origin routing the default.
+- [x] Define root verification scripts for lint, typecheck, test, build, and smoke.
+
+Current blocker:
+
+- Docker Compose wiring exists, but the `web` service still fails during containerized Astro build with an esbuild host or binary mismatch under `oven/bun:1.3.10`, so the stack does not yet complete the local Compose smoke.
 
 ### Exit criteria
 
 - [ ] The repo can boot an empty vNext stack through Docker Compose.
 - [ ] Astro and Elysia both run under Bun.
-- [ ] Shared contracts compile from one source of truth.
+- [x] Shared contracts compile from one source of truth.
 - [ ] Caddy can serve the web app and proxy the API locally.
 
 ## Phase 2 - Rewrite the data layer onto PostgreSQL
 
 ### Work checklist
 
-- [ ] Create PostgreSQL migrations for repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings.
+- [x] Create PostgreSQL migrations for repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings.
 - [ ] Normalize timestamp, enum-like, and JSON payload handling for PostgreSQL.
 - [ ] Implement explicit query modules and service-layer writes in TypeScript.
 - [ ] Keep SQL explicit and reviewable.
@@ -277,14 +283,14 @@ These are not rewrite goals unless Stephen changes direction:
 
 ### Docs and planning changes
 
-- [ ] Search active docs for stale hybrid-backend future framing and remove or qualify it.
-- [ ] Run `git diff --check`.
-- [ ] Run targeted `rg` searches that confirm active docs describe the Go runtime as current truth, not future destination.
+- [x] Search active docs for stale hybrid-backend future framing and remove or qualify it.
+- [x] Run `git diff --check`.
+- [x] Run targeted `rg` searches that confirm active docs describe the Go runtime as current truth, not future destination.
 
 ### Implementation phases
 
-- [ ] Keep the current Go and frontend verification lanes green while Go is still the shipped app.
-- [ ] Add root Bun verification scripts before Phase 1 is considered done.
+- [x] Keep the current Go and frontend verification lanes green while Go is still the shipped app.
+- [x] Add root Bun verification scripts before Phase 1 is considered done.
 - [ ] Add API, contract, and core smoke coverage before claiming backend cutover.
 - [ ] Add migration smoke coverage before calling PostgreSQL cutover complete.
 - [ ] Add end-to-end smoke coverage through Docker Compose and Caddy before calling the rewrite done.
@@ -308,8 +314,8 @@ The rewrite is done only when all of these are true:
 
 ## Immediate next recommended work
 
-- [ ] Freeze the current operator contract, schema inventory, and config inventory.
-- [ ] Define the PostgreSQL table mapping and the Elysia route map.
-- [ ] Scaffold the root Bun workspace with `apps/api`, `apps/web`, `packages/contracts`, `packages/core`, and `packages/config`.
-- [ ] Add `docker-compose.yml` and `deploy/Caddyfile`.
-- [ ] Boot a no-feature vNext stack before porting data and runtime logic.
+- [ ] Fix the containerized Astro web service so `docker compose up` reaches a green smoke pass through Caddy.
+- [ ] Add a small migration runner and apply `db/migrations/0001_initial.sql` against PostgreSQL during bootstrap.
+- [ ] Move explicit PostgreSQL query modules and service-layer writes into TypeScript under `apps/api` and `packages/core`.
+- [ ] Implement the SQLite importer using the table rules in `docs/rewrite/sqlite-to-postgres.md`.
+- [ ] Start replacing the Go read routes with Elysia route groups beginning with `GET /api/dashboard` and `GET /api/repositories`.
