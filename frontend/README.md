@@ -8,7 +8,6 @@ Current truth:
 - Go remains the only backend and system of record
 - `frontend/shared` owns the shared TypeScript contracts and API client for both frontend lanes
 - `frontend/tui` is still only a foundation shell. The real terminal console has not been built yet.
-- `python-ui/` is still in-tree only as a temporary migration reference and is no longer on the runtime path
 
 Workspace packages:
 

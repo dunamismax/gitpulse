@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Delete the legacy `python-ui/` migration reference directory now that the Go-served Astro + Vue frontend is the only shipped browser lane.
+
+### Changed
+- Align BUILD and repo docs with the completed Python UI cleanup so the remaining frontend migration work is the TUI lane.
+
 ## [0.2.0] - 2026-03-29
 
 ### Added

@@ -6,7 +6,7 @@
 
 GitPulse keeps live work, commit history, and push activity as separate ledgers. The codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, and a shipped Astro + Vue browser frontend under `frontend/web/` served directly by the Go runtime.
 
-> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` now serves the built Astro + Vue frontend directly from Go while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. Background watchers or pollers and packaged desktop releases are not shipped yet. The frontend migration plan lives in [BUILD.md](BUILD.md), and the current operator flow lives in [docs/operator-workflow.md](docs/operator-workflow.md). The legacy `python-ui/` directory is still in-tree temporarily as migration reference only and is no longer on the runtime path.
+> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` now serves the built Astro + Vue frontend directly from Go while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. Background watchers or pollers and packaged desktop releases are not shipped yet. The remaining frontend migration work lives in [BUILD.md](BUILD.md), and the current operator flow lives in [docs/operator-workflow.md](docs/operator-workflow.md).
 
 ## Why GitPulse?
 
@@ -175,7 +175,6 @@ Reported by `gitpulse doctor` and discovered by the Go runtime:
 ├── migrations/                # SQLite migration files
 ├── docs/architecture.md       # Current architecture notes
 ├── docs/operator-workflow.md  # Current manual-first operator workflow
-├── python-ui/                 # Legacy migration reference, not active runtime
 └── ROADMAP.md                 # Product roadmap
 ```
 

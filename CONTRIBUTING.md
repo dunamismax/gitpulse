@@ -53,7 +53,6 @@ GitPulse uses a Go-first backend with a Bun workspace frontend.
 | `internal/runtime` | orchestration and view assembly |
 | `internal/sessions` | sessionization |
 | `internal/web` | HTTP handlers, JSON API, and static frontend serving |
-| `python-ui` | legacy migration reference, not active product runtime |
 
 Rules:
 

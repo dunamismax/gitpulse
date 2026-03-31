@@ -9,7 +9,6 @@ Purpose: status-tracked frontend migration plan from the legacy Python browser U
 - **Backend:** keep **Go** as the only backend and system of record
 - **Web frontend:** **TypeScript + Bun + Astro + Vue**
 - **Terminal frontend:** **TypeScript + Bun + OpenTUI**
-- **Removal target:** retire `python-ui/` after final repo cleanup
 
 ### Why this is the right target
 
@@ -28,7 +27,7 @@ This repo should **not** go web-only unless the TUI later proves redundant, and 
 - SQLite with plain SQL is the active storage model.
 - `gitpulse serve` now serves the built Astro frontend directly from `frontend/web/dist`.
 - The shipped browser surface is Astro + Vue under `frontend/web/`.
-- `python-ui/` is still in-tree only as temporary migration reference and is no longer on the request path.
+- The legacy Python browser lane has been removed from the repo.
 - The supported operator loop is still manual-first: **add -> import -> rescan -> rebuild -> inspect**.
 - Background watchers, pollers, desktop packaging, and plugin runtime work are not current product truth.
 
@@ -39,7 +38,7 @@ This repo should **not** go web-only unless the TUI later proves redundant, and 
 - [x] Phase 2 is complete. `frontend/` now contains the Bun workspace, shared TypeScript contract layer, shared route and screen maps, and the lane structure for both the web and terminal frontends.
 - [x] Phase 3 is complete. `frontend/web/` now owns the shipped browser surface and `gitpulse serve` serves the built web frontend directly from Go.
 - [ ] Phase 4 has not started. `frontend/tui/` still exists only as a foundation shell, with no `gitpulse tui` entrypoint or real operator console.
-- [ ] Phase 5 is in progress. The managed Python runtime path, docs, and CI lane are gone, but the legacy `python-ui/` directory is still present and should be removed.
+- [x] Phase 5 is complete. The managed Python runtime path, docs, CI lane, and legacy `python-ui/` reference directory are gone.
 
 ## Target state
 
@@ -60,7 +59,7 @@ Target behavior:
 - `gitpulse serve` serves the Astro build directly from Go in non-dev paths.
 - A new terminal entrypoint, preferably `gitpulse tui`, becomes the terminal operator console.
 - Both frontends consume the same Go-owned API and shared TypeScript client and types.
-- Python stops being a runtime dependency once the web cutover is complete.
+- Python is no longer a runtime or shipped frontend dependency.
 
 ## Backend notes
 
@@ -189,18 +188,18 @@ Exit criteria:
 - [ ] the TUI is materially better than chaining CLI commands for inspection and control
 - [ ] the CLI still exists as the low-level fallback
 
-### [ ] Phase 5 - Remove Python UI and tighten the repo
+### [x] Phase 5 - Remove Python UI and tighten the repo
 
 Status notes:
 
 - `gitpulse serve` no longer launches a managed Python subprocess.
 - README, architecture docs, operator docs, AGENTS notes, and CI now describe the active Go + Bun lanes.
-- `python-ui/` still remains in-tree as legacy migration reference and should be removed once nothing useful remains to preserve.
+- The legacy `python-ui/` directory and its stale assets are gone from the repo.
 - Desktop packaging remains out of scope for the migration itself.
 
 Deliverables:
 
-- [ ] remove the remaining `python-ui/` directory and legacy assets once the reference is no longer needed
+- [x] remove the remaining `python-ui/` directory and legacy assets once the reference is no longer needed
 - [x] remove managed Python UI launch and proxy code
 - [x] remove Python UI docs and verification steps from current repo docs and CI
 - [x] update README and architecture and operator docs to reflect the active Go + Bun frontend shape
@@ -210,7 +209,7 @@ Exit criteria:
 
 - [x] no Python runtime dependency remains for shipped GitPulse frontend behavior
 - [x] docs and CI describe only the active Go + Bun lanes
-- [ ] stale Python-browser reference code is gone from the repo
+- [x] stale Python-browser reference code is gone from the repo
 
 ## Recommended execution order
 
@@ -219,12 +218,11 @@ Exit criteria:
 - [x] **Phase 2** - create the shared TypeScript foundation
 - [x] **Phase 3** - replace the browser UI and cut over `gitpulse serve`
 - [ ] **Phase 4** - add the OpenTUI operator console
-- [ ] **Phase 5** - remove the legacy Python UI directory and finish cleanup
+- [x] **Phase 5** - remove the legacy Python UI directory and finish cleanup
 
 ### Ordering rules
 
 - Do **not** start the real TUI before the backend contract and shared TypeScript layer exist.
-- Do **not** remove the legacy Python directory until the Astro + Vue browser surface is clearly stable.
 - Keep the web replacement shipped before the TUI because the browser dashboard is already a current product surface.
 
 ## Risks
@@ -233,7 +231,6 @@ Exit criteria:
 - It is easy to build a ceremonial TUI. The TUI must improve operator speed, not just mirror pages.
 - Bun-based frontends add a second toolchain beside Go. Keep boundaries clean and CI explicit.
 - Docs can accidentally imply background tracking, plugins, or desktop packaging if the cutover is described sloppily.
-- Leaving `python-ui/` around too long increases the chance of stale references lingering.
 
 ## Acceptance criteria
 

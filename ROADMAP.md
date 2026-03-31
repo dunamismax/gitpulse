@@ -24,7 +24,6 @@ Near-term roadmap decisions:
 - prove the local add/import/rescan/rebuild happy path end to end
 - harden the SQLite-backed runtime instead of adding extra infrastructure
 - complete the TUI lane only if it earns its keep
-- remove legacy `python-ui/` code once the remaining repo cleanup is done
 - treat packaging as optional follow-on work, not a current product surface
 
 ## Milestone 1 — operator-ready Go runtime

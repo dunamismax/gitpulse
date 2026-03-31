@@ -10,13 +10,6 @@ gitpulse-data
 /.claude
 /.claire
 
-# Python UI
-/python-ui/.venv
-/python-ui/.pytest_cache
-/python-ui/.ruff_cache
-/python-ui/.pyright
-/python-ui/**/__pycache__
-
 # Frontend workspace
 /frontend/node_modules
 /frontend/**/node_modules

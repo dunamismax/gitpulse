@@ -10,7 +10,6 @@ GitPulse is manual-first today. It does not ship a background watcher, poller, o
 - the supported ingestion loop is add, import, rescan, rebuild, inspect
 - analytics are rebuilt from stored local events
 - packaged desktop releases are not implemented in this repo
-- `python-ui/` is legacy reference only and is no longer on the request path
 
 ## Daily operator loop
 

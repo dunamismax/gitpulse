@@ -22,10 +22,6 @@ Active implementation path:
 - `internal/web/`
 - `migrations/`
 
-Legacy migration reference still present:
-
-- `python-ui/`
-
 New backend work goes into Go. The active storage layer is SQLite via `database/sql` and `modernc.org/sqlite` with plain SQL.
 
 ## Current product shape
@@ -47,7 +43,6 @@ What is not complete yet:
 - packaged desktop release workflow
 - fuzz coverage for git parsing
 - the real TUI implementation and `gitpulse tui` entrypoint
-- final repo cleanup to remove `python-ui/` entirely
 
 ## Working rules
 

@@ -2,7 +2,7 @@
 
 GitPulse is a local-first Go application with SQLite persistence and plain SQL in the Go runtime. The Go backend remains the source of truth. The browser surface is now the Astro + Vue frontend under `frontend/web/`, built with Bun and served directly by the Go runtime.
 
-The frontend migration plan is tracked in `BUILD.md`. The browser cutover is complete. The Bun workspace under `frontend/` now contains the shared TypeScript contract layer, the shipped Astro + Vue web app under `frontend/web/`, and the still-foundational terminal lane under `frontend/tui`. The legacy `python-ui/` directory remains only as temporary migration reference while repo cleanup finishes.
+The frontend migration plan is tracked in `BUILD.md`. The browser cutover is complete. The Bun workspace under `frontend/` now contains the shared TypeScript contract layer, the shipped Astro + Vue web app under `frontend/web/`, and the still-foundational terminal lane under `frontend/tui`.
 
 ## Active stack
 
@@ -81,10 +81,6 @@ Astro + Vue browser frontend. Built to static output, hydrated against the live 
 ### `frontend/tui`
 
 OpenTUI foundation shell. The real terminal operator console has not been implemented yet.
-
-### `python-ui`
-
-Legacy FastAPI + Jinja2 reference kept temporarily during repo cleanup. It is no longer launched by `gitpulse serve`.
 
 ### `internal/config`
 
