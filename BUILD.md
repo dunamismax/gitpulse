@@ -232,7 +232,7 @@ Verified this pass:
 
 ### Work checklist
 
-- [ ] Implement Elysia route groups for dashboard, repositories, repository detail, sessions, achievements, settings, and health.
+- [x] Implement Elysia route groups for dashboard, repositories, repository detail, sessions, achievements, settings, and health.
 - [ ] Implement Elysia action endpoints for add, import, rescan, rebuild, refresh, toggle, remove, and settings save.
 - [ ] Validate all request and response payloads with Zod.
 - [ ] Move git subprocess integration into `packages/core`.
@@ -242,9 +242,10 @@ Verified this pass:
 
 Verified this pass:
 
-- `apps/api/src/read-models.ts` now threads the verified PostgreSQL store from `packages/core` into Elysia read-model services instead of only serving a health stub.
-- `GET /api/dashboard` and `GET /api/repositories` now return Zod-validated PostgreSQL-backed payloads from `packages/contracts`.
-- Real PostgreSQL-backed API coverage now exists in `apps/api/test/app.integration.test.ts`, and Compose smoke now verifies empty fresh-install responses for dashboard and repositories through Caddy.
+- `apps/api/src/read-models.ts` now covers the full shipped read surface: dashboard, repositories, repository detail, sessions, achievements, and settings.
+- `GET /api/repositories/{id}`, `GET /api/sessions`, `GET /api/achievements`, and `GET /api/settings` now return Zod-validated payloads backed by PostgreSQL read models, with settings composed from stored `settings` rows plus vNext env-derived config and data paths.
+- `packages/contracts/src/index.ts` now owns the missing repository detail, sessions, achievements, and settings schemas and response envelopes.
+- `apps/api/test/app.test.ts`, `apps/api/test/app.integration.test.ts`, and `scripts/smoke.ts` now cover the full read-route tranche, including repository-detail 404 handling and fresh-install sessions, achievements, and settings responses through Caddy.
 
 ### Exit criteria
 
@@ -345,5 +346,5 @@ The rewrite is done only when all of these are true:
 - [x] Thread the verified PostgreSQL store from `packages/core` into `apps/api` services and route wiring.
 - [ ] Implement the SQLite importer using the table rules in `docs/rewrite/sqlite-to-postgres.md`.
 - [x] Start replacing the Go read routes with Elysia route groups beginning with `GET /api/dashboard` and `GET /api/repositories`.
-- [ ] Extend the read-route replacement to `GET /api/repositories/{id}`, `GET /api/sessions`, `GET /api/achievements`, and `GET /api/settings` with the same PostgreSQL-backed and Zod-validated path.
+- [x] Extend the read-route replacement to `GET /api/repositories/{id}`, `GET /api/sessions`, `GET /api/achievements`, and `GET /api/settings` with the same PostgreSQL-backed and Zod-validated path.
 - [ ] Start replacing the Go action routes with Elysia endpoints for add, import, rescan, rebuild, toggle, remove, and settings save.

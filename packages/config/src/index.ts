@@ -4,6 +4,8 @@ const apiEnvSchema = z.object({
   GITPULSE_API_HOST: z.string().default('0.0.0.0'),
   GITPULSE_API_PORT: z.coerce.number().int().positive().default(3001),
   GITPULSE_DATABASE_URL: z.string().min(1),
+  GITPULSE_CONFIG_DIR: z.string().default('/var/lib/gitpulse/config'),
+  GITPULSE_DATA_DIR: z.string().default('/var/lib/gitpulse/data'),
 });
 
 const webEnvSchema = z.object({

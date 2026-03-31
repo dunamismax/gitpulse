@@ -37,6 +37,10 @@ export const repoHealthSchema = z.enum([
   'Error',
 ]);
 export const activityFeedKindSchema = z.enum(['commit', 'push', 'file_change']);
+export const pushKindSchema = z.enum([
+  'push_detected_local',
+  'push_remote_confirmed',
+]);
 
 export const healthResponseSchema = z.object({
   status: z.literal('ok'),
@@ -152,6 +156,43 @@ export const repoCardSchema = z.object({
   sparkline: z.array(z.number().int().nonnegative()),
 });
 
+export const commitEventSchema = z.object({
+  id: z.string().uuid(),
+  repo_id: z.string().uuid(),
+  commit_sha: z.string().min(1),
+  authored_at: timestampSchema,
+  author_name: z.string().min(1).nullable().optional(),
+  author_email: z.string().min(1).nullable().optional(),
+  summary: z.string().min(1),
+  branch: z.string().min(1).nullable().optional(),
+  additions: z.number().int(),
+  deletions: z.number().int(),
+  files_changed: z.number().int(),
+  is_merge: z.boolean(),
+  imported_at: timestampSchema,
+});
+
+export const pushEventSchema = z.object({
+  id: z.string().uuid(),
+  repo_id: z.string().uuid(),
+  observed_at: timestampSchema,
+  kind: pushKindSchema,
+  head_sha: z.string().min(1).nullable().optional(),
+  pushed_commit_count: z.number().int(),
+  upstream_ref: z.string().min(1).nullable().optional(),
+  notes: z.string().min(1).nullable().optional(),
+});
+
+export const focusSessionSchema = z.object({
+  id: z.string().uuid(),
+  started_at: timestampSchema,
+  ended_at: timestampSchema,
+  active_minutes: z.number().int().nonnegative(),
+  repo_ids: z.array(z.string().uuid()),
+  event_count: z.number().int().nonnegative(),
+  total_changed_lines: z.number().int().nonnegative(),
+});
+
 export const dashboardViewSchema = z.object({
   summary: todaySummarySchema,
   activity_feed: z.array(activityFeedItemSchema),
@@ -164,12 +205,129 @@ export const repositoriesPayloadSchema = z.object({
   repositories: z.array(repoCardSchema),
 });
 
+export const repoDetailViewSchema = z.object({
+  card: repoCardSchema,
+  include_patterns: z.array(z.string()),
+  exclude_patterns: z.array(z.string()),
+  recent_commits: z.array(commitEventSchema),
+  recent_pushes: z.array(pushEventSchema),
+  recent_sessions: z.array(focusSessionSchema),
+  language_breakdown: z.array(languageStatSchema),
+  top_files: z.array(z.string()),
+});
+
+export const sessionSummarySchema = z.object({
+  sessions: z.array(focusSessionSchema),
+  total_minutes: z.number().int().nonnegative(),
+  average_length_minutes: z.number().int().nonnegative(),
+  longest_session_minutes: z.number().int().nonnegative(),
+});
+
+export const achievementSchema = z.object({
+  kind: z.string().min(1),
+  unlocked_at: timestampSchema,
+  day: daySchema.nullable().optional(),
+  reason: z.string().min(1),
+});
+
+export const streakSummarySchema = z.object({
+  current_days: z.number().int().nonnegative(),
+  best_days: z.number().int().nonnegative(),
+});
+
+export const achievementsViewSchema = z.object({
+  achievements: z.array(achievementSchema),
+  streaks: streakSummarySchema,
+  today_score: z.number().int(),
+});
+
+export const authorIdentitySchema = z.object({
+  email: z.string().min(1),
+  name: z.string().min(1).optional(),
+  aliases: z.array(z.string().min(1)).optional(),
+});
+
+export const goalConfigSchema = z.object({
+  changed_lines_per_day: z.number().int().nonnegative(),
+  commits_per_day: z.number().int().nonnegative(),
+  focus_minutes_per_day: z.number().int().nonnegative(),
+});
+
+export const monitoringConfigSchema = z.object({
+  import_days: z.number().int().positive(),
+  session_gap_minutes: z.number().int().positive(),
+  repo_discovery_depth: z.number().int().positive().optional(),
+});
+
+export const uiConfigSchema = z.object({
+  timezone: z.string().min(1),
+  day_boundary_minutes: z.number().int().nonnegative(),
+});
+
+export const patternConfigSchema = z.object({
+  include: z.array(z.string()),
+  exclude: z.array(z.string()),
+});
+
+export const githubConfigSchema = z.object({
+  enabled: z.boolean(),
+  token: z.string().min(1).nullable().optional(),
+  verify_remote_pushes: z.boolean(),
+});
+
+export const databaseConfigSchema = z.object({
+  path: z.string().min(1),
+});
+
+export const serverConfigSchema = z.object({
+  host: z.string().min(1),
+  port: z.number().int().positive(),
+});
+
+export const runtimeConfigSchema = z.object({
+  authors: z.array(authorIdentitySchema),
+  goals: goalConfigSchema,
+  patterns: patternConfigSchema,
+  github: githubConfigSchema,
+  monitoring: monitoringConfigSchema,
+  ui: uiConfigSchema,
+  database: databaseConfigSchema.optional(),
+  server: serverConfigSchema.optional(),
+});
+
+export const appPathsSchema = z.object({
+  config_dir: z.string().min(1),
+  data_dir: z.string().min(1),
+  config_file: z.string().min(1),
+});
+
+export const settingsViewSchema = z.object({
+  config: runtimeConfigSchema,
+  paths: appPathsSchema,
+});
+
 export const dashboardResponseSchema = z.object({
   data: dashboardViewSchema,
 });
 
 export const repositoriesResponseSchema = z.object({
   data: repositoriesPayloadSchema,
+});
+
+export const repoDetailResponseSchema = z.object({
+  data: repoDetailViewSchema,
+});
+
+export const sessionsResponseSchema = z.object({
+  data: sessionSummarySchema,
+});
+
+export const achievementsResponseSchema = z.object({
+  data: achievementsViewSchema,
+});
+
+export const settingsResponseSchema = z.object({
+  data: settingsViewSchema,
 });
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
@@ -182,7 +340,30 @@ export type Repository = z.infer<typeof repositorySchema>;
 export type RepoStatusSnapshot = z.infer<typeof repoStatusSnapshotSchema>;
 export type DailyRollup = z.infer<typeof dailyRollupSchema>;
 export type RepoCard = z.infer<typeof repoCardSchema>;
+export type CommitEvent = z.infer<typeof commitEventSchema>;
+export type PushEvent = z.infer<typeof pushEventSchema>;
+export type FocusSession = z.infer<typeof focusSessionSchema>;
 export type DashboardView = z.infer<typeof dashboardViewSchema>;
 export type RepositoriesPayload = z.infer<typeof repositoriesPayloadSchema>;
+export type RepoDetailView = z.infer<typeof repoDetailViewSchema>;
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+export type Achievement = z.infer<typeof achievementSchema>;
+export type StreakSummary = z.infer<typeof streakSummarySchema>;
+export type AchievementsView = z.infer<typeof achievementsViewSchema>;
+export type AuthorIdentity = z.infer<typeof authorIdentitySchema>;
+export type GoalConfig = z.infer<typeof goalConfigSchema>;
+export type MonitoringConfig = z.infer<typeof monitoringConfigSchema>;
+export type UIConfig = z.infer<typeof uiConfigSchema>;
+export type PatternConfig = z.infer<typeof patternConfigSchema>;
+export type GithubConfig = z.infer<typeof githubConfigSchema>;
+export type DatabaseConfig = z.infer<typeof databaseConfigSchema>;
+export type ServerConfig = z.infer<typeof serverConfigSchema>;
+export type RuntimeConfig = z.infer<typeof runtimeConfigSchema>;
+export type AppPaths = z.infer<typeof appPathsSchema>;
+export type SettingsView = z.infer<typeof settingsViewSchema>;
 export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
 export type RepositoriesResponse = z.infer<typeof repositoriesResponseSchema>;
+export type RepoDetailResponse = z.infer<typeof repoDetailResponseSchema>;
+export type SessionsResponse = z.infer<typeof sessionsResponseSchema>;
+export type AchievementsResponse = z.infer<typeof achievementsResponseSchema>;
+export type SettingsResponse = z.infer<typeof settingsResponseSchema>;

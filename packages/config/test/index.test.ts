@@ -11,6 +11,8 @@ describe('config parsing', () => {
     expect(env.GITPULSE_DATABASE_URL).toBe(
       'postgres://gitpulse:gitpulse@127.0.0.1:5432/gitpulse'
     );
+    expect(env.GITPULSE_CONFIG_DIR).toBe('/var/lib/gitpulse/config');
+    expect(env.GITPULSE_DATA_DIR).toBe('/var/lib/gitpulse/data');
   });
 
   test('applies web defaults', () => {

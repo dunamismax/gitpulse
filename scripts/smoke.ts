@@ -64,4 +64,40 @@ if (!Array.isArray(repositoriesPayload?.data?.repositories)) {
   throw new Error('api repositories did not return a repositories collection');
 }
 
+const sessionsResponse = await waitForOk(
+  `${apiBaseUrl}/sessions`,
+  'api sessions'
+);
+const sessionsPayload = await sessionsResponse.json();
+if (!Array.isArray(sessionsPayload?.data?.sessions)) {
+  throw new Error('api sessions did not return a sessions collection');
+}
+if (typeof sessionsPayload?.data?.total_minutes !== 'number') {
+  throw new Error('api sessions did not return total minutes');
+}
+
+const achievementsResponse = await waitForOk(
+  `${apiBaseUrl}/achievements`,
+  'api achievements'
+);
+const achievementsPayload = await achievementsResponse.json();
+if (!Array.isArray(achievementsPayload?.data?.achievements)) {
+  throw new Error('api achievements did not return an achievements collection');
+}
+if (typeof achievementsPayload?.data?.today_score !== 'number') {
+  throw new Error('api achievements did not return today score');
+}
+
+const settingsResponse = await waitForOk(
+  `${apiBaseUrl}/settings`,
+  'api settings'
+);
+const settingsPayload = await settingsResponse.json();
+if (settingsPayload?.data?.config?.goals?.changed_lines_per_day !== 250) {
+  throw new Error('api settings did not return the default goals payload');
+}
+if (typeof settingsPayload?.data?.paths?.config_file !== 'string') {
+  throw new Error('api settings did not return resolved config paths');
+}
+
 console.log(`Smoke passed for ${publicOrigin}`);
