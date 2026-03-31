@@ -7,11 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "lint:vnext": "bunx biome check biome.json package.json tsconfig.base.json .github/workflows/ci.yml apps/api/src apps/api/test apps/api/package.json apps/api/tsconfig.json apps/web/src apps/web/package.json apps/web/astro.config.mjs apps/web/tsconfig.json packages/contracts/src packages/contracts/package.json packages/contracts/tsconfig.json packages/core/src packages/core/test packages/core/package.json packages/core/tsconfig.json packages/config/src packages/config/test packages/config/package.json packages/config/tsconfig.json scripts/migrate.ts scripts/smoke.ts docs/rewrite README.md README.md BUILD.md CHANGELOG.md CONTRIBUTING.md AGENTS.md",
+    "lint:vnext": "bunx biome check biome.json package.json tsconfig.base.json .github/workflows/ci.yml apps/api/src apps/api/test apps/api/package.json apps/api/tsconfig.json apps/web/src apps/web/package.json apps/web/astro.config.mjs apps/web/tsconfig.json packages/contracts/src packages/contracts/package.json packages/contracts/tsconfig.json packages/core/src packages/core/test packages/core/package.json packages/core/tsconfig.json packages/config/src packages/config/test packages/config/package.json packages/config/tsconfig.json scripts/migrate.ts scripts/migrate-sqlite.ts scripts/smoke.ts docs/rewrite README.md README.md BUILD.md CHANGELOG.md CONTRIBUTING.md AGENTS.md",
     "typecheck:vnext": "bun run --filter @gitpulse-vnext/contracts typecheck && bun run --filter @gitpulse-vnext/core typecheck && bun run --filter @gitpulse-vnext/config typecheck && bun run --filter @gitpulse-vnext/api typecheck && bun run --filter @gitpulse-vnext/web typecheck",
     "test:vnext": "bun test apps packages",
     "build:vnext": "bun run --filter @gitpulse-vnext/contracts build && bun run --filter @gitpulse-vnext/core build && bun run --filter @gitpulse-vnext/config build && bun run --filter @gitpulse-vnext/api build && bun run --filter @gitpulse-vnext/web build",
     "migrate:vnext": "bun run scripts/migrate.ts",
+    "migrate-sqlite:vnext": "bun run scripts/migrate-sqlite.ts",
     "smoke:vnext": "bun run scripts/smoke.ts",
     "verify:vnext": "bun run lint:vnext && bun run typecheck:vnext && bun run test:vnext && bun run build:vnext"
   },

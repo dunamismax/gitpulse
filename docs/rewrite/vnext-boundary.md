@@ -63,7 +63,7 @@ gitpulse/
     Caddyfile
   scripts/
     migrate.ts
-    import-sqlite.ts
+    migrate-sqlite.ts
     smoke.ts
   docker-compose.yml
   bun.lock

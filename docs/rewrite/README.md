@@ -15,8 +15,8 @@ Current product truth is still documented in `README.md`, `docs/architecture.md`
 
 - Phase 0 boundary docs are complete.
 - Phase 1 bootstrap is now verified under `apps/`, `packages/`, `db/migrations/`, `deploy/`, `scripts/`, and `docker-compose.yml`.
-- The shipped product is still the Go + SQLite runtime. The Bun, Elysia, PostgreSQL, Docker Compose, and Caddy lane now has verified PostgreSQL-backed read routes for dashboard, repositories, repository detail, sessions, achievements, and settings, but it is still far from parity or cutover.
+- The shipped product is still the Go + SQLite runtime. The Bun, Elysia, PostgreSQL, Docker Compose, and Caddy lane now has verified PostgreSQL-backed read and action routes for the current manual operator surface, but it is still far from parity or cutover.
 - `bun run verify:vnext`, real PostgreSQL-backed API integration tests, `docker compose up -d`, and `bun run smoke:vnext` are now green for the current vNext slice, including PostgreSQL schema application through `scripts/migrate.ts` during API startup plus empty dashboard, sessions, achievements, and settings responses through Caddy.
-- Early Phase 2 groundwork is now verified in `packages/core` with explicit PostgreSQL query modules, normalization helpers, and real PostgreSQL-backed integration tests for the store and rebuild path.
-- Phase 3 now has the full shipped read surface in `apps/api/src/read-models.ts`, with Zod-owned contracts in `packages/contracts` and Elysia routes serving the same surfaces the Go API already exposes.
+- Early Phase 2 groundwork is now verified in `packages/core` with explicit PostgreSQL query modules, normalization helpers, real PostgreSQL-backed integration tests for the store and rebuild path, and a first SQLite importer path via `packages/core/src/sqlite-import.ts` plus `scripts/migrate-sqlite.ts`.
+- Phase 3 now has the full shipped read surface in `apps/api/src/read-models.ts` and the current manual action surface in `apps/api/src/actions.ts`, with Zod-owned contracts in `packages/contracts` and Elysia routes serving the same surfaces the Go API already exposes.
 - If current code and these docs disagree about shipped behavior, the Go code wins until cutover.

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { ApiEnv } from '@gitpulse-vnext/config';
+import { type ApiEnv, defaultRuntimeConfig } from '@gitpulse-vnext/config';
 import {
   authorIdentitySchema,
   githubConfigSchema,
@@ -12,72 +12,8 @@ import {
 } from '@gitpulse-vnext/contracts';
 import type { PostgresGitPulseStore } from '@gitpulse-vnext/core';
 
-const defaultExcludePatterns = [
-  '.git/**',
-  'target/**',
-  'node_modules/**',
-  'build/**',
-  'dist/**',
-  '.next/**',
-  '*.lock',
-  'package-lock.json',
-  'yarn.lock',
-  'pnpm-lock.yaml',
-  'go.sum',
-  '*.png',
-  '*.jpg',
-  '*.jpeg',
-  '*.gif',
-  '*.svg',
-  '*.ico',
-  '*.webp',
-  '*.mp4',
-  '*.mov',
-  '*.avi',
-  '*.zip',
-  '*.tar',
-  '*.gz',
-  '*.bz2',
-  '*.7z',
-  '*.woff',
-  '*.woff2',
-  '*.ttf',
-  '*.eot',
-  '*.wasm',
-] as const;
-
-const defaultGoals = {
-  changedLinesPerDay: 250,
-  commitsPerDay: 3,
-  focusMinutesPerDay: 90,
-} as const;
-
-export const defaultSettingsConfig = {
-  authors: [],
-  goals: {
-    changed_lines_per_day: defaultGoals.changedLinesPerDay,
-    commits_per_day: defaultGoals.commitsPerDay,
-    focus_minutes_per_day: defaultGoals.focusMinutesPerDay,
-  },
-  patterns: {
-    include: [],
-    exclude: [...defaultExcludePatterns],
-  },
-  github: {
-    enabled: false,
-    token: null,
-    verify_remote_pushes: false,
-  },
-  monitoring: {
-    import_days: 30,
-    session_gap_minutes: 15,
-    repo_discovery_depth: 5,
-  },
-  ui: {
-    timezone: 'UTC',
-    day_boundary_minutes: 0,
-  },
-} satisfies SettingsView['config'];
+export const defaultSettingsConfig =
+  defaultRuntimeConfig satisfies SettingsView['config'];
 
 export function mergeSettings(
   records: Awaited<ReturnType<PostgresGitPulseStore['listSettings']>>,

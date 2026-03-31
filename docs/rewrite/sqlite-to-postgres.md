@@ -84,6 +84,21 @@ Implication:
 11. Run the vNext rebuild to regenerate `focus_sessions`, `daily_rollups`, and `achievements`.
 12. Run parity checks against exported Go baselines before cutover.
 
+## Current repo tooling
+
+The first importer implementation now lives in two places:
+
+- `packages/core/src/sqlite-import.ts`: read-only SQLite import logic that copies canonical tables, replays legacy `settings` rows, and rebuilds derived analytics from the imported ledgers.
+- `scripts/migrate-sqlite.ts`: Bun entrypoint that applies PostgreSQL migrations, loads the effective TOML plus env-backed config through `packages/config`, imports the legacy SQLite database, and writes the authoritative config-backed settings records last so they win over stale SQLite settings rows.
+
+Current usage:
+
+```bash
+bun run migrate-sqlite:vnext --sqlite /path/to/gitpulse.db --config /path/to/gitpulse.toml
+```
+
+This is the first credible importer path, not the end of migration verification. Live PostgreSQL end-to-end coverage and parity fixture comparison still remain future Phase 2 and Phase 5 work.
+
 ## Explicit First-cut Non-goals
 
 - no path remapping manifest in the first cut; first cutover depends on identity repo mounts

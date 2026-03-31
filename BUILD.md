@@ -208,7 +208,7 @@ Verified state:
 - [x] Normalize timestamp, enum-like, and JSON payload handling for PostgreSQL.
 - [x] Implement explicit query modules and service-layer writes in TypeScript.
 - [x] Keep SQL explicit and reviewable.
-- [ ] Write the legacy importer that reads the current SQLite database and inserts canonical PostgreSQL records.
+- [x] Write the legacy importer that reads the current SQLite database and inserts canonical PostgreSQL records.
 - [ ] Create fixtures for fresh installs and migrated installs.
 - [x] Preserve separate ledgers instead of collapsing them into one activity table.
 - [x] Keep analytics rebuildable from stored events.
@@ -219,7 +219,10 @@ Verified this pass:
 - Real round-trip coverage now exists against PostgreSQL through `packages/core/test/store.integration.test.ts`.
 - `packages/core/src/analytics.ts` now rebuilds focus sessions, daily rollups, streak inputs, score inputs, and achievements directly from persisted snapshots, commits, push events, and file activity ledgers.
 - Separate ledgers are preserved in the rebuild path instead of being collapsed into a synthetic activity table, with regression coverage in `packages/core/test/rebuild.test.ts` and real PostgreSQL persistence coverage in `packages/core/test/rebuild.integration.test.ts`.
-- `scripts/migrate.ts` is shared with that Phase 2 store layer and still works in both host and Compose verification paths.
+- `packages/core/src/sqlite-import.ts` now imports canonical SQLite tracked targets, repositories, snapshots, file activity, commits, pushes, and optional legacy settings into the PostgreSQL store, then rebuilds derived analytics instead of copying legacy derived tables.
+- `packages/config/src/index.ts` now loads the effective legacy TOML plus env-backed runtime config for migration use, and `scripts/migrate-sqlite.ts` wires that into a real Bun importer entrypoint documented in `docs/rewrite/sqlite-to-postgres.md`.
+- Unit coverage now exists for the importer and config-backed settings replay in `packages/core/test/sqlite-import.test.ts` and `packages/config/test/index.test.ts`.
+- Live PostgreSQL importer verification and parity-fixture comparison still remain undone.
 
 ### Exit criteria
 
@@ -346,7 +349,8 @@ The rewrite is done only when all of these are true:
 ## Immediate next recommended work
 
 - [x] Thread the verified PostgreSQL store from `packages/core` into `apps/api` services and route wiring.
-- [ ] Implement the SQLite importer using the table rules in `docs/rewrite/sqlite-to-postgres.md`.
+- [x] Implement the SQLite importer using the table rules in `docs/rewrite/sqlite-to-postgres.md`.
+- [ ] Create deterministic fresh-install and migrated-install fixtures plus frozen Go baselines for parity comparison.
 - [x] Start replacing the Go read routes with Elysia route groups beginning with `GET /api/dashboard` and `GET /api/repositories`.
 - [x] Extend the read-route replacement to `GET /api/repositories/{id}`, `GET /api/sessions`, `GET /api/achievements`, and `GET /api/settings` with the same PostgreSQL-backed and Zod-validated path.
 - [x] Start replacing the Go action routes with Elysia endpoints for add, import, rescan, rebuild, toggle, remove, and settings save.
