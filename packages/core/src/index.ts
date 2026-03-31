@@ -8,6 +8,7 @@ export const rewriteStatus = {
 
 export type ActivityLedgerId = (typeof activityLedgerIds)[number];
 
+export * from './analytics';
 export * from './db/activity';
 export * from './db/analytics';
 export * from './db/migrations';

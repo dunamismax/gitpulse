@@ -178,7 +178,7 @@ These are not rewrite goals unless Stephen changes direction:
 - [x] Create a root Bun workspace for the whole app, not just the frontend.
 - [x] Add `apps/api` for Elysia and `apps/web` for Astro and Vue.
 - [x] Add `packages/contracts` for Zod schemas and inferred shared types.
-- [x] Add `packages/core` for shared domain services, analytics logic, and git integration helpers.
+- [x] Add `packages/core` for shared domain services, analytics rebuild logic, and PostgreSQL data-layer helpers.
 - [x] Add `packages/config` for environment parsing and runtime config.
 - [x] Leave `packages/ui` out for now because shared UI is not earned yet.
 - [x] Add PostgreSQL migrations under `db/migrations/`.
@@ -210,13 +210,15 @@ Verified state:
 - [x] Keep SQL explicit and reviewable.
 - [ ] Write the legacy importer that reads the current SQLite database and inserts canonical PostgreSQL records.
 - [ ] Create fixtures for fresh installs and migrated installs.
-- [ ] Preserve separate ledgers instead of collapsing them into one activity table.
-- [ ] Keep analytics rebuildable from stored events.
+- [x] Preserve separate ledgers instead of collapsing them into one activity table.
+- [x] Keep analytics rebuildable from stored events.
 
 Verified this pass:
 
-- `packages/core` now owns explicit PostgreSQL migration helpers, normalization helpers, query modules, and service-layer writes with readable SQL.
+- `packages/core` now owns explicit PostgreSQL migration helpers, normalization helpers, query modules, service-layer writes, and rebuild orchestration with readable SQL plus TypeScript analytics logic.
 - Real round-trip coverage now exists against PostgreSQL through `packages/core/test/store.integration.test.ts`.
+- `packages/core/src/analytics.ts` now rebuilds focus sessions, daily rollups, streak inputs, score inputs, and achievements directly from persisted snapshots, commits, push events, and file activity ledgers.
+- Separate ledgers are preserved in the rebuild path instead of being collapsed into a synthetic activity table, with regression coverage in `packages/core/test/rebuild.test.ts` and real PostgreSQL persistence coverage in `packages/core/test/rebuild.integration.test.ts`.
 - `scripts/migrate.ts` is shared with that Phase 2 store layer and still works in both host and Compose verification paths.
 
 ### Exit criteria
@@ -234,7 +236,7 @@ Verified this pass:
 - [ ] Implement Elysia action endpoints for add, import, rescan, rebuild, refresh, toggle, remove, and settings save.
 - [ ] Validate all request and response payloads with Zod.
 - [ ] Move git subprocess integration into `packages/core`.
-- [ ] Move analytics rebuild logic into `packages/core`.
+- [x] Move analytics rebuild logic into `packages/core`.
 - [ ] Keep action execution server-side only.
 - [ ] Expose stable machine-readable action result payloads with user-facing summaries.
 
