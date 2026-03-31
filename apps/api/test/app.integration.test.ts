@@ -6,10 +6,12 @@ import {
   closePostgresClient,
   createPostgresClient,
   createPostgresGitPulseStore,
+  type GitBackend,
   type PostgresClient,
   rebuildAnalytics,
 } from '@gitpulse-vnext/core';
 
+import { createApiActions } from '../src/actions';
 import { createApp } from '../src/app';
 import { createApiReadModels } from '../src/read-models';
 
@@ -378,5 +380,222 @@ if (!databaseUrl) {
       data_dir: '/var/lib/gitpulse/data',
       config_file: '/var/lib/gitpulse/config/gitpulse.toml',
     });
+  });
+
+  test('action routes mutate PostgreSQL-backed state through Elysia', async () => {
+    const fixedNow = new Date('2026-03-31T14:00:00Z');
+    const apiEnv = {
+      GITPULSE_API_HOST: '127.0.0.1',
+      GITPULSE_API_PORT: 3001,
+      GITPULSE_DATABASE_URL: databaseUrl,
+      GITPULSE_CONFIG_DIR: '/var/lib/gitpulse/config',
+      GITPULSE_DATA_DIR: '/var/lib/gitpulse/data',
+    } as const;
+    let sequence = 1;
+    const idGenerator = () =>
+      `00000000-0000-4000-8000-${String(sequence++).padStart(12, '0')}`;
+    const fakeGit: GitBackend = {
+      async discoverRepositories(rootPath) {
+        return [`${rootPath}/gitpulse`];
+      },
+      async probeRepository() {
+        return {
+          name: 'gitpulse',
+          remoteUrl: 'git@github.com-dunamismax:dunamismax/gitpulse.git',
+          defaultBranch: 'main',
+        };
+      },
+      async snapshotRepository() {
+        return {
+          branch: 'main',
+          isDetached: false,
+          headSha: 'deadbeef',
+          upstreamRef: 'origin/main',
+          upstreamHeadSha: 'deadbeef',
+          aheadCount: 0,
+          behindCount: 0,
+          liveStats: {
+            additions: 5,
+            deletions: 1,
+            fileCount: 1,
+          },
+          stagedStats: {
+            additions: 0,
+            deletions: 0,
+            fileCount: 0,
+          },
+          touchedPaths: [
+            {
+              path: 'apps/api/src/app.ts',
+              additions: 5,
+              deletions: 1,
+            },
+          ],
+          repoSizeBytes: 2048,
+          languageBreakdown: [
+            {
+              language: 'TypeScript',
+              code: 1,
+              comments: 0,
+              blanks: 0,
+            },
+          ],
+        };
+      },
+      async importHistory() {
+        return [
+          {
+            commitSha: 'deadbeef',
+            authoredAt: new Date('2026-03-31T13:00:00Z'),
+            authorName: 'Stephen Sawyer',
+            authorEmail: 'stephen@example.com',
+            summary: 'ship action routes',
+            branch: 'main',
+            additions: 12,
+            deletions: 2,
+            filesChanged: 1,
+            isMerge: false,
+            touchedPaths: [
+              {
+                path: 'apps/api/src/app.ts',
+                additions: 12,
+                deletions: 2,
+              },
+            ],
+          },
+        ];
+      },
+    };
+
+    const app = createApp(apiEnv, {
+      readModels: createApiReadModels(store, apiEnv, {
+        now: () => fixedNow,
+      }),
+      actions: createApiActions(store, apiEnv, {
+        git: fakeGit,
+        now: () => fixedNow,
+        idGenerator,
+      }),
+    });
+
+    const addResponse = await app.handle(
+      new Request('http://gitpulse.local/api/repositories/add', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: '/tmp/gitpulse-fixtures' }),
+      })
+    );
+    const addPayload = await addResponse.json();
+    expect(addResponse.status).toBe(200);
+    expect(addPayload.data.result.action).toBe('add_target');
+    expect(addPayload.data.repositories).toHaveLength(1);
+    const repoId = addPayload.data.repositories[0].id as string;
+
+    const refreshResponse = await app.handle(
+      new Request(`http://gitpulse.local/api/repositories/${repoId}/refresh`, {
+        method: 'POST',
+      })
+    );
+    const refreshPayload = await refreshResponse.json();
+    expect(refreshResponse.status).toBe(200);
+    expect(refreshPayload.data.repository_card.snapshot.live_additions).toBe(5);
+
+    const importResponse = await app.handle(
+      new Request(`http://gitpulse.local/api/repositories/${repoId}/import`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ days: 365 }),
+      })
+    );
+    const importPayload = await importResponse.json();
+    expect(importResponse.status).toBe(200);
+    expect(importPayload.data.result.action).toBe('import_repo');
+    expect((await store.listCommits(repoId, 10)).length).toBe(1);
+
+    const rebuildResponse = await app.handle(
+      new Request('http://gitpulse.local/api/actions/rebuild', {
+        method: 'POST',
+      })
+    );
+    const rebuildPayload = await rebuildResponse.json();
+    expect(rebuildResponse.status).toBe(200);
+    expect(rebuildPayload.data.result.lines).toContain('Sessions written: 1');
+
+    const sessionsResponse = await app.handle(
+      new Request('http://gitpulse.local/api/sessions')
+    );
+    const sessionsPayload = await sessionsResponse.json();
+    expect(sessionsResponse.status).toBe(200);
+    expect(sessionsPayload.data.sessions.length).toBe(1);
+
+    const toggleResponse = await app.handle(
+      new Request(`http://gitpulse.local/api/repositories/${repoId}/toggle`, {
+        method: 'POST',
+      })
+    );
+    const togglePayload = await toggleResponse.json();
+    expect(toggleResponse.status).toBe(200);
+    expect(togglePayload.data.repository.state).toBe('disabled');
+
+    const rescanResponse = await app.handle(
+      new Request('http://gitpulse.local/api/actions/rescan', {
+        method: 'POST',
+      })
+    );
+    const rescanPayload = await rescanResponse.json();
+    expect(rescanResponse.status).toBe(200);
+    expect(rescanPayload.data.result.lines).toContain(
+      'Active monitored repositories: 0'
+    );
+
+    const patternsResponse = await app.handle(
+      new Request(`http://gitpulse.local/api/repositories/${repoId}/patterns`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          include_patterns: ['apps/**'],
+          exclude_patterns: ['node_modules/**'],
+        }),
+      })
+    );
+    const patternsPayload = await patternsResponse.json();
+    expect(patternsResponse.status).toBe(200);
+    expect(patternsPayload.data.result.action).toBe('save_repo_patterns');
+
+    const settingsResponse = await app.handle(
+      new Request('http://gitpulse.local/api/settings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          authors: ['stephen@example.com'],
+          changed_lines_per_day: 400,
+          commits_per_day: 5,
+          focus_minutes_per_day: 120,
+          timezone: 'America/New_York',
+          day_boundary_minutes: 30,
+          session_gap_minutes: 20,
+          import_days: 45,
+          include_patterns: ['apps/**'],
+          exclude_patterns: ['node_modules/**'],
+          github_enabled: true,
+          github_verify_remote_pushes: false,
+          github_token: 'secret-token',
+        }),
+      })
+    );
+    const settingsPayload = await settingsResponse.json();
+    expect(settingsResponse.status).toBe(200);
+    expect(
+      settingsPayload.data.settings.config.goals.changed_lines_per_day
+    ).toBe(400);
+
+    const removeResponse = await app.handle(
+      new Request(`http://gitpulse.local/api/repositories/${repoId}/remove`, {
+        method: 'POST',
+      })
+    );
+    const removePayload = await removeResponse.json();
+    expect(removeResponse.status).toBe(200);
+    expect(removePayload.data.repository.state).toBe('removed');
   });
 }

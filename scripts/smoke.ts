@@ -100,4 +100,20 @@ if (typeof settingsPayload?.data?.paths?.config_file !== 'string') {
   throw new Error('api settings did not return resolved config paths');
 }
 
+const rebuildResponse = await fetch(`${apiBaseUrl}/actions/rebuild`, {
+  method: 'POST',
+});
+if (!rebuildResponse.ok) {
+  throw new Error(
+    `api rebuild action returned status ${rebuildResponse.status}`
+  );
+}
+const rebuildPayload = await rebuildResponse.json();
+if (rebuildPayload?.data?.result?.action !== 'rebuild_analytics') {
+  throw new Error('api rebuild action did not return the expected action id');
+}
+if (!Array.isArray(rebuildPayload?.data?.result?.lines)) {
+  throw new Error('api rebuild action did not return result lines');
+}
+
 console.log(`Smoke passed for ${publicOrigin}`);

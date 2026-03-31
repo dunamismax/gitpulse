@@ -233,24 +233,26 @@ Verified this pass:
 ### Work checklist
 
 - [x] Implement Elysia route groups for dashboard, repositories, repository detail, sessions, achievements, settings, and health.
-- [ ] Implement Elysia action endpoints for add, import, rescan, rebuild, refresh, toggle, remove, and settings save.
-- [ ] Validate all request and response payloads with Zod.
-- [ ] Move git subprocess integration into `packages/core`.
+- [x] Implement Elysia action endpoints for add, import, rescan, rebuild, refresh, toggle, remove, and settings save.
+- [x] Validate all request and response payloads with Zod.
+- [x] Move git subprocess integration into `packages/core`.
 - [x] Move analytics rebuild logic into `packages/core`.
-- [ ] Keep action execution server-side only.
-- [ ] Expose stable machine-readable action result payloads with user-facing summaries.
+- [x] Keep action execution server-side only.
+- [x] Expose stable machine-readable action result payloads with user-facing summaries.
 
 Verified this pass:
 
-- `apps/api/src/read-models.ts` now covers the full shipped read surface: dashboard, repositories, repository detail, sessions, achievements, and settings.
-- `GET /api/repositories/{id}`, `GET /api/sessions`, `GET /api/achievements`, and `GET /api/settings` now return Zod-validated payloads backed by PostgreSQL read models, with settings composed from stored `settings` rows plus vNext env-derived config and data paths.
-- `packages/contracts/src/index.ts` now owns the missing repository detail, sessions, achievements, and settings schemas and response envelopes.
-- `apps/api/test/app.test.ts`, `apps/api/test/app.integration.test.ts`, and `scripts/smoke.ts` now cover the full read-route tranche, including repository-detail 404 handling and fresh-install sessions, achievements, and settings responses through Caddy.
+- `apps/api/src/actions.ts` now wires PostgreSQL-backed Elysia action handlers for add, refresh, toggle, remove, per-repo pattern save, repo import, import-all, rescan-all, rebuild, and settings save, all returning stable machine-readable action envelopes with user-facing summaries.
+- `packages/core/src/git.ts` now owns the Bun shell-backed git discovery, probe, snapshot, and history-import helpers used by the vNext action layer.
+- `packages/contracts/src/index.ts` now owns the action request and response schemas alongside the read-route contracts, and `apps/api/src/app.ts` validates both request bodies and response envelopes with Zod.
+- `apps/api/test/app.test.ts` now exercises the new action-route contract and validation paths with injected action handlers.
+- `apps/api/test/app.integration.test.ts` now has a PostgreSQL-backed action-route integration harness ready for live database coverage when `GITPULSE_TEST_DATABASE_URL` is available, and `scripts/smoke.ts` now probes the rebuild action in addition to the read surface.
+- Live PostgreSQL action-route coverage and Compose or Caddy smoke still need to be rerun in an environment with the required services available.
 
 ### Exit criteria
 
 - [ ] Elysia can run the full manual operator loop without the Go runtime.
-- [ ] The API contract is Zod-owned and shared with the web app.
+- [x] The API contract is Zod-owned and shared with the web app.
 - [ ] The app can start, operate, and persist without any Go process present.
 
 ## Phase 4 - Rewrite the browser product in Astro and Vue
@@ -347,4 +349,4 @@ The rewrite is done only when all of these are true:
 - [ ] Implement the SQLite importer using the table rules in `docs/rewrite/sqlite-to-postgres.md`.
 - [x] Start replacing the Go read routes with Elysia route groups beginning with `GET /api/dashboard` and `GET /api/repositories`.
 - [x] Extend the read-route replacement to `GET /api/repositories/{id}`, `GET /api/sessions`, `GET /api/achievements`, and `GET /api/settings` with the same PostgreSQL-backed and Zod-validated path.
-- [ ] Start replacing the Go action routes with Elysia endpoints for add, import, rescan, rebuild, toggle, remove, and settings save.
+- [x] Start replacing the Go action routes with Elysia endpoints for add, import, rescan, rebuild, toggle, remove, and settings save.

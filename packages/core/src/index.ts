@@ -16,3 +16,4 @@ export * from './db/store';
 export * from './db/support';
 export * from './db/tracked-repositories';
 export * from './domain';
+export * from './git';

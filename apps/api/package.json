@@ -13,6 +13,7 @@
     "@gitpulse-vnext/config": "workspace:*",
     "@gitpulse-vnext/contracts": "workspace:*",
     "@gitpulse-vnext/core": "workspace:*",
-    "elysia": "^1.4.8"
+    "elysia": "^1.4.8",
+    "zod": "^4.1.5"
   }
 }

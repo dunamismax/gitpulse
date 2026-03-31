@@ -306,6 +306,51 @@ export const settingsViewSchema = z.object({
   paths: appPathsSchema,
 });
 
+export const operatorActionResultSchema = z.object({
+  action: manualActionSchema,
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  lines: z.array(z.string().min(1)),
+  warnings: z.array(z.string().min(1)).optional(),
+});
+
+export const actionPayloadSchema = z.object({
+  result: operatorActionResultSchema,
+  repositories: z.array(repositorySchema).optional(),
+  repository: repositorySchema.nullable().optional(),
+  repository_card: repoCardSchema.nullable().optional(),
+  settings: settingsViewSchema.nullable().optional(),
+});
+
+export const addTargetRequestSchema = z.object({
+  path: z.string().min(1),
+});
+
+export const importRequestSchema = z.object({
+  days: z.number().int().optional(),
+});
+
+export const repositoryPatternsRequestSchema = z.object({
+  include_patterns: z.array(z.string()),
+  exclude_patterns: z.array(z.string()),
+});
+
+export const saveSettingsRequestSchema = z.object({
+  authors: z.array(z.string()),
+  changed_lines_per_day: z.number().int().nonnegative(),
+  commits_per_day: z.number().int().nonnegative(),
+  focus_minutes_per_day: z.number().int().nonnegative(),
+  timezone: z.string(),
+  day_boundary_minutes: z.number().int().nonnegative(),
+  session_gap_minutes: z.number().int().positive(),
+  import_days: z.number().int().positive(),
+  include_patterns: z.array(z.string()),
+  exclude_patterns: z.array(z.string()),
+  github_enabled: z.boolean(),
+  github_verify_remote_pushes: z.boolean(),
+  github_token: z.string(),
+});
+
 export const dashboardResponseSchema = z.object({
   data: dashboardViewSchema,
 });
@@ -328,6 +373,10 @@ export const achievementsResponseSchema = z.object({
 
 export const settingsResponseSchema = z.object({
   data: settingsViewSchema,
+});
+
+export const actionResponseSchema = z.object({
+  data: actionPayloadSchema,
 });
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
@@ -361,9 +410,18 @@ export type ServerConfig = z.infer<typeof serverConfigSchema>;
 export type RuntimeConfig = z.infer<typeof runtimeConfigSchema>;
 export type AppPaths = z.infer<typeof appPathsSchema>;
 export type SettingsView = z.infer<typeof settingsViewSchema>;
+export type OperatorActionResult = z.infer<typeof operatorActionResultSchema>;
+export type ActionPayload = z.infer<typeof actionPayloadSchema>;
+export type AddTargetRequest = z.infer<typeof addTargetRequestSchema>;
+export type ImportRequest = z.infer<typeof importRequestSchema>;
+export type RepositoryPatternsRequest = z.infer<
+  typeof repositoryPatternsRequestSchema
+>;
+export type SaveSettingsRequest = z.infer<typeof saveSettingsRequestSchema>;
 export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
 export type RepositoriesResponse = z.infer<typeof repositoriesResponseSchema>;
 export type RepoDetailResponse = z.infer<typeof repoDetailResponseSchema>;
 export type SessionsResponse = z.infer<typeof sessionsResponseSchema>;
 export type AchievementsResponse = z.infer<typeof achievementsResponseSchema>;
 export type SettingsResponse = z.infer<typeof settingsResponseSchema>;
+export type ActionResponse = z.infer<typeof actionResponseSchema>;
