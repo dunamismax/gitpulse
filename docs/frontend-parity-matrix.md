@@ -1,18 +1,18 @@
 # GitPulse Frontend Parity Matrix
 
-Purpose: minimum Phase 0 inventory used to bound the frontend migration in [BUILD.md](../BUILD.md) before Astro + Vue or OpenTUI work started.
+Purpose: historical inventory from the completed browser cutover. Keep this as a reference for the current shipped UI surface while [BUILD.md](../BUILD.md) now tracks the broader full-stack rewrite.
 
 Current truth as of 2026-03-30:
 
 - the browser cutover to `frontend/web/` is complete
 - Go remains the only backend and system of record
-- the migration target is still dual frontend: shipped `frontend/web` first, then `frontend/tui`
-- Phase 2 foundation exists under `frontend/`, including the shared TypeScript contract and shared route and screen maps in `frontend/shared/src/surfaces.ts`
-- this document is now historical migration inventory and contract boundary, not a claim that `python-ui/` remains the shipped browser surface
+- the current codebase still has a shipped `frontend/web` browser surface and a secondary `frontend/tui` preview
+- the Bun frontend foundation exists under `frontend/`, including the shared TypeScript contract and shared route and screen maps in `frontend/shared/src/surfaces.ts`
+- this document is historical inventory and contract boundary material, not the new rewrite plan
 
-## Target frontend workspace
+## Historical frontend workspace
 
-Planned repo layout from `BUILD.md`:
+Cutover layout used by the current shipped implementation:
 
 ```text
 frontend/
@@ -23,9 +23,9 @@ frontend/
 
 Ownership boundary:
 
-- Go owns orchestration, validation, persistence, analytics, and action execution
+- Go owns orchestration, validation, persistence, analytics, and action execution in the current shipped implementation
 - frontend code owns rendering, navigation, input state, and presentation-level formatting
-- both future frontends should consume the same Go-owned JSON contracts
+- both current frontend surfaces consume the same Go-owned JSON contracts
 
 ## Page and workflow parity
 
@@ -59,12 +59,12 @@ Contract expectations for these actions:
 - action responses may include the affected repository, repository card, repository list, or settings payload when helpful
 - actions do not move orchestration or validation into the frontend
 
-## Phase 1 backend gaps now addressed
+## Backend gaps addressed during the browser cutover
 
-This inventory exists because the pre-migration API had a few risks called out in `BUILD.md`:
+This inventory existed because the pre-cutover API had a few risks:
 
 - some endpoints returned bare arrays
 - some action endpoints returned ad hoc `{ "ok": true }` payloads
 - achievements and settings were assembled as handler-local maps instead of named contracts
 
-Phase 1 hardened those endpoints into explicit Go response structs so later frontend work could target stable contracts instead of Python-UI-shaped assumptions.
+The browser cutover hardened those endpoints into explicit Go response structs so later frontend work could target stable contracts instead of Python-UI-shaped assumptions.

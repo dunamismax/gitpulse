@@ -1,8 +1,8 @@
 # GitPulse Architecture
 
-GitPulse is a local-first Go application with SQLite persistence and plain SQL in the Go runtime. The Go backend remains the source of truth. The browser surface is now the Astro + Vue frontend under `frontend/web/`, built with Bun and served directly by the Go runtime.
+GitPulse is a local-first Go application with SQLite persistence and plain SQL in the Go runtime. The Go backend remains the source of truth for the shipped implementation today. The browser surface is the Astro + Vue frontend under `frontend/web/`, built with Bun and served directly by the Go runtime.
 
-The frontend migration plan is tracked in `BUILD.md`. The browser cutover is complete. The Bun workspace under `frontend/` now contains the shared TypeScript contract layer, the shipped Astro + Vue web app under `frontend/web/`, and an in-progress keyboard-driven terminal preview under `frontend/tui` launched by `gitpulse tui`.
+`BUILD.md` now tracks the planned full rewrite to Stephen's unified Bun + TypeScript + Astro + Vue + Elysia + PostgreSQL + Docker Compose + Caddy stack. This document remains the current architecture of the shipped Go implementation. The Bun workspace under `frontend/` contains the shared TypeScript contract layer, the shipped Astro + Vue web app under `frontend/web/`, and an in-progress keyboard-driven terminal preview under `frontend/tui` launched by `gitpulse tui`.
 
 ## Active stack
 

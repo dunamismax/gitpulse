@@ -22,7 +22,7 @@ Active implementation path:
 - `internal/web/`
 - `migrations/`
 
-New backend work goes into Go. The active storage layer is SQLite via `database/sql` and `modernc.org/sqlite` with plain SQL.
+Current shipped-backend implementation work still lives in Go, and the active shipped storage layer is SQLite via `database/sql` and `modernc.org/sqlite` with plain SQL. The approved rewrite target now lives in `BUILD.md`: Bun + TypeScript + Astro + Vue + Elysia + PostgreSQL + Docker Compose + Caddy. Do not confuse the current implementation lane with the planned destination architecture.
 
 ## Current product shape
 
