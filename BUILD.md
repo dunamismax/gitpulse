@@ -145,18 +145,18 @@ These are not rewrite goals unless Stephen changes direction:
 
 ### Work checklist
 
-- [ ] Freeze the current product contract from the Go app and current docs.
-- [ ] Inventory the current SQLite schema, API routes, config behavior, CLI actions, and operator workflow.
-- [ ] Define the vNext repo layout, container topology, ports, and environment contract.
-- [ ] Define the SQLite to PostgreSQL migration plan at the table and field level.
-- [ ] Define parity fixtures using a small set of deterministic git repositories and test databases.
-- [ ] Define a cutover checklist with explicit non-goals.
+- [x] Freeze the current product contract from the Go app and current docs.
+- [x] Inventory the current SQLite schema, API routes, config behavior, CLI actions, and operator workflow.
+- [x] Define the vNext repo layout, container topology, ports, and environment contract.
+- [x] Define the SQLite to PostgreSQL migration plan at the table and field level.
+- [x] Define parity fixtures using a small set of deterministic git repositories and test databases.
+- [x] Define a cutover checklist with explicit non-goals.
 
 ### Exit criteria
 
-- [ ] Rewrite scope is bounded.
-- [ ] The data migration path is specific instead of hand-waved.
-- [ ] No one has to guess which current behaviors are required for parity.
+- [x] Rewrite scope is bounded.
+- [x] The data migration path is specific instead of hand-waved.
+- [x] No one has to guess which current behaviors are required for parity.
 
 ## Phase 1 - Bootstrap the unified TypeScript monorepo
 
