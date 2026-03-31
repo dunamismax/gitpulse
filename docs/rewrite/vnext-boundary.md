@@ -62,6 +62,7 @@ gitpulse/
   deploy/
     Caddyfile
   scripts/
+    migrate.ts
     import-sqlite.ts
     smoke.ts
   docker-compose.yml
@@ -75,7 +76,7 @@ Repo layout rules:
 
 - `apps/api` owns HTTP routes, action execution, database access wiring, and background entrypoints if they are added later.
 - `apps/web` owns Astro pages, Vue islands, typed data fetchers, and UI behavior only.
-- `packages/core` owns git integration, analytics rebuild logic, repository orchestration, and any logic that should stay usable from both API handlers and smoke tooling.
+- `packages/core` owns git integration, analytics rebuild logic, repository orchestration, explicit PostgreSQL query modules, and any logic that should stay usable from both API handlers and smoke tooling.
 - `packages/config` owns environment parsing, path helpers, and filesystem/config abstractions.
 - `packages/contracts` owns Zod schemas and inferred types that cross the API boundary.
 - `packages/ui` is optional and must not appear until duplicated UI primitives justify it.

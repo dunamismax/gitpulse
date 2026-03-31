@@ -14,7 +14,8 @@ Current product truth is still documented in `README.md`, `docs/architecture.md`
 ## Status
 
 - Phase 0 boundary docs are complete.
-- The repo now contains an initial unshipped Phase 1 bootstrap under `apps/`, `packages/`, `db/migrations/`, `deploy/`, and `docker-compose.yml`.
+- Phase 1 bootstrap is now verified under `apps/`, `packages/`, `db/migrations/`, `deploy/`, `scripts/`, and `docker-compose.yml`.
 - The shipped product is still the Go + SQLite runtime. The Bun, Elysia, PostgreSQL, Docker Compose, and Caddy lane is only a verified bootstrap right now, not parity or cutover.
-- Host-side `bun run verify:vnext` is green, but the Compose smoke is still blocked by the containerized Astro web build mismatch tracked in `BUILD.md`.
+- `bun run verify:vnext`, `docker compose up -d`, and `bun run smoke:vnext` are now green for the vNext bootstrap, including PostgreSQL schema application through `scripts/migrate.ts` during API startup.
+- Early Phase 2 groundwork is now verified in `packages/core` with explicit PostgreSQL query modules, normalization helpers, and a real round-trip integration test against PostgreSQL.
 - If current code and these docs disagree about shipped behavior, the Go code wins until cutover.

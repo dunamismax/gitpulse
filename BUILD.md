@@ -60,8 +60,18 @@ What must stay honest during the rewrite:
 - the shipped app today is still Go plus SQLite
 - no shipped PostgreSQL runtime exists here yet
 - the new root Bun workspace is only a bootstrap lane today, not the default product runtime
-- host-side vNext verification is green, but Docker Compose boot is still blocked by the Astro container build mismatch described below
+- host-side vNext verification is green and the unshipped vNext bootstrap now passes a local Docker Compose smoke through Caddy
 - the TUI exists, but it is not a required parity target for the rewrite
+
+## Phase status board
+
+- [x] Phase 0 - rewrite boundary frozen and migration plan documented
+- [x] Phase 1 - Bun, PostgreSQL, Docker Compose, and Caddy bootstrap verified locally
+- [ ] Phase 2 - PostgreSQL data layer rewrite in TypeScript
+- [ ] Phase 3 - Elysia backend parity
+- [ ] Phase 4 - Astro and Vue browser parity
+- [ ] Phase 5 - parity verification, data migration, and cutover
+- [ ] Phase 6 - legacy runtime removal
 
 ## Target state
 
@@ -85,6 +95,7 @@ gitpulse/
   deploy/
     Caddyfile
   scripts/
+    migrate.ts            # apply PostgreSQL schema migrations during bootstrap
     migrate-sqlite.ts     # legacy SQLite to PostgreSQL importer
     smoke.ts              # end-to-end local smoke checks
   docker-compose.yml
@@ -175,29 +186,38 @@ These are not rewrite goals unless Stephen changes direction:
 - [x] Add `deploy/Caddyfile` and make same-origin routing the default.
 - [x] Define root verification scripts for lint, typecheck, test, build, and smoke.
 
-Current blocker:
+Verified state:
 
-- Docker Compose wiring exists, but the `web` service still fails during containerized Astro build with an esbuild host or binary mismatch under `oven/bun:1.3.10`, so the stack does not yet complete the local Compose smoke.
+- `docker compose up -d` now reaches a healthy local bootstrap with PostgreSQL, API, web, and Caddy.
+- The stale `ESBUILD_BINARY_PATH` override was removed from the `web` service, and Astro is pinned to `5.13.6` so Astro and Vite stay on the same `esbuild` major path under Bun in containers.
+- `scripts/migrate.ts` now applies every `db/migrations/*.sql` file against PostgreSQL during API startup, so the bootstrap stack comes up against an initialized schema.
+- This is still only bootstrap verification, not backend or UI parity with the shipped Go runtime.
 
 ### Exit criteria
 
-- [ ] The repo can boot an empty vNext stack through Docker Compose.
-- [ ] Astro and Elysia both run under Bun.
+- [x] The repo can boot an empty vNext stack through Docker Compose.
+- [x] Astro and Elysia both run under Bun.
 - [x] Shared contracts compile from one source of truth.
-- [ ] Caddy can serve the web app and proxy the API locally.
+- [x] Caddy can serve the web app and proxy the API locally.
 
 ## Phase 2 - Rewrite the data layer onto PostgreSQL
 
 ### Work checklist
 
 - [x] Create PostgreSQL migrations for repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings.
-- [ ] Normalize timestamp, enum-like, and JSON payload handling for PostgreSQL.
-- [ ] Implement explicit query modules and service-layer writes in TypeScript.
-- [ ] Keep SQL explicit and reviewable.
+- [x] Normalize timestamp, enum-like, and JSON payload handling for PostgreSQL.
+- [x] Implement explicit query modules and service-layer writes in TypeScript.
+- [x] Keep SQL explicit and reviewable.
 - [ ] Write the legacy importer that reads the current SQLite database and inserts canonical PostgreSQL records.
 - [ ] Create fixtures for fresh installs and migrated installs.
 - [ ] Preserve separate ledgers instead of collapsing them into one activity table.
 - [ ] Keep analytics rebuildable from stored events.
+
+Verified this pass:
+
+- `packages/core` now owns explicit PostgreSQL migration helpers, normalization helpers, query modules, and service-layer writes with readable SQL.
+- Real round-trip coverage now exists against PostgreSQL through `packages/core/test/store.integration.test.ts`.
+- `scripts/migrate.ts` is shared with that Phase 2 store layer and still works in both host and Compose verification paths.
 
 ### Exit criteria
 
@@ -314,8 +334,6 @@ The rewrite is done only when all of these are true:
 
 ## Immediate next recommended work
 
-- [ ] Fix the containerized Astro web service so `docker compose up` reaches a green smoke pass through Caddy.
-- [ ] Add a small migration runner and apply `db/migrations/0001_initial.sql` against PostgreSQL during bootstrap.
-- [ ] Move explicit PostgreSQL query modules and service-layer writes into TypeScript under `apps/api` and `packages/core`.
+- [ ] Thread the verified PostgreSQL store from `packages/core` into `apps/api` services and route wiring.
 - [ ] Implement the SQLite importer using the table rules in `docs/rewrite/sqlite-to-postgres.md`.
 - [ ] Start replacing the Go read routes with Elysia route groups beginning with `GET /api/dashboard` and `GET /api/repositories`.

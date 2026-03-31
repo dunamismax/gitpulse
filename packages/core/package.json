@@ -7,6 +7,10 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "bun build ./src/index.ts --outdir dist --target bun"
+    "build": "bun build ./src/index.ts --outdir dist --target bun",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "postgres": "^3.4.7"
   }
 }

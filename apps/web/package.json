@@ -12,6 +12,9 @@
   "dependencies": {
     "@gitpulse-vnext/contracts": "workspace:*",
     "@gitpulse-vnext/core": "workspace:*",
-    "astro": "^5.13.6"
+    "astro": "5.13.6"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.8"
   }
 }
