@@ -80,7 +80,7 @@ Astro + Vue browser frontend. Built to static output, hydrated against the live 
 
 ### `frontend/tui`
 
-Keyboard-driven terminal preview powered by Bun and the shared TypeScript GitPulse client. It can inspect dashboard, repositories, repository detail, sessions, achievements, and settings data from the live Go API, trigger the manual import, rescan, rebuild, refresh, and toggle actions, run selected-repo quick actions directly from the repositories screen, and step between adjacent repositories from repository detail without falling back to CLI selectors. Phase 4 is still in progress, so this lane remains a source-run preview rather than a finished terminal product surface.
+Keyboard-driven terminal preview powered by Bun and the shared TypeScript GitPulse client. It can inspect dashboard, repositories, repository detail, sessions, achievements, and settings data from the live Go API, trigger the manual import, rescan, rebuild, refresh, and toggle actions, run selected-repo quick actions directly from the repositories screen, page through larger repository inventories, jump to a repo by name or path fragment, and step between adjacent repositories from repository detail without falling back to CLI selectors. Phase 4 is still in progress, so this lane remains a source-run preview rather than a finished terminal product surface.
 
 ### `internal/config`
 

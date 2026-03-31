@@ -17,6 +17,8 @@ interface AppOptions {
   screen: SurfaceKey;
 }
 
+const repositoryPageStep = 5;
+
 class GitPulseTuiPreview {
   readonly #client = createGitPulseClient({
     baseUrl: defaultApiBaseUrl({
@@ -30,6 +32,7 @@ class GitPulseTuiPreview {
 
   #done?: () => void;
   #busy = false;
+  #lastRepoSearch = "";
 
   constructor(options: AppOptions) {
     this.#options = options;
@@ -37,6 +40,8 @@ class GitPulseTuiPreview {
       apiBaseUrl: this.#client.baseUrl,
       loading: true,
       pendingGoto: false,
+      pendingSearch: false,
+      repoSearchQuery: "",
       screen: options.screen,
       selectedRepoIndex: 0,
       statusLines: [
@@ -85,7 +90,17 @@ class GitPulseTuiPreview {
   }
 
   private async handleKey(key: string): Promise<void> {
-    if (key === "\u0003" || key === "q") {
+    if (key === "\u0003") {
+      this.stop();
+      return;
+    }
+
+    if (this.#state.pendingSearch) {
+      await this.handleRepositorySearchKey(key);
+      return;
+    }
+
+    if (key === "q") {
       this.stop();
       return;
     }
@@ -111,6 +126,21 @@ class GitPulseTuiPreview {
         this.#state.pendingGoto = true;
         this.render();
         return;
+      case "/":
+        if (this.isRepositoryScreen()) {
+          this.beginRepositorySearch();
+        }
+        return;
+      case "n":
+        if (this.isRepositoryScreen()) {
+          await this.jumpRepositorySearch(1);
+        }
+        return;
+      case "N":
+        if (this.isRepositoryScreen()) {
+          await this.jumpRepositorySearch(-1);
+        }
+        return;
       case "\u0012":
         await this.reload("Reloaded data.", false);
         return;
@@ -121,6 +151,14 @@ class GitPulseTuiPreview {
       case "k":
       case "\u001b[A":
         this.moveSelection(-1);
+        return;
+      case "\u0004":
+      case "\u001b[6~":
+        this.moveSelectionPage(1);
+        return;
+      case "\u0015":
+      case "\u001b[5~":
+        this.moveSelectionPage(-1);
         return;
       case "\r":
       case "\n":
@@ -183,10 +221,7 @@ class GitPulseTuiPreview {
       }
     }
 
-    if (
-      this.#state.screen === "repositories" ||
-      this.#state.screen === "repository_detail"
-    ) {
+    if (this.isRepositoryScreen()) {
       switch (key) {
         case "i":
           await this.runRepositoryAction(
@@ -232,6 +267,105 @@ class GitPulseTuiPreview {
     this.render();
   }
 
+  private isRepositoryScreen(): boolean {
+    return (
+      this.#state.screen === "repositories" ||
+      this.#state.screen === "repository_detail"
+    );
+  }
+
+  private beginRepositorySearch(): void {
+    this.#state.pendingSearch = true;
+    this.#state.repoSearchQuery = "";
+    this.setStatus("Repository search started.");
+    this.render();
+  }
+
+  private async handleRepositorySearchKey(key: string): Promise<void> {
+    switch (key) {
+      case "\u001b":
+        this.#state.pendingSearch = false;
+        this.#state.repoSearchQuery = "";
+        this.setStatus("Repository search cancelled.");
+        this.render();
+        return;
+      case "\r":
+      case "\n": {
+        const query = this.#state.repoSearchQuery.trim();
+        this.#state.pendingSearch = false;
+        this.#state.repoSearchQuery = query;
+        if (!query) {
+          this.setStatus("Repository search cancelled.");
+          this.render();
+          return;
+        }
+        await this.applyRepositorySearch(query, 1, true);
+        return;
+      }
+      case "\u007f":
+      case "\b":
+        this.#state.repoSearchQuery = this.#state.repoSearchQuery.slice(0, -1);
+        this.render();
+        return;
+      default:
+        break;
+    }
+
+    if (/^[\x20-\x7e]+$/.test(key)) {
+      this.#state.repoSearchQuery += key;
+      this.render();
+    }
+  }
+
+  private async jumpRepositorySearch(direction: 1 | -1): Promise<void> {
+    const query = this.#lastRepoSearch.trim();
+    if (!query) {
+      this.setStatus("No previous repository search. Press / to search first.");
+      this.render();
+      return;
+    }
+
+    await this.applyRepositorySearch(query, direction, false);
+  }
+
+  private async applyRepositorySearch(
+    query: string,
+    direction: 1 | -1,
+    includeCurrent: boolean,
+  ): Promise<void> {
+    const repositories = this.#state.data?.repositories ?? [];
+    if (repositories.length === 0) {
+      this.setStatus("No repositories available to search.");
+      this.render();
+      return;
+    }
+
+    const matchIndex = findRepositoryMatchIndex(
+      repositories,
+      query,
+      this.#state.selectedRepoIndex,
+      direction,
+      includeCurrent,
+    );
+    if (matchIndex < 0) {
+      this.setStatus(`No repository matched \"${query}\".`);
+      this.render();
+      return;
+    }
+
+    this.#lastRepoSearch = query;
+    this.#state.selectedRepoIndex = matchIndex;
+    const selected = repositories[matchIndex];
+
+    if (this.#state.screen === "repository_detail") {
+      await this.openSelectedRepository();
+      return;
+    }
+
+    this.setStatus(`Selected ${selected.repo.name} via search \"${query}\".`);
+    this.render();
+  }
+
   private moveSelection(delta: number): void {
     if (this.#state.screen !== "repositories") {
       return;
@@ -249,6 +383,14 @@ class GitPulseTuiPreview {
     const selected = repositories[this.#state.selectedRepoIndex];
     this.setStatus(`Selected ${selected.repo.name}.`);
     this.render();
+  }
+
+  private moveSelectionPage(direction: 1 | -1): void {
+    if (this.#state.screen !== "repositories") {
+      return;
+    }
+
+    this.moveSelection(direction * repositoryPageStep);
   }
 
   private async openSelectedRepository(): Promise<void> {
@@ -514,6 +656,49 @@ function findRepositoryIndex(
       .filter(Boolean)
       .some((value) => value.toLowerCase() === normalized);
   });
+}
+
+function findRepositoryMatchIndex(
+  repositories: RepoCard[],
+  query: string,
+  currentIndex: number,
+  direction: 1 | -1,
+  includeCurrent: boolean,
+): number {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized || repositories.length === 0) {
+    return -1;
+  }
+
+  const total = repositories.length;
+  const startOffset = includeCurrent ? 0 : direction;
+
+  for (let step = startOffset; Math.abs(step) < total; step += direction) {
+    const index = normalizeWrappedIndex(currentIndex + step, total);
+    if (repositoryMatchesQuery(repositories[index], normalized)) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function repositoryMatchesQuery(
+  repo: RepoCard,
+  normalizedQuery: string,
+): boolean {
+  return [repo.repo.id, repo.repo.name, repo.repo.root_path]
+    .filter(Boolean)
+    .some((value) => value.toLowerCase().includes(normalizedQuery));
+}
+
+function normalizeWrappedIndex(index: number, length: number): number {
+  if (length <= 0) {
+    return 0;
+  }
+
+  const wrapped = index % length;
+  return wrapped < 0 ? wrapped + length : wrapped;
 }
 
 function normalizeError(error: unknown): string {

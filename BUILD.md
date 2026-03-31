@@ -37,7 +37,7 @@ This repo should **not** go web-only unless the TUI later proves redundant, and 
 - [x] Phase 1 is complete. The Go API now exposes explicit frontend-facing contracts with focused contract tests.
 - [x] Phase 2 is complete. `frontend/` now contains the Bun workspace, shared TypeScript contract layer, shared route and screen maps, and the lane structure for both the web and terminal frontends.
 - [x] Phase 3 is complete. `frontend/web/` now owns the shipped browser surface and `gitpulse serve` serves the built web frontend directly from Go.
-- [ ] Phase 4 is in progress. `gitpulse tui` now launches a keyboard-driven terminal preview backed by the live Go API, but the terminal lane still needs deeper keyboard polish and real-workspace validation before it is done.
+- [ ] Phase 4 is in progress. `gitpulse tui` now launches a keyboard-driven terminal preview backed by the live Go API, including repo jump search and page navigation for larger tracked inventories, but the terminal lane still needs broader real-workspace validation before it is done.
 - [x] Phase 5 is complete. The managed Python runtime path, docs, CI lane, and legacy `python-ui/` reference directory are gone.
 
 ## Target state
@@ -174,7 +174,7 @@ Status notes:
 - `frontend/tui/` now contains a keyboard-driven source-run terminal preview that talks to the live Go API through the shared TypeScript client.
 - The Cobra CLI now exposes `gitpulse tui` to launch the terminal preview through Bun.
 - The preview covers dashboard, repositories, repository detail, sessions, achievements, settings, manual runbook actions, and explicit backend error states.
-- The repositories screen now supports selected-repo quick actions, and repository detail can step across adjacent tracked repos without dropping back to the list or falling through to CLI selectors.
+- The repositories screen now supports selected-repo quick actions, repo jump search, and page navigation for larger tracked inventories, and repository detail can step across adjacent tracked repos without dropping back to the list or falling through to CLI selectors.
 - Phase 4 is still open because the terminal lane still needs broader real-workspace validation and a stronger case that it is materially better than chaining the CLI across a fuller operator session.
 
 Deliverables:
@@ -182,7 +182,7 @@ Deliverables:
 - [x] add `frontend/tui`
 - [x] introduce a dedicated terminal entrypoint, preferably `gitpulse tui`
 - [x] implement the operator-critical workflow first: repository list and detail, action center, sessions summary, achievements summary, settings basics, and clear error states
-- [ ] optimize for keyboard flow, visibility, and speed rather than page-for-page web mimicry
+- [ ] optimize for keyboard flow, visibility, and speed rather than page-for-page web mimicry, with repo jump search and paging now in place but broader operator-session validation still remaining
 
 Exit criteria:
 

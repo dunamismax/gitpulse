@@ -7,13 +7,13 @@ Current truth:
 - `gitpulse serve` now serves the built Astro + Vue frontend from `frontend/web/dist`
 - Go remains the only backend and system of record
 - `frontend/shared` owns the shared TypeScript contracts and API client for both frontend lanes
-- `frontend/tui` now contains a keyboard-driven source-run terminal preview launched by `gitpulse tui`
+- `frontend/tui` now contains a keyboard-driven source-run terminal preview launched by `gitpulse tui`, including repo jump search and page navigation for larger tracked inventories
 
 Workspace packages:
 
 - `shared/`: shared API client, contract types, formatting helpers, route maps, screen maps, and operator action metadata
 - `web/`: shipped Astro + Vue browser frontend consumed by `gitpulse serve`
-- `tui/`: keyboard-driven Bun terminal preview wired to the live Go backend and shared contracts, with selected-repo quick actions from the repositories screen and adjacent repo navigation from repository detail
+- `tui/`: keyboard-driven Bun terminal preview wired to the live Go backend and shared contracts, with selected-repo quick actions, repo jump search, and page navigation from the repositories screen plus adjacent repo navigation from repository detail
 
 Local setup:
 

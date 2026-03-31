@@ -30,6 +30,8 @@ export interface RenderState {
   lastUpdated?: string;
   loading: boolean;
   pendingGoto: boolean;
+  pendingSearch: boolean;
+  repoSearchQuery: string;
   screen: SurfaceKey;
   selectedRepoIndex: number;
   statusLines: string[];
@@ -44,9 +46,9 @@ export function renderApp(state: RenderState): string {
     `API ${state.apiBaseUrl}`,
     "Keys: q quit · Ctrl-R reload · g then d/r/s/a/, switch screens",
     state.screen === "repositories"
-      ? "Repo keys: j/k or ↑/↓ move · enter/l detail · i import · r rescan · t toggle"
+      ? "Repo keys: j/k or ↑/↓ move · Ctrl-U/Ctrl-D page · / search · n/N next/prev · enter/l detail · i import · r rescan · t toggle"
       : state.screen === "repository_detail"
-        ? "Repo detail keys: esc/h back · [ prev repo · ] next repo · i import · r rescan · t toggle"
+        ? "Repo detail keys: esc/h back · [ prev repo · ] next repo · / search repos · n/N next/prev · i import · r rescan · t toggle"
         : state.screen === "dashboard"
           ? "Action keys: i import all · r rescan all · b rebuild analytics"
           : "",
@@ -72,10 +74,21 @@ export function renderApp(state: RenderState): string {
     lines.push("No screen data loaded yet.", sectionDivider);
   }
 
-  if (state.statusLines.length > 0 || state.lastUpdated || state.pendingGoto) {
+  if (
+    state.statusLines.length > 0 ||
+    state.lastUpdated ||
+    state.pendingGoto ||
+    state.pendingSearch
+  ) {
     lines.push("Status");
     if (state.pendingGoto) {
       lines.push("  Waiting for a goto key: d, r, s, a, or ,");
+    }
+    if (state.pendingSearch) {
+      lines.push(
+        `  Search repositories: ${state.repoSearchQuery || ""}`,
+        "  Type a repo name, path, or id fragment, then press Enter.",
+      );
     }
     if (state.lastUpdated) {
       lines.push(`  Last updated: ${state.lastUpdated}`);
@@ -398,7 +411,10 @@ function renderList(values: string[]): string {
   return values.join(", ");
 }
 
-function repositoryWindow(total: number, selectedIndex: number): {
+function repositoryWindow(
+  total: number,
+  selectedIndex: number,
+): {
   start: number;
   end: number;
 } {

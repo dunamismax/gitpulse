@@ -62,7 +62,7 @@ This recomputes sessions, rollups, streaks, score, and achievements from stored 
 
 ### 6. Inspect the results
 
-Use the dashboard, repository pages, sessions, achievements, settings, the terminal preview via `go run ./cmd/gitpulse tui`, or the Go JSON API to confirm the new state. The current TUI preview is strongest for keyboard-first repository inspection because you can move the repositories list selection, run import or rescan on the selected repo immediately, open detail, and step between adjacent repositories without dropping back to CLI selectors.
+Use the dashboard, repository pages, sessions, achievements, settings, the terminal preview via `go run ./cmd/gitpulse tui`, or the Go JSON API to confirm the new state. The current TUI preview is strongest for keyboard-first repository inspection because you can move the repositories list selection, page through larger inventories, jump to a repo by name or path fragment, run import or rescan on the selected repo immediately, open detail, and step between adjacent repositories without dropping back to CLI selectors.
 
 ## What GitPulse does not do yet
 
@@ -70,7 +70,7 @@ Use the dashboard, repository pages, sessions, achievements, settings, the termi
 - no packaged desktop release flow exists in-tree
 - real-workspace smoke runs are still worth doing manually from time to time
 - fuzz coverage for git parsing is still missing
-- the terminal lane now exists as a source-run preview, but Phase 4 still needs deeper keyboard polish and real-workspace validation before it is done
+- the terminal lane now exists as a source-run preview, with repo jump search and page navigation now in place, but Phase 4 still needs broader real-workspace validation before it is done
 
 ## Verification
 

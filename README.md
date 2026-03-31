@@ -6,7 +6,7 @@
 
 GitPulse keeps live work, commit history, and push activity as separate ledgers. The codebase is a Go application backed by SQLite with plain SQL via `database/sql`, a Cobra CLI, a shipped Astro + Vue browser frontend under `frontend/web/` served directly by the Go runtime, and a source-run terminal preview under `frontend/tui/` launched by `gitpulse tui`.
 
-> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` now serves the built Astro + Vue frontend directly from Go while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. `gitpulse tui` now provides a keyboard-driven terminal preview of that same operator loop, but Phase 4 is still in progress. Background watchers or pollers and packaged desktop releases are not shipped yet. The remaining frontend migration work lives in [BUILD.md](BUILD.md), and the current operator flow lives in [docs/operator-workflow.md](docs/operator-workflow.md).
+> **Status:** Active and usable today as a Go CLI plus local web dashboard. `gitpulse serve` now serves the built Astro + Vue frontend directly from Go while keeping the Go JSON API as the source of truth. GitPulse is manual-first today: add repositories, import history, rescan working trees, and rebuild analytics explicitly. `gitpulse tui` now provides a keyboard-driven terminal preview of that same operator loop, including repo jump search and page navigation for larger inventories, but Phase 4 is still in progress. Background watchers or pollers and packaged desktop releases are not shipped yet. The remaining frontend migration work lives in [BUILD.md](BUILD.md), and the current operator flow lives in [docs/operator-workflow.md](docs/operator-workflow.md).
 
 ## Why GitPulse?
 
@@ -43,7 +43,7 @@ GitPulse keeps live work, commit history, and push activity as separate ledgers.
 - `gitpulse doctor` for environment and configuration diagnostics
 - browser dashboard, repositories, repository detail, sessions, achievements, and settings pages through the Astro + Vue frontend
 - terminal preview screens for dashboard, repositories, repository detail, sessions, achievements, and settings, plus manual import, rescan, rebuild, refresh, and toggle actions when Bun is available from source
-- repositories screen quick actions for the selected repo, with adjacent repo-to-repo navigation from repository detail so operator work stays keyboard-first instead of bouncing through CLI selectors
+- repositories screen quick actions for the selected repo, repo jump search and page navigation for larger tracked inventories, and adjacent repo-to-repo navigation from repository detail so operator work stays keyboard-first instead of bouncing through CLI selectors
 - first-run guidance plus explicit import, rescan, and rebuild runbook controls backed by the Go API
 - Go-served JSON API endpoints backing the browser UI
 - explicit Go-owned frontend response contracts for dashboard, repositories, sessions, achievements, settings, and operator actions

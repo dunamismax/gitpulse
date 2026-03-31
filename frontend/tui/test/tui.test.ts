@@ -220,6 +220,8 @@ const baseState: RenderState = {
   lastUpdated: "3/31/2026, 12:10:00 AM",
   loading: false,
   pendingGoto: false,
+  pendingSearch: false,
+  repoSearchQuery: "",
   screen: "dashboard",
   selectedRepoIndex: 0,
   statusLines: ["Loaded GitPulse terminal preview."],
@@ -244,8 +246,10 @@ describe("tui preview", () => {
 
     expect(output).toContain("selected 2/3");
     expect(output).toContain("Selected repository");
+    expect(output).toContain("Ctrl-U/Ctrl-D page · / search · n/N next/prev");
     expect(output).toContain("Quick actions: i import selected repo");
-    expect(output).toContain("> gitpulse-2 [active/Healthy] · main · live 12 · staged 3",
+    expect(output).toContain(
+      "> gitpulse-2 [active/Healthy] · main · live 12 · staged 3",
     );
   });
 
@@ -255,7 +259,9 @@ describe("tui preview", () => {
       screen: "repository_detail",
     });
 
-    expect(output).toContain("Repo detail keys: esc/h back · [ prev repo · ] next repo");
+    expect(output).toContain(
+      "Repo detail keys: esc/h back · [ prev repo · ] next repo · / search repos · n/N next/prev",
+    );
     expect(output).toContain("Repository · gitpulse-1");
     expect(output).toContain("Selection 1/3");
     expect(output).toContain("Ship the TUI preview");
@@ -277,9 +283,24 @@ describe("tui preview", () => {
     });
 
     expect(output).toContain("... 4 repository(s) above");
-    expect(output).toContain("> gitpulse-10 [active/Healthy] · main · live 20 · staged 3",
+    expect(output).toContain(
+      "> gitpulse-10 [active/Healthy] · main · live 20 · staged 3",
     );
     expect(output).not.toContain("... 1 repository(s) below");
+  });
+
+  test("renders repository search prompt status", () => {
+    const output = renderApp({
+      ...baseState,
+      screen: "repositories",
+      pendingSearch: true,
+      repoSearchQuery: "gitpulse-2",
+    });
+
+    expect(output).toContain("Search repositories: gitpulse-2");
+    expect(output).toContain(
+      "Type a repo name, path, or id fragment, then press Enter.",
+    );
   });
 
   test("parses repo selector into repository detail mode", () => {
