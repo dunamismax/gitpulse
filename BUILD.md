@@ -5,352 +5,517 @@
 Future agents working in `gitpulse` must follow these rules before touching code or docs:
 
 - Read this file first.
-- Treat this file as the active rewrite execution manual while the rewrite is in flight.
+- Treat this file as the active rewrite execution manual while the build is in flight.
 - Keep this file current whenever scope, sequencing, or repo truth changes.
 - Only check a box after the work is actually completed and verified in the repo.
 - Do not mark a box done for partial progress, intent, or unverified claims.
-- Keep stable docs focused on current shipped truth. Keep forward-looking execution detail here while the rewrite is active.
-- Treat `README.md`, `docs/architecture.md`, and `docs/operator-workflow.md` as current shipped-state docs until cutover is done.
 - If code and docs disagree about shipped behavior, code wins.
-- If this file and older planning language disagree about the rewrite target, this file wins.
+- If this file and older planning language disagree about the build target, this file wins.
 
-## Rewrite decision
+## Product description
 
-`GitPulse` is now on a full-stack TypeScript end-to-end rewrite path.
+**GitPulse** is a native macOS application for local-first git activity analytics. It tracks commit history, working tree changes, and push activity as separate ledgers, giving developers honest signals about their coding patterns without uploading source code anywhere.
 
-The approved destination is Stephen's web full-stack lane:
+GitPulse runs as a menu bar app with a full SwiftUI dashboard window, scanning local git repositories and building analytics locally. A companion CLI mode provides the same operator actions from the terminal. The app watches configured directories for changes and refreshes analytics automatically.
 
-- TypeScript
-- Bun
-- Astro
-- Vue when the interaction level earns it
-- Elysia
-- Zod
-- PostgreSQL
-- Docker Compose
-- Caddy
+Core product concepts carried forward from the proven Go prototype:
 
-This repo is no longer on a hybrid plan where Go stays the backend and the browser just keeps growing around it.
-The shipped Go plus SQLite implementation remains the current product until the rewrite reaches parity and cutover quality, but it is not the long-term architecture.
+- **Separate ledgers**: live work (uncommitted changes), committed work (commit history), and pushed work (remote sync) are tracked independently
+- **Rebuildable analytics**: focus sessions, daily rollups, streaks, scores, and achievements are derived from stored events and can be recomputed at any time
+- **Manual-first with optional automation**: explicit add, import, rescan, and rebuild actions remain available; FSEvents-based file watching layers on top as opt-in convenience
+- **No cloud dependency for core use**: all scanning, storage, and analysis happen on the local machine
+- **CloudKit is additive only**: optional cross-device sync for stats, never required for core functionality
 
 ## Current repo truth
 
-GitPulse ships today as a Go application with a real browser frontend already in place:
+- [ ] Swift Package Manager project compiles and runs
+- [ ] Git CLI integration scans repositories and imports history
+- [ ] SwiftData schema stores all domain entities
+- [ ] Dashboard window renders real analytics data
+- [ ] Swift Charts visualizations display commit activity and language breakdowns
+- [ ] Menu bar item shows quick stats and provides app access
+- [ ] CLI mode supports add, import, rescan, rebuild, and doctor commands
+- [ ] FSEvents watches configured directories for changes
+- [ ] Contribution graph renders with accurate daily data
+- [ ] Settings persist and restore across launches
+- [ ] App is notarized and distributable outside the App Store
+- [ ] Homebrew formula published
 
-- Go backend and Cobra CLI under `cmd/` and `internal/`
-- SQLite via `database/sql` and `modernc.org/sqlite`
-- plain SQL persistence and migration files under `internal/db/` and `migrations/`
-- `net/http` JSON API plus static serving of the built Astro app from Go
-- Bun workspace under `frontend/`
-- Astro plus Vue operator web UI under `frontend/web/`
-- TypeScript terminal preview under `frontend/tui/`
-- manual-first operator loop: add, import, rescan, rebuild, inspect
-- unshipped vNext bootstrap under `apps/`, `packages/`, `db/migrations/`, `deploy/`, and `docker-compose.yml`
+## Product guardrails
 
-What the current implementation has already proven:
+These are not build goals unless Stephen changes direction:
 
-- local-first git analytics is a valid product shape
-- separate ledgers for working tree activity, commit history, and push history are the right domain model
-- explicit operator actions are better than hidden automation for the current product
-- the browser surface is the primary user-facing product, even though Go still serves it today
-- the TUI is useful as a secondary source-run surface, not as the future architectural center
+- Turning GitPulse into a cloud-first or source-upload service
+- Adding a backend server or web dashboard; this is a native app
+- Supporting Linux or Windows; macOS-first, iOS companion later
+- Replacing explicit SQL-equivalent queries with opaque Core Data fetch patterns
+- Adding social features, team dashboards, or multi-user analytics
+- Background network activity beyond optional CloudKit sync
+- Tracking repositories the user has not explicitly added or approved
+- Shipping an iOS app before the macOS app is complete and stable
 
-What must stay honest during the rewrite:
+## Stack
 
-- the shipped app today is still Go plus SQLite
-- no shipped PostgreSQL runtime exists here yet
-- the new root Bun workspace is only a bootstrap lane today, not the default product runtime
-- host-side vNext verification is green and the unshipped vNext stack now passes a local Docker Compose smoke through Caddy for web root, API health, dashboard, and repositories
-- the TUI exists, but it is not a required parity target for the rewrite
+| Layer | Technology |
+|---|---|
+| UI framework | SwiftUI (macOS 14+ / iOS 17+) |
+| Charts | Swift Charts |
+| Data persistence | SwiftData |
+| Git integration | git CLI via Process (with libgit2 Swift bindings as future option) |
+| CLI mode | Swift Argument Parser |
+| File watching | FSEvents via DispatchSource / FileManager |
+| Networking | CloudKit (optional sync only) |
+| Package manager | Swift Package Manager |
+| Distribution | Homebrew formula + direct .dmg download + Mac App Store (stretch) |
+| CI | GitHub Actions (xcodebuild + swift test) |
+| Minimum deployment | macOS 14 Sonoma |
 
-## Phase status board
+## Phase status summary
 
-- [x] Phase 0 - rewrite boundary frozen and migration plan documented
-- [x] Phase 1 - Bun, PostgreSQL, Docker Compose, and Caddy bootstrap verified locally
-- [ ] Phase 2 - PostgreSQL data layer rewrite in TypeScript
-- [ ] Phase 3 - Elysia backend parity
-- [ ] Phase 4 - Astro and Vue browser parity
-- [ ] Phase 5 - parity verification, data migration, and cutover
-- [ ] Phase 6 - legacy runtime removal
+- [ ] Phase 1 -- Bootstrap Swift package and app target
+- [ ] Phase 2 -- Git scanning engine
+- [ ] Phase 3 -- Data model and SwiftData storage
+- [ ] Phase 4 -- Dashboard UI shell
+- [ ] Phase 5 -- Charts and visualizations
+- [ ] Phase 6 -- Menu bar app
+- [ ] Phase 7 -- CLI mode
+- [ ] Phase 8 -- File watching and auto-refresh
+- [ ] Phase 9 -- Polish and accessibility
+- [ ] Phase 10 -- Distribution
 
-## Target state
+---
 
-`GitPulse` should converge on one Bun-first TypeScript runtime with a web-first product surface.
+## Phase 1 -- Bootstrap Swift package and app target
 
-### Target repo shape
+### Objectives
 
-```text
-gitpulse/
-  apps/
-    api/                  # Elysia backend
-    web/                  # Astro + Vue operator app
-  packages/
-    contracts/            # Zod schemas and inferred shared types
-    core/                 # git ingestion, analytics, services, shared logic
-    config/               # env parsing, runtime config, path helpers
-    ui/                   # shared UI bits only if they actually earn it
-  db/
-    migrations/           # PostgreSQL schema migrations
-    seeds/                # fixture or smoke data when needed
-  deploy/
-    Caddyfile
-  scripts/
-    migrate.ts            # apply PostgreSQL schema migrations during bootstrap
-    migrate-sqlite.ts     # legacy SQLite to PostgreSQL importer
-    smoke.ts              # end-to-end local smoke checks
-  docker-compose.yml
-  README.md
-  BUILD.md
+Stand up the Swift Package Manager project structure, create the macOS app target and CLI target, confirm the build compiles, and establish CI.
+
+### Checklist
+
+- [ ] Initialize Swift package with `Package.swift` at repo root
+- [ ] Create macOS app target (`GitPulse`) with SwiftUI lifecycle
+- [ ] Create CLI target (`gitpulse-cli`) with Swift Argument Parser dependency
+- [ ] Create shared library target (`GitPulseCore`) for domain logic shared between app and CLI
+- [ ] Add Swift Argument Parser as a package dependency
+- [ ] Add `.swiftlint.yml` or equivalent lint configuration
+- [ ] Create basic `GitPulseApp.swift` with an empty window
+- [ ] Create basic CLI entrypoint that prints version
+- [ ] Verify `swift build` succeeds for all targets
+- [ ] Verify `swift test` runs (even with zero tests)
+- [ ] Set up GitHub Actions workflow for `swift build` and `swift test` on macOS
+- [ ] Add `Package.resolved` to version control
+- [ ] Remove or archive legacy Go/TypeScript/frontend files (or move to `legacy/` branch)
+- [ ] Update `.gitignore` for Swift artifacts (`.build/`, `.swiftpm/`, `DerivedData/`)
+- [ ] Update `README.md` to describe the Swift rewrite status
+
+### Exit criteria
+
+- [ ] `swift build` compiles all three targets (app, CLI, core library) without errors
+- [ ] `swift test` exits cleanly
+- [ ] CI runs green on push to `main`
+
+### Verification
+
+```bash
+swift build
+swift test
+swift run gitpulse-cli --version
 ```
 
-### Runtime target
+---
 
-- Bun is the only application runtime in the final architecture.
-- Elysia owns all API routes and operator action execution.
-- Astro owns page delivery and app shell routing.
-- Vue is used for interaction-heavy operator views where it clearly helps.
-- Zod owns request, response, and settings payload validation.
-- PostgreSQL is the only primary application database.
-- Docker Compose is the default local and self-hosted runtime path.
-- Caddy is the front door and same-origin HTTP edge.
+## Phase 2 -- Git scanning engine
 
-### Product target
+### Objectives
 
-GitPulse vNext should ship as a local-first web product with these primary surfaces:
+Build the git integration layer in `GitPulseCore` that discovers repositories, probes their state, imports commit history, and detects push activity by shelling out to the git CLI.
 
-- dashboard
-- repositories list
-- repository detail
-- sessions
-- achievements
-- settings
-- explicit operator action center for add, import, rescan, rebuild, refresh, toggle, remove, and diagnostics
+### Checklist
 
-CLI and TUI lanes are compatibility surfaces only if they still earn maintenance after the web and API cutover.
-
-## Boundaries and non-goals
-
-These are not rewrite goals unless Stephen changes direction:
-
-- keeping Go as the permanent backend while only replacing pieces around it
-- treating the current TUI as a required parity target
-- adding background watchers, pollers, or cloud services during first cutover unless explicitly carved out and verified
-- adding desktop packaging work before the web and API rewrite is complete
-- replacing explicit SQL with an ORM just because the language changed
-- changing the product into a source-upload or cloud-first analytics service
-
-## Hard constraints
-
-- Local-first behavior is non-negotiable.
-- No source upload or cloud dependency for core use.
-- The manual-first operator loop remains the baseline interaction model until a later phase explicitly changes it.
-- Separate ledgers for working tree, commit, and push activity must survive the rewrite intact.
-- Repo-controlled strings, subprocess output, and filesystem paths remain untrusted input.
-- Docker Compose must become the boring default runtime path.
-- Caddy is the only public HTTP edge in the shipped path.
-- The browser should talk to one origin in shipped mode.
-- SQLite becomes legacy import input only once the rewrite lands. It is not the end-state application store.
-- There is no dual-write phase between the Go app and the rewritten stack.
-
-## Phase plan
-
-## Phase 0 - Freeze the current contract and define the migration boundary
-
-### Work checklist
-
-- [x] Freeze the current product contract from the Go app and current docs.
-- [x] Inventory the current SQLite schema, API routes, config behavior, CLI actions, and operator workflow.
-- [x] Define the vNext repo layout, container topology, ports, and environment contract.
-- [x] Define the SQLite to PostgreSQL migration plan at the table and field level.
-- [x] Define parity fixtures using a small set of deterministic git repositories and test databases.
-- [x] Define a cutover checklist with explicit non-goals.
+- [ ] Implement `GitScanner` actor that runs git commands via `Process`
+- [ ] Implement repository discovery: given a root path, find all `.git` directories recursively
+- [ ] Implement repository probe: current branch, HEAD SHA, upstream ref, ahead/behind counts
+- [ ] Implement working tree diff stats: unstaged additions, deletions, file count
+- [ ] Implement staged diff stats: staged additions, deletions, file count
+- [ ] Implement commit history import: parse `git log` output for a configurable date range
+- [ ] Implement push detection: compare local HEAD to upstream HEAD
+- [ ] Implement language breakdown: count lines by file extension (or integrate with `tokei` if available)
+- [ ] Parse all git subprocess output defensively; treat repo-controlled strings as untrusted
+- [ ] Handle edge cases: bare repos, detached HEAD, missing upstream, empty repos
+- [ ] Unit tests for git output parsing with fixture data
+- [ ] Integration tests against a real temporary git repository
 
 ### Exit criteria
 
-- [x] Rewrite scope is bounded.
-- [x] The data migration path is specific instead of hand-waved.
-- [x] No one has to guess which current behaviors are required for parity.
+- [ ] `GitScanner` can discover, probe, and import history from real local repositories
+- [ ] All parsing is tested against known git output fixtures
+- [ ] Error cases (missing git, corrupt repo, permission denied) return typed errors, not crashes
 
-## Phase 1 - Bootstrap the unified TypeScript monorepo
+### Verification
 
-### Work checklist
+```bash
+swift test --filter GitScannerTests
+```
 
-- [x] Create a root Bun workspace for the whole app, not just the frontend.
-- [x] Add `apps/api` for Elysia and `apps/web` for Astro and Vue.
-- [x] Add `packages/contracts` for Zod schemas and inferred shared types.
-- [x] Add `packages/core` for shared domain services, analytics rebuild logic, and PostgreSQL data-layer helpers.
-- [x] Add `packages/config` for environment parsing and runtime config.
-- [x] Leave `packages/ui` out for now because shared UI is not earned yet.
-- [x] Add PostgreSQL migrations under `db/migrations/`.
-- [x] Add `docker-compose.yml` for PostgreSQL, API, web, and Caddy.
-- [x] Add `deploy/Caddyfile` and make same-origin routing the default.
-- [x] Define root verification scripts for lint, typecheck, test, build, and smoke.
+---
 
-Verified state:
+## Phase 3 -- Data model and SwiftData storage
 
-- `docker compose up -d` now reaches a healthy local bootstrap with PostgreSQL, API, web, and Caddy.
-- The stale `ESBUILD_BINARY_PATH` override was removed from the `web` service, and Astro is pinned to `5.13.6` so Astro and Vite stay on the same `esbuild` major path under Bun in containers.
-- `scripts/migrate.ts` now applies every `db/migrations/*.sql` file against PostgreSQL during API startup, so the bootstrap stack comes up against an initialized schema.
-- This is still only bootstrap verification, not backend or UI parity with the shipped Go runtime.
+### Objectives
 
-### Exit criteria
+Define the full SwiftData schema mirroring the proven domain model: tracked targets, repositories, snapshots, file activity, commits, pushes, focus sessions, daily rollups, and achievements. Implement the analytics rebuild pipeline.
 
-- [x] The repo can boot an empty vNext stack through Docker Compose.
-- [x] Astro and Elysia both run under Bun.
-- [x] Shared contracts compile from one source of truth.
-- [x] Caddy can serve the web app and proxy the API locally.
+### Checklist
 
-## Phase 2 - Rewrite the data layer onto PostgreSQL
-
-### Work checklist
-
-- [x] Create PostgreSQL migrations for repositories, snapshots, file activity, commits, pushes, sessions, rollups, achievements, and settings.
-- [x] Normalize timestamp, enum-like, and JSON payload handling for PostgreSQL.
-- [x] Implement explicit query modules and service-layer writes in TypeScript.
-- [x] Keep SQL explicit and reviewable.
-- [x] Write the legacy importer that reads the current SQLite database and inserts canonical PostgreSQL records.
-- [ ] Create fixtures for fresh installs and migrated installs.
-- [x] Preserve separate ledgers instead of collapsing them into one activity table.
-- [x] Keep analytics rebuildable from stored events.
-
-Verified this pass:
-
-- `packages/core` now owns explicit PostgreSQL migration helpers, normalization helpers, query modules, service-layer writes, and rebuild orchestration with readable SQL plus TypeScript analytics logic.
-- Real round-trip coverage now exists against PostgreSQL through `packages/core/test/store.integration.test.ts`.
-- `packages/core/src/analytics.ts` now rebuilds focus sessions, daily rollups, streak inputs, score inputs, and achievements directly from persisted snapshots, commits, push events, and file activity ledgers.
-- Separate ledgers are preserved in the rebuild path instead of being collapsed into a synthetic activity table, with regression coverage in `packages/core/test/rebuild.test.ts` and real PostgreSQL persistence coverage in `packages/core/test/rebuild.integration.test.ts`.
-- `packages/core/src/sqlite-import.ts` now imports canonical SQLite tracked targets, repositories, snapshots, file activity, commits, pushes, and optional legacy settings into the PostgreSQL store, then rebuilds derived analytics instead of copying legacy derived tables.
-- `packages/config/src/index.ts` now loads the effective legacy TOML plus env-backed runtime config for migration use, and `scripts/migrate-sqlite.ts` wires that into a real Bun importer entrypoint documented in `docs/rewrite/sqlite-to-postgres.md`.
-- Unit coverage now exists for the importer and config-backed settings replay in `packages/core/test/sqlite-import.test.ts` and `packages/config/test/index.test.ts`.
-- Live PostgreSQL importer verification and parity-fixture comparison still remain undone.
+- [ ] Define `@Model` classes: `TrackedTarget`, `Repository`, `RepoStatusSnapshot`, `FileActivityEvent`, `CommitEvent`, `PushEvent`, `FocusSession`, `DailyRollup`, `Achievement`, `AppSettings`
+- [ ] `Repository` tracks: name, root path, remote URL, default branch, include/exclude patterns, state (active/disabled/removed), monitoring flag
+- [ ] `RepoStatusSnapshot` tracks: branch, HEAD SHA, upstream ref, ahead/behind, live diff stats, staged diff stats, language breakdown, observed timestamp
+- [ ] `CommitEvent` tracks: SHA, authored date, author name/email, summary, branch, additions, deletions, files changed, merge flag
+- [ ] `PushEvent` tracks: observed date, kind (local detected / remote confirmed), HEAD SHA, pushed commit count, upstream ref
+- [ ] `FileActivityEvent` tracks: relative path, additions, deletions, activity kind, observed timestamp
+- [ ] `FocusSession` tracks: start/end time, active minutes, associated repo IDs, event count, total changed lines
+- [ ] `DailyRollup` tracks: scope, day, live/staged/committed additions and deletions, commit count, push count, session count, session minutes, score
+- [ ] `Achievement` tracks: kind, unlocked timestamp, description
+- [ ] Implement sessionization logic: group activity points into focus sessions using configurable gap threshold
+- [ ] Implement daily rollup aggregation from stored events
+- [ ] Implement streak calculation (current streak, longest streak, active today flag)
+- [ ] Implement score calculation from daily activity
+- [ ] Implement achievement evaluation rules
+- [ ] Implement full analytics rebuild: clear derived data, recompute sessions, rollups, streaks, scores, achievements
+- [ ] Configure `ModelContainer` with appropriate store location (`~/Library/Application Support/GitPulse/`)
+- [ ] Unit tests for sessionization, rollup, streak, score, and achievement logic
+- [ ] Integration tests that persist and query real SwiftData entities
 
 ### Exit criteria
 
-- [ ] PostgreSQL can support the full current product domain.
-- [ ] A fresh install works on PostgreSQL only.
-- [ ] A legacy SQLite database can be imported with documented tooling.
-- [ ] Data parity checks pass on a representative fixture set.
+- [ ] All domain entities persist and query correctly through SwiftData
+- [ ] Analytics rebuild produces correct sessions, rollups, and achievements from fixture data
+- [ ] Separate ledgers (live work, commits, pushes) remain distinct in the data model
 
-## Phase 3 - Rewrite backend behavior in Elysia
+### Verification
 
-### Work checklist
+```bash
+swift test --filter DataModelTests
+swift test --filter AnalyticsTests
+```
 
-- [x] Implement Elysia route groups for dashboard, repositories, repository detail, sessions, achievements, settings, and health.
-- [x] Implement Elysia action endpoints for add, import, rescan, rebuild, refresh, toggle, remove, and settings save.
-- [x] Validate all request and response payloads with Zod.
-- [x] Move git subprocess integration into `packages/core`.
-- [x] Move analytics rebuild logic into `packages/core`.
-- [x] Keep action execution server-side only.
-- [x] Expose stable machine-readable action result payloads with user-facing summaries.
+---
 
-Verified this pass:
+## Phase 4 -- Dashboard UI shell
 
-- `apps/api/src/actions.ts` now wires PostgreSQL-backed Elysia action handlers for add, refresh, toggle, remove, per-repo pattern save, repo import, import-all, rescan-all, rebuild, and settings save, all returning stable machine-readable action envelopes with user-facing summaries.
-- `packages/core/src/git.ts` now owns the Bun shell-backed git discovery, probe, snapshot, and history-import helpers used by the vNext action layer.
-- `packages/contracts/src/index.ts` now owns the action request and response schemas alongside the read-route contracts, and `apps/api/src/app.ts` validates both request bodies and response envelopes with Zod.
-- `apps/api/test/app.test.ts` now exercises the new action-route contract and validation paths with injected action handlers.
-- `apps/api/test/app.integration.test.ts` now has a PostgreSQL-backed action-route integration harness ready for live database coverage when `GITPULSE_TEST_DATABASE_URL` is available, and `scripts/smoke.ts` now probes the rebuild action in addition to the read surface.
-- Live PostgreSQL action-route coverage and Compose or Caddy smoke still need to be rerun in an environment with the required services available.
+### Objectives
 
-### Exit criteria
+Build the main SwiftUI window with navigation and page shells for all primary views. Wire real data from SwiftData through the view layer.
 
-- [ ] Elysia can run the full manual operator loop without the Go runtime.
-- [x] The API contract is Zod-owned and shared with the web app.
-- [ ] The app can start, operate, and persist without any Go process present.
+### Checklist
 
-## Phase 4 - Rewrite the browser product in Astro and Vue
-
-### Work checklist
-
-- [ ] Build Astro route shells for all shipped operator pages.
-- [ ] Implement Vue components and islands only where interactivity is clearly earned.
-- [ ] Consume shared Zod-derived contracts through typed client helpers.
-- [ ] Preserve first-run guidance, empty states, loading states, and backend error handling.
-- [ ] Keep operator actions explicit and visible.
-- [ ] Make settings editable through the new API.
-- [ ] Keep the browser surface same-origin through Caddy in shipped mode.
+- [ ] Implement `DashboardView` as the main window content with sidebar navigation
+- [ ] Implement navigation destinations: Dashboard, Repositories, Sessions, Achievements, Settings
+- [ ] `DashboardView` displays: total repos tracked, today's commits, today's lines changed, current streak, today's score, recent activity summary
+- [ ] `RepositoriesView` displays: list of tracked repos with name, path, health status, last activity, and quick stats
+- [ ] `RepositoryDetailView` displays: full repo info, recent commits, working tree status, language breakdown, activity timeline
+- [ ] `SessionsView` displays: list of focus sessions with duration, repos involved, and line counts
+- [ ] `AchievementsView` displays: unlocked achievements with timestamps, streak summary, today's score
+- [ ] `SettingsView` displays: configurable options (scan directories, gap threshold, include/exclude patterns, appearance)
+- [ ] Implement empty states for each view when no data exists
+- [ ] Implement loading states for long-running scans
+- [ ] Implement first-run onboarding flow: add first repository or scan directory
+- [ ] Wire `@Query` and `@Environment(\.modelContext)` for live SwiftData reads
+- [ ] Implement operator action buttons: Add Repository, Import History, Rescan All, Rebuild Analytics
+- [ ] Use `@Observable` view models where query composition or action orchestration is needed
+- [ ] Respect system appearance (light/dark mode) and Dynamic Type
 
 ### Exit criteria
 
-- [ ] The web app covers the current browser product surface.
-- [ ] The web app feels native to the new stack instead of mimicking Go templates or the transitional TUI.
-- [ ] No shipped browser workflow depends on the Go runtime.
+- [ ] All five primary views render with real SwiftData content
+- [ ] Navigation between views works without state loss
+- [ ] Operator actions trigger real git scanning and data updates
+- [ ] Empty states and loading states display correctly
 
-## Phase 5 - Verify parity, migrate data, and cut over the default runtime
+### Verification
 
-### Work checklist
+```bash
+swift build --target GitPulse
+# Manual: launch app, add a repo, import history, verify dashboard populates
+```
 
-- [ ] Run the Go app and the rewritten stack side by side against the same fixture repositories.
-- [ ] Verify dashboard numbers, repository counts, session totals, achievement unlocks, and settings behavior.
-- [ ] Verify manual add, import, rescan, and rebuild actions in both fresh-install and migrated-data flows.
-- [ ] Validate the SQLite to PostgreSQL import path end to end.
-- [ ] Make Docker Compose the default quick-start path in the docs.
-- [ ] Make Caddy the default local and deploy edge.
-- [ ] Decide whether a compatibility CLI is still required after the web cutover.
-- [ ] Explicitly deprecate or remove the current source-run TUI unless it earns a post-cutover role.
+---
+
+## Phase 5 -- Charts and visualizations
+
+### Objectives
+
+Build the data visualization layer using Swift Charts: commit activity heatmap, contribution graph, language breakdown, daily line counts, and session duration charts.
+
+### Checklist
+
+- [ ] Implement contribution graph (GitHub-style grid) showing daily commit/activity intensity over the past year
+- [ ] Implement daily commit count bar chart for the past 30/90/365 days
+- [ ] Implement daily lines changed area chart (additions vs deletions)
+- [ ] Implement language breakdown pie/donut chart from latest snapshot data
+- [ ] Implement session duration chart showing focus session lengths over time
+- [ ] Implement hourly activity heatmap (hour of day vs day of week)
+- [ ] Implement per-repository activity sparklines for the repositories list
+- [ ] All charts respond to date range selection (7d / 30d / 90d / 1y / all)
+- [ ] Charts animate on data load and range change
+- [ ] Charts adapt to light/dark mode and respect accessibility settings
+- [ ] Charts handle empty data gracefully (empty state, not a broken chart)
+- [ ] Embed charts in the appropriate dashboard, repository detail, and sessions views
 
 ### Exit criteria
 
-- [ ] vNext is the documented and verified default runtime.
-- [ ] Data migration is repeatable and boring.
-- [ ] The old Go path is no longer the mainline product story.
+- [ ] At least six chart types render with real analytics data
+- [ ] Date range filtering works across all time-series charts
+- [ ] Charts are readable at default and increased Dynamic Type sizes
 
-## Phase 6 - Remove legacy runtime and tighten the repo
+### Verification
 
-### Work checklist
+```bash
+swift build --target GitPulse
+# Manual: verify each chart type renders with fixture data across light/dark mode
+```
 
-- [ ] Remove the Go runtime, Go-only docs, and SQLite-first assumptions once cutover is complete.
-- [ ] Remove or archive the old `frontend/tui` lane unless it has earned an explicit support commitment.
-- [ ] Remove stale migration-only notes from `README.md` and architecture docs.
-- [ ] Update CI to validate only the active Bun and TypeScript plus Docker path.
-- [ ] Publish release notes that explain migration, operator expectations, and any intentionally dropped lanes.
-- [ ] Delete this file once the rewrite is complete and stable docs fully describe current truth.
+---
+
+## Phase 6 -- Menu bar app
+
+### Objectives
+
+Add a persistent menu bar presence that shows quick stats, provides fast access to common actions, and opens the full dashboard window on demand.
+
+### Checklist
+
+- [ ] Implement `MenuBarExtra` with a custom icon (git branch glyph or pulse icon)
+- [ ] Display in menu bar popover: today's commits, today's lines, current streak, active session indicator
+- [ ] Add menu items: Open Dashboard, Rescan All, Import All, Rebuild Analytics, Quit
+- [ ] Add recently active repositories as quick-access menu items
+- [ ] Implement `NSStatusItem`-based click behavior: left click opens popover, right click opens menu
+- [ ] Keep the menu bar item updated on a timer or via SwiftData observation
+- [ ] Add option in Settings to launch at login (via `SMAppService` / `ServiceManagement`)
+- [ ] Add option in Settings to show/hide the dock icon (accessory app mode via `LSUIElement`)
+- [ ] Ensure the app can run as menu-bar-only or with both menu bar and dock presence
 
 ### Exit criteria
 
-- [ ] GitPulse is a Bun and TypeScript application end to end.
-- [ ] PostgreSQL is the only primary application database.
-- [ ] Caddy and Docker Compose are the standard runtime path.
-- [ ] The repo no longer reads like a Go app with a frontend attached.
+- [ ] Menu bar icon appears on launch and persists
+- [ ] Popover displays current, accurate quick stats
+- [ ] Menu bar actions trigger real operations
+- [ ] Launch at login works when enabled
 
-## Verification expectations
+### Verification
 
-### Docs and planning changes
+```bash
+swift build --target GitPulse
+# Manual: launch app, verify menu bar icon, check popover stats, trigger rescan from menu
+```
 
-- [x] Search active docs for stale hybrid-backend future framing and remove or qualify it.
-- [x] Run `git diff --check`.
-- [x] Run targeted `rg` searches that confirm active docs describe the Go runtime as current truth, not future destination.
+---
 
-### Implementation phases
+## Phase 7 -- CLI mode
 
-- [x] Keep the current Go and frontend verification lanes green while Go is still the shipped app.
-- [x] Add root Bun verification scripts before Phase 1 is considered done.
-- [ ] Add API, contract, and core smoke coverage before claiming backend cutover.
-- [ ] Add migration smoke coverage before calling PostgreSQL cutover complete.
-- [ ] Add end-to-end smoke coverage through Docker Compose and Caddy before calling the rewrite done.
+### Objectives
+
+Build a full CLI interface using Swift Argument Parser that mirrors the operator actions available in the GUI, sharing all scanning and analytics logic from `GitPulseCore`.
+
+### Checklist
+
+- [ ] Implement `gitpulse add <path>` to register a repository or discover repos under a folder
+- [ ] Implement `gitpulse import [--all] [--days N] [--repo <path>]` to import commit history
+- [ ] Implement `gitpulse rescan [--all] [--repo <path>]` to refresh repository snapshots
+- [ ] Implement `gitpulse rebuild` to recompute all derived analytics
+- [ ] Implement `gitpulse status` to display dashboard summary in the terminal
+- [ ] Implement `gitpulse repos` to list tracked repositories with health and stats
+- [ ] Implement `gitpulse detail <path>` to show full repository detail
+- [ ] Implement `gitpulse sessions [--days N]` to list recent focus sessions
+- [ ] Implement `gitpulse achievements` to list unlocked achievements and streaks
+- [ ] Implement `gitpulse doctor` to check environment, git version, data directory, and config
+- [ ] Implement `gitpulse config [key] [value]` to view or update settings
+- [ ] All CLI commands share the same `ModelContainer` and `GitPulseCore` logic as the GUI
+- [ ] Output formats: human-readable (default) and `--json` for machine consumption
+- [ ] Proper exit codes: 0 for success, 1 for errors
+- [ ] `--help` text for every command and subcommand
+- [ ] Unit tests for CLI argument parsing and output formatting
+
+### Exit criteria
+
+- [ ] Every operator action available in the GUI is available from the CLI
+- [ ] CLI reads from and writes to the same SwiftData store as the GUI app
+- [ ] `gitpulse doctor` verifies the environment accurately
+
+### Verification
+
+```bash
+swift run gitpulse-cli --help
+swift run gitpulse-cli add ~/github
+swift run gitpulse-cli import --all --days 30
+swift run gitpulse-cli rescan --all
+swift run gitpulse-cli rebuild
+swift run gitpulse-cli status
+swift run gitpulse-cli doctor
+swift test --filter CLITests
+```
+
+---
+
+## Phase 8 -- File watching and auto-refresh
+
+### Objectives
+
+Implement FSEvents-based directory monitoring so GitPulse automatically detects changes in watched repositories and refreshes analytics without requiring manual rescan.
+
+### Checklist
+
+- [ ] Implement `FileWatcher` actor using `DispatchSource.makeFileSystemObjectSource` or `FSEventStream` for monitored directories
+- [ ] Watch for file system events in all active repository working trees
+- [ ] Debounce rapid events (batch changes within a configurable window, default 5 seconds)
+- [ ] On detected change: re-probe the affected repository's working tree status
+- [ ] On detected change: update the relevant `RepoStatusSnapshot` in SwiftData
+- [ ] Trigger incremental analytics refresh (re-sessionize recent activity, update today's rollup)
+- [ ] Add Settings toggle: enable/disable auto-refresh
+- [ ] Add Settings option: debounce interval
+- [ ] Show "watching" indicator in repository list for actively monitored repos
+- [ ] Handle repository deletion, move, and permission changes gracefully
+- [ ] Pause watching when the app is in the background (configurable)
+- [ ] Unit tests for debounce logic
+- [ ] Integration tests for file change detection in a temporary repository
+
+### Exit criteria
+
+- [ ] File changes in a watched repository trigger automatic snapshot refresh within the configured debounce window
+- [ ] Dashboard data updates reflect file watching without manual intervention
+- [ ] Auto-refresh can be disabled per-repo and globally
+
+### Verification
+
+```bash
+swift test --filter FileWatcherTests
+# Manual: enable watching, edit a file in a tracked repo, verify dashboard updates within debounce window
+```
+
+---
+
+## Phase 9 -- Polish and accessibility
+
+### Objectives
+
+Harden the app for daily use: keyboard navigation, VoiceOver support, performance optimization, error handling, and visual polish.
+
+### Checklist
+
+- [ ] Full keyboard navigation for all views (Tab, arrow keys, Enter, Escape)
+- [ ] VoiceOver labels and hints for all interactive elements and charts
+- [ ] Reduce motion support: disable chart animations when accessibility setting is active
+- [ ] Performance profiling: ensure scan of 50+ repositories completes in under 10 seconds
+- [ ] Lazy loading for large repository lists and long session histories
+- [ ] Background scanning on a detached `Task` so UI never blocks
+- [ ] Graceful error sheets for git failures, permission issues, and data corruption
+- [ ] App icon (1024x1024 with proper macOS rounding)
+- [ ] About window with version, build number, and license info
+- [ ] Sparkle or similar update framework integration for direct-download updates
+- [ ] Crash reporting opt-in (or rely on macOS built-in crash reports)
+- [ ] Memory and energy profiling to ensure menu bar presence is lightweight
+- [ ] Localization infrastructure (`String(localized:)`) even if only English ships initially
+- [ ] User-facing changelog accessible from the app
+
+### Exit criteria
+
+- [ ] VoiceOver can navigate every view and read every chart
+- [ ] No UI hangs during repository scanning or analytics rebuild
+- [ ] Memory usage stays under 100MB with 50+ tracked repositories
+
+### Verification
+
+```bash
+swift build -c release --target GitPulse
+# Manual: Accessibility Inspector audit, Instruments profiling, full VoiceOver walkthrough
+```
+
+---
+
+## Phase 10 -- Distribution
+
+### Objectives
+
+Package GitPulse for distribution via Homebrew, direct download, and optionally the Mac App Store. Sign, notarize, and automate the release pipeline.
+
+### Checklist
+
+- [ ] Configure Xcode project or `xcodebuild` for release signing with Developer ID
+- [ ] Notarize the app bundle with `notarytool`
+- [ ] Create `.dmg` installer with drag-to-Applications layout
+- [ ] Create Homebrew cask formula (`homebrew-tap` repo or `homebrew-cask` PR)
+- [ ] Automate release builds in GitHub Actions: build, sign, notarize, create GitHub Release with `.dmg` asset
+- [ ] Install CLI binary to `/usr/local/bin/gitpulse` (or via Homebrew)
+- [ ] Verify Gatekeeper passes on a clean macOS install
+- [ ] Verify launch-at-login survives app updates
+- [ ] Write migration guide for users coming from the Go/TypeScript version
+- [ ] Update `README.md` to describe the native macOS app as the current product
+- [ ] Add Mac App Store target (stretch goal: sandbox compliance, entitlements review)
+- [ ] Tag release as `v1.0.0` when all distribution checks pass
+
+### Exit criteria
+
+- [ ] A new user can install GitPulse via `brew install --cask gitpulse` or by downloading and opening a `.dmg`
+- [ ] The app passes Gatekeeper and notarization on a clean Mac
+- [ ] The CLI is installable alongside the GUI app
+
+### Verification
+
+```bash
+# CI release workflow
+xcodebuild -scheme GitPulse -configuration Release archive
+xcrun notarytool submit GitPulse.dmg --wait
+brew install --cask gitpulse  # from tap
+gitpulse doctor               # CLI verification
+# Manual: install on a clean Mac, launch, add repos, verify full workflow
+```
+
+---
+
+## Cross-phase verification gates
+
+| Gate | Phases | Check |
+|---|---|---|
+| Core library compiles | 1-3 | `swift build --target GitPulseCore` |
+| App target compiles | 1+ | `swift build --target GitPulse` |
+| CLI target compiles | 1, 7 | `swift build --target gitpulse-cli` |
+| Unit tests pass | All | `swift test` |
+| Git scanning works on real repos | 2+ | `swift test --filter GitScannerTests` |
+| SwiftData round-trips correctly | 3+ | `swift test --filter DataModelTests` |
+| Analytics rebuild is deterministic | 3+ | `swift test --filter AnalyticsTests` |
+| Dashboard renders with live data | 4+ | Manual launch and inspect |
+| Charts render correctly | 5+ | Manual visual inspection across light/dark mode |
+| Menu bar is responsive | 6+ | Manual menu bar interaction test |
+| CLI mirrors GUI actions | 7+ | Run each CLI command and compare results |
+| File watching triggers refresh | 8+ | Edit file in tracked repo, verify auto-update |
+| Notarization passes | 10 | `xcrun notarytool` exit code 0 |
 
 ## Definition of done
 
-The rewrite is done only when all of these are true:
+The build is done only when all of these are true:
 
-- [ ] Bun and TypeScript own the app end to end.
-- [ ] Elysia owns backend runtime and action execution.
-- [ ] Astro and Vue own the primary user-facing product surface.
-- [ ] Zod owns shared API contracts and validation boundaries.
-- [ ] PostgreSQL is the primary database and SQLite is only a migration source.
-- [ ] Docker Compose starts the full app locally with PostgreSQL, API, web, and Caddy.
-- [ ] Caddy serves one same-origin app boundary in shipped mode.
-- [ ] The web app supports add, import, rescan, rebuild, and inspect without the Go runtime.
-- [ ] Dashboard, repositories, repository detail, sessions, achievements, and settings all exist in the new web app.
-- [ ] Current SQLite users can migrate their data into PostgreSQL with a documented tool and verification step.
-- [ ] The old Go path is removed or clearly archived.
-- [ ] Stable docs describe the new reality without split-stack confusion.
+- [ ] GitPulse is a native macOS application written entirely in Swift
+- [ ] SwiftUI renders the full dashboard, repository, session, achievement, and settings views
+- [ ] Swift Charts provides commit activity, contribution graph, language breakdown, and session visualizations
+- [ ] SwiftData stores all domain entities locally with no external database dependency
+- [ ] The menu bar app shows quick stats and provides fast access to actions
+- [ ] The CLI mode supports every operator action available in the GUI
+- [ ] FSEvents-based file watching triggers automatic analytics refresh
+- [ ] Git scanning works by shelling out to the git CLI with defensive parsing
+- [ ] All analytics (sessions, rollups, streaks, scores, achievements) are rebuildable from stored events
+- [ ] The app is signed, notarized, and distributable via Homebrew cask and direct download
+- [ ] `README.md` and stable docs describe the native macOS app as the current product
+- [ ] Legacy Go, TypeScript, and frontend code is removed or archived
+- [ ] `swift test` passes with meaningful coverage across core, CLI, and data model
 
-## Immediate next recommended work
+## When to retire this file
 
-- [x] Thread the verified PostgreSQL store from `packages/core` into `apps/api` services and route wiring.
-- [x] Implement the SQLite importer using the table rules in `docs/rewrite/sqlite-to-postgres.md`.
-- [ ] Create deterministic fresh-install and migrated-install fixtures plus frozen Go baselines for parity comparison.
-- [x] Start replacing the Go read routes with Elysia route groups beginning with `GET /api/dashboard` and `GET /api/repositories`.
-- [x] Extend the read-route replacement to `GET /api/repositories/{id}`, `GET /api/sessions`, `GET /api/achievements`, and `GET /api/settings` with the same PostgreSQL-backed and Zod-validated path.
-- [x] Start replacing the Go action routes with Elysia endpoints for add, import, rescan, rebuild, toggle, remove, and settings save.
+Delete `BUILD.md` when:
+
+- All phases are complete and verified
+- The app is distributed and in active use
+- Stable docs (`README.md`, inline code docs) fully describe current truth
+- No phase work remains in flight
+
+At that point, fold any remaining operational guidance into `README.md` or `docs/` and remove this file. A `BUILD.md` is a build manual, not permanent repo furniture.
