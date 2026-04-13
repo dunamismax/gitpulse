@@ -52,7 +52,7 @@ The repo also now contains a verified but unshipped vNext lane under `apps/`, `p
 - shared Zod contracts in `packages/contracts/`
 - config and path handling in `packages/config/`
 - Elysia API read models and manual action routes in `apps/api/`
-- Astro bootstrap web app in `apps/web/`
+- Astro + Vue operator web app in `apps/web/` with all six primary surfaces and all ten manual actions wired to the vNext API
 - same-origin local Compose stack through Caddy
 
 What is verified right now:
@@ -65,7 +65,7 @@ What is verified right now:
 What must stay honest during the rewrite:
 
 - the shipped app today is still Go plus SQLite
-- the vNext web surface is only a bootstrap shell today, not browser parity with the shipped product
+- the vNext web surface now covers all six primary operator pages and all ten manual actions, but end-to-end browser parity has not been verified against the shipped Go product yet
 - vNext is not the default runtime yet
 - the TUI exists, but it is not a required parity target for the rewrite
 - SQLite migration and side-by-side parity are not done yet
@@ -243,19 +243,23 @@ These are not rewrite goals unless Stephen changes direction:
 
 ### Work checklist
 
-- [ ] Build Astro route shells for all shipped operator pages.
-- [ ] Implement Vue components and islands only where interactivity is clearly earned.
-- [ ] Consume shared Zod-derived contracts through typed client helpers.
-- [ ] Preserve first-run guidance, empty states, loading states, and backend error handling.
-- [ ] Keep operator actions explicit and visible.
-- [ ] Make settings editable through the new API.
-- [ ] Keep the browser surface same-origin through Caddy in shipped mode.
+- [x] Build Astro route shells for all shipped operator pages.
+- [x] Implement Vue components and islands only where interactivity is clearly earned.
+- [x] Consume shared Zod-derived contracts through typed client helpers.
+- [x] Preserve first-run guidance, empty states, loading states, and backend error handling.
+- [x] Keep operator actions explicit and visible.
+- [x] Make settings editable through the new API.
+- [x] Keep the browser surface same-origin through Caddy in shipped mode.
 
 ### Exit criteria
 
 - [ ] The web app covers the current browser product surface.
 - [ ] The web app feels native to the new stack instead of mimicking Go templates or the transitional TUI.
 - [ ] No shipped browser workflow depends on the Go runtime.
+
+### Implementation notes
+
+The vNext web surface lives in `apps/web/` as an Astro + Vue application using the `@astrojs/node` adapter in server output mode. All six primary operator pages (dashboard, repositories, repository detail, sessions, achievements, settings) and all ten manual actions are wired to the PostgreSQL-backed Elysia API through a typed client at `apps/web/src/lib/client.ts`. Vue islands handle interactive surfaces: ActionCenter, RepositoryListManager, RepoDetailActions, and SettingsForm. The design system CSS matches the shipped frontend. `bun run verify:vnext` is green.
 
 ## Phase 5 - Verify parity, migrate data, and cut over the default runtime
 
@@ -330,8 +334,9 @@ The rewrite is done only when all of these are true:
 
 ## Immediate next recommended work
 
-- [ ] Connect the Astro web surface to the verified vNext read and action routes, starting with dashboard and repositories.
+- [x] Connect the Astro web surface to the verified vNext read and action routes, starting with dashboard and repositories.
 - [ ] Expand the SQLite importer into a documented, end-to-end verified migration path with parity fixtures.
 - [ ] Add side-by-side parity assertions between the Go runtime and the PostgreSQL-backed Elysia runtime for dashboard, repositories, sessions, achievements, and settings.
-- [ ] Add browser-level tests for the operator loop once the new web pages exist.
+- [ ] Add browser-level tests for the operator loop now that the new web pages exist.
+- [ ] Verify the full Compose stack (docker compose up plus smoke tests) with the new SSR web surface.
 - [ ] Decide when the current TUI stops earning maintenance after web parity lands.

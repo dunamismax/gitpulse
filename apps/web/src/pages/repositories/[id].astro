@@ -1,0 +1,16 @@
+---
+import RepositoryDetailPage from '../../components/RepositoryDetailPage.vue';
+import AppLayout from '../../layouts/AppLayout.astro';
+
+const { id } = Astro.params;
+---
+
+<AppLayout
+  title="Repository Detail"
+  activeNav="repositories"
+  eyebrow="Repository"
+  heading="Repository Detail"
+  description="Detailed view of commits, pushes, sessions, language breakdown, and management actions for a single repository."
+>
+  <RepositoryDetailPage repoId={id!} client:load />
+</AppLayout>

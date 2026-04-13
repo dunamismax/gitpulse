@@ -1,0 +1,77 @@
+---
+import '../styles/app.css';
+import PageFlash from '../components/PageFlash.vue';
+
+interface Props {
+  title: string;
+  activeNav:
+    | 'dashboard'
+    | 'repositories'
+    | 'sessions'
+    | 'achievements'
+    | 'settings';
+  eyebrow: string;
+  heading: string;
+  description: string;
+}
+
+const { title, activeNav, eyebrow, heading, description } = Astro.props;
+
+const nav = [
+  { key: 'dashboard', href: '/', label: 'Dashboard' },
+  { key: 'repositories', href: '/repositories', label: 'Repositories' },
+  { key: 'sessions', href: '/sessions', label: 'Sessions' },
+  { key: 'achievements', href: '/achievements', label: 'Achievements' },
+  { key: 'settings', href: '/settings', label: 'Settings' },
+] as const;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} - GitPulse</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">GP</div>
+          <div>
+            <h1>GitPulse</h1>
+            <p>Local-first git analytics</p>
+          </div>
+        </div>
+
+        <nav class="nav">
+          {
+            nav.map((item) => (
+              <a
+                href={item.href}
+                class={item.key === activeNav ? 'active' : undefined}
+              >
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">{eyebrow}</p>
+            <h2>{heading}</h2>
+            <p class="description">{description}</p>
+          </div>
+        </header>
+
+        <div class="stack">
+          <PageFlash client:load />
+          <slot />
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

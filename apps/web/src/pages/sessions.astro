@@ -1,0 +1,14 @@
+---
+import SessionsPage from '../components/SessionsPage.vue';
+import AppLayout from '../layouts/AppLayout.astro';
+---
+
+<AppLayout
+  title="Sessions"
+  activeNav="sessions"
+  eyebrow="Focus"
+  heading="Sessions"
+  description="Focus sessions are computed from activity timestamps. Each session represents a continuous stretch of coding with gaps shorter than the configured threshold."
+>
+  <SessionsPage client:load />
+</AppLayout>

@@ -1,113 +1,14 @@
 ---
-import { manualActionIds, primarySurfaceIds } from '@gitpulse-vnext/contracts';
-import { activityLedgerIds, rewriteStatus } from '@gitpulse-vnext/core';
-
-const launchedAt = new Date().toISOString().slice(0, 10);
+import DashboardPage from '../components/DashboardPage.vue';
+import AppLayout from '../layouts/AppLayout.astro';
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>GitPulse vNext bootstrap</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-        background: #09111f;
-        color: #e5eefc;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background:
-          radial-gradient(circle at top right, rgba(59, 130, 246, 0.24), transparent 28%),
-          linear-gradient(180deg, #0b1322 0%, #09111f 100%);
-      }
-
-      main {
-        max-width: 68rem;
-        margin: 0 auto;
-        padding: 3rem 1.5rem 4rem;
-      }
-
-      h1,
-      h2 {
-        margin-bottom: 0.75rem;
-      }
-
-      p,
-      li {
-        color: #c0d3f0;
-        line-height: 1.55;
-      }
-
-      .card {
-        background: rgba(15, 23, 42, 0.88);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        border-radius: 1rem;
-        padding: 1.25rem;
-        margin-top: 1rem;
-        box-shadow: 0 16px 48px rgba(3, 7, 18, 0.28);
-      }
-
-      .grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-      }
-
-      code,
-      a {
-        color: #93c5fd;
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <p>Launched {launchedAt}</p>
-      <h1>GitPulse vNext bootstrap</h1>
-      <p>
-        The shipped product is still the Go + SQLite runtime. This Astro shell is the first live
-        Bun-side landing zone for the rewrite and exists to keep the repo moving toward the final
-        same-origin Bun + PostgreSQL stack without pretending parity is already done.
-      </p>
-
-      <div class="grid">
-        <section class="card">
-          <h2>Current truth</h2>
-          <ul>
-            <li>Current runtime: {rewriteStatus.currentRuntime}</li>
-            <li>Target runtime: {rewriteStatus.targetRuntime}</li>
-            <li>Manual operator loop: {rewriteStatus.currentOperatorLoop.join(' → ')}</li>
-            <li>
-              Bootstrap API contract: <a href="/api/health">/api/health</a>
-            </li>
-          </ul>
-        </section>
-
-        <section class="card">
-          <h2>Primary surfaces</h2>
-          <ul>
-            {primarySurfaceIds.map((surface) => <li>{surface}</li>)}
-          </ul>
-        </section>
-
-        <section class="card">
-          <h2>Separate ledgers</h2>
-          <ul>
-            {activityLedgerIds.map((ledger) => <li>{ledger}</li>)}
-          </ul>
-        </section>
-
-        <section class="card">
-          <h2>Manual actions</h2>
-          <ul>
-            {manualActionIds.map((action) => <li>{action}</li>)}
-          </ul>
-        </section>
-      </div>
-    </main>
-  </body>
-</html>
+<AppLayout
+  title="Dashboard"
+  activeNav="dashboard"
+  eyebrow="Overview"
+  heading="Dashboard"
+  description="Daily summary, activity trends, and repository pulse across all tracked repositories."
+>
+  <DashboardPage client:load />
+</AppLayout>

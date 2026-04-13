@@ -1,0 +1,14 @@
+---
+import AchievementsPage from '../components/AchievementsPage.vue';
+import AppLayout from '../layouts/AppLayout.astro';
+---
+
+<AppLayout
+  title="Achievements"
+  activeNav="achievements"
+  eyebrow="Progress"
+  heading="Achievements"
+  description="Milestones unlocked based on your coding activity. Streaks track consecutive days with recorded score."
+>
+  <AchievementsPage client:load />
+</AppLayout>

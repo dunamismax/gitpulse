@@ -1,0 +1,14 @@
+---
+import RepositoriesPage from '../../components/RepositoriesPage.vue';
+import AppLayout from '../../layouts/AppLayout.astro';
+---
+
+<AppLayout
+  title="Repositories"
+  activeNav="repositories"
+  eyebrow="Manage"
+  heading="Repositories"
+  description="Add, remove, and manage tracked git repositories. Each card shows live working-tree state and recent score."
+>
+  <RepositoriesPage client:load />
+</AppLayout>

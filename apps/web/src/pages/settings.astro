@@ -1,0 +1,14 @@
+---
+import SettingsPage from '../components/SettingsPage.vue';
+import AppLayout from '../layouts/AppLayout.astro';
+---
+
+<AppLayout
+  title="Settings"
+  activeNav="settings"
+  eyebrow="Configure"
+  heading="Settings"
+  description="Author identity, daily goals, monitoring behavior, file patterns, and GitHub verification."
+>
+  <SettingsPage client:load />
+</AppLayout>
